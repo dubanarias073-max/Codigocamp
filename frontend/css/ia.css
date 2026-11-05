@@ -1,0 +1,16 @@
+/* Estilos de ia.html (lo común de la aplicación está en app.css) */
+.sugerencias{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 10px}
+.sugerencias button{padding:6px 12px;border:2px solid var(--borde);border-radius:99px;background:none;cursor:pointer}
+.ia-form{display:flex;gap:10px;padding:12px;border-top:2px solid var(--borde)}
+.ia-form textarea{flex:1;resize:none;padding:12px;border:2px solid var(--borde);border-radius:12px;background:var(--bg)}
+.ia-barra{display:flex;align-items:center;gap:8px;padding:0 14px 8px}
+.ia-barra small{margin-left:auto}
+.ia .msg.tutor{white-space:normal}
+.ia .msg p{margin:0 0 8px}.ia .msg p:last-child{margin-bottom:0}
+.ia .msg ul,.ia .msg ol{margin:4px 0 8px;padding-left:22px}
+.ia .msg code{padding:1px 6px;border-radius:6px;background:rgba(0,0,0,.25);font-family:ui-monospace,Consolas,monospace;font-size:.92em}
+.bloque{margin:8px 0;border:1px solid var(--borde);border-radius:12px;overflow:hidden;background:var(--bg)}
+.bloque-cab{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--borde);font-size:12px;font-weight:800;text-transform:uppercase;color:var(--sub)}
+.bloque pre{margin:0;padding:12px;overflow:auto}
+.bloque pre code{padding:0;background:none;white-space:pre}
+.ia-form button:disabled{opacity:.6}

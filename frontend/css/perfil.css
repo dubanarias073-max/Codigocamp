@@ -1,0 +1,24 @@
+/* Estilos de perfil.html (lo común de la aplicación está en app.css) */
+.stats-p{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0}
+.avatar-p{display:grid;place-items:center;width:84px;height:84px;border-radius:50%;font-size:38px;font-weight:800;color:#04130d;background:linear-gradient(135deg,var(--cy),var(--acc))}
+.cab-p{display:flex;align-items:center;gap:18px}
+.stats-p{gap:10px}
+.stats-p{gap:12px}
+.coleccion{display:flex;flex-wrap:wrap;gap:10px}
+.obj-col{display:grid;justify-items:center;gap:4px;min-width:92px;padding:12px 10px;border:2px solid var(--borde);border-radius:16px;background:var(--panel);font-size:34px}
+.obj-col small{font-size:11px;font-weight:800;color:var(--sub);text-align:center}
+.obj-col.rareza-raro{border-color:#38bdf8}.obj-col.rareza-epico{border-color:#a855f7}
+.obj-col.rareza-legendario{border-color:#f5b73b;box-shadow:0 0 16px color-mix(in srgb,#f5b73b 40%,transparent)}
+.cab-p{flex-wrap:wrap}
+.cab-t{flex:1;min-width:180px}
+.avatar-p.emoji{font-size:46px;background:var(--panel);border:3px solid var(--cy)}
+.form-perfil{margin:16px 0 22px;max-width:560px}
+.form-perfil[hidden]{display:none}
+.av-sel{border:0;padding:0;margin:0 0 16px}
+.av-sel legend{font-weight:700;margin-bottom:8px}
+#avatares{display:flex;flex-wrap:wrap;gap:8px}
+.av-op{display:grid;place-items:center;width:48px;height:48px;border:2px solid var(--borde);border-radius:50%;background:var(--panel);font-size:24px;cursor:pointer;color:inherit}
+.av-op:hover{transform:scale(1.08)}
+.av-op.on{border-color:var(--cy);box-shadow:0 0 0 3px color-mix(in srgb,var(--cy) 30%,transparent)}
+.av-op.rara{border-color:#f5b73b}
+.fila-btn{display:flex;gap:10px;flex-wrap:wrap}

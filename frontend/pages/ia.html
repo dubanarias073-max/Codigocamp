@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IA · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/ia.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body class="cargando">
+  <div class="app ancho">
+    <nav class="lado" id="lado" aria-label="Principal"></nav>
+    <main class="centro" id="contenido">
+      <h1 class="titulo-pag">Tutor de IA</h1>
+      <p class="sub">Pregunta lo que quieras o pega tu código para que lo revise. Conoce tu curso y tu nivel. Si quieres practicar con otras personas, ve a <a href="/pages/chats.html">Chats</a>.</p>
+      <section class="tarjeta ia">
+        <div class="chat-log" id="log" aria-live="polite"><div class="msg tutor">¡Hola! Soy tu tutor. ¿Qué quieres aprender hoy?</div></div>
+        <div class="sugerencias" id="sug"></div>
+        <div class="ia-barra"><button class="btn sm" id="codigo" type="button" title="Insertar un bloque de código">&lt;/&gt; Código</button><button class="btn sm ghost" id="nueva" type="button" title="Borrar la conversación">🗑 Nueva conversación</button><small id="cuenta">0 / 3500</small></div>
+        <form class="ia-form" id="f"><textarea id="q" rows="2" maxlength="3500" placeholder="Escribe tu pregunta… (Enter envía, Shift + Enter salto de línea)" aria-label="Tu pregunta"></textarea><button class="bj" id="enviar" type="submit">Enviar</button></form>
+      </section>
+    </main>
+    <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
+  </div>
+  <nav class="inf" id="inf" aria-label="Principal"></nav>
+  <script type="module" src="/js/ia.js"></script>
+</body>
+</html>

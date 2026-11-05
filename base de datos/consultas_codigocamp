@@ -1,0 +1,321 @@
+-- =====================================================================
+--  CodigoCamp · consultas por tabla (MySQL / MariaDB)
+--  Ejecuta primero el esquema y luego este archivo en MySQL Workbench.
+--  Para cada tabla: 1) consulta basica  2) consulta util con filtros,
+--  JOIN o agregaciones.
+-- =====================================================================
+USE codigocamp;
+
+-- ======================== CUENTAS ====================================
+
+-- usuarios
+SELECT * FROM usuarios;
+
+SELECT id, email, nombre, creado_en
+FROM usuarios
+WHERE activo = 1
+ORDER BY creado_en DESC;
+
+
+-- ======================== CATALOGO ===================================
+
+-- cursos
+SELECT * FROM cursos;
+
+SELECT slug, nombre, tipo, color
+FROM cursos
+WHERE activo = 1
+ORDER BY orden;
+
+-- Cantidad de cursos por tipo
+SELECT tipo, COUNT(*) AS total_cursos
+FROM cursos
+GROUP BY tipo;
+
+
+-- etapas
+SELECT * FROM etapas;
+
+SELECT c.nombre AS curso, e.orden, e.titulo
+FROM etapas e
+JOIN cursos c ON c.id = e.curso_id
+ORDER BY c.orden, e.orden;
+
+
+-- secciones
+SELECT * FROM secciones;
+
+SELECT c.nombre AS curso, e.titulo AS etapa, s.orden, s.titulo AS seccion
+FROM secciones s
+JOIN etapas e ON e.id = s.etapa_id
+JOIN cursos c ON c.id = e.curso_id
+ORDER BY c.orden, e.orden, s.orden;
+
+
+-- niveles
+SELECT * FROM niveles;
+
+SELECT c.nombre AS curso, s.titulo AS seccion, n.orden, n.titulo, n.tipo, n.xp
+FROM niveles n
+JOIN secciones s ON s.id = n.seccion_id
+JOIN etapas e ON e.id = s.etapa_id
+JOIN cursos c ON c.id = e.curso_id
+ORDER BY c.orden, e.orden, s.orden, n.orden;
+
+-- XP total disponible por curso
+SELECT c.nombre AS curso, SUM(n.xp) AS xp_disponible
+FROM niveles n
+JOIN secciones s ON s.id = n.seccion_id
+JOIN etapas e ON e.id = s.etapa_id
+JOIN cursos c ON c.id = e.curso_id
+GROUP BY c.id, c.nombre;
+
+
+-- retos
+SELECT * FROM retos;
+
+SELECT n.titulo AS nivel, r.orden, r.tipo, r.enunciado, r.respuesta
+FROM retos r
+JOIN niveles n ON n.id = r.nivel_id
+ORDER BY n.id, r.orden;
+
+-- Cantidad de retos por tipo
+SELECT tipo, COUNT(*) AS total
+FROM retos
+GROUP BY tipo
+ORDER BY total DESC;
+
+-- Cantidad de retos por curso
+SELECT c.nombre AS curso, COUNT(r.id) AS total_retos
+FROM cursos c
+LEFT JOIN etapas e ON e.curso_id = c.id
+LEFT JOIN secciones s ON s.etapa_id = e.id
+LEFT JOIN niveles n ON n.seccion_id = s.id
+LEFT JOIN retos r ON r.nivel_id = n.id
+GROUP BY c.id, c.nombre
+ORDER BY c.orden;
+
+
+-- ======================== PERFIL Y PROGRESO ==========================
+
+-- perfiles
+SELECT * FROM perfiles;
+
+SELECT u.nombre, p.alias, p.codigo, c.nombre AS curso_actual,
+       p.xp_total, p.vidas, p.racha_actual, p.racha_maxima
+FROM perfiles p
+JOIN usuarios u ON u.id = p.usuario_id
+LEFT JOIN cursos c ON c.id = p.curso_actual_id
+ORDER BY p.xp_total DESC;
+
+-- Ranking top 10 por XP
+SELECT COALESCE(p.alias, u.nombre) AS jugador, p.xp_total
+FROM perfiles p
+JOIN usuarios u ON u.id = p.usuario_id
+ORDER BY p.xp_total DESC
+LIMIT 10;
+
+-- Usuarios que no completaron el onboarding
+SELECT u.id, u.email
+FROM perfiles p
+JOIN usuarios u ON u.id = p.usuario_id
+WHERE p.onboarding_completo = 0;
+
+
+-- niveles_completados
+SELECT * FROM niveles_completados;
+
+SELECT u.nombre, n.titulo AS nivel, nc.estrellas, nc.veces, nc.completado_en
+FROM niveles_completados nc
+JOIN usuarios u ON u.id = nc.usuario_id
+JOIN niveles n ON n.id = nc.nivel_id
+ORDER BY nc.completado_en DESC;
+
+-- Niveles completados y estrellas por usuario
+SELECT u.nombre, COUNT(*) AS niveles_hechos, SUM(nc.estrellas) AS estrellas
+FROM niveles_completados nc
+JOIN usuarios u ON u.id = nc.usuario_id
+GROUP BY u.id, u.nombre
+ORDER BY niveles_hechos DESC;
+
+
+-- lecciones_hechas
+SELECT * FROM lecciones_hechas;
+
+SELECT u.nombre, c.nombre AS curso, COUNT(*) AS lecciones
+FROM lecciones_hechas lh
+JOIN usuarios u ON u.id = lh.usuario_id
+JOIN cursos c ON c.id = lh.curso_id
+GROUP BY u.id, u.nombre, c.id, c.nombre
+ORDER BY lecciones DESC;
+
+
+-- actividad_diaria
+SELECT * FROM actividad_diaria;
+
+SELECT u.nombre, a.fecha, a.xp, a.niveles, a.perfectos
+FROM actividad_diaria a
+JOIN usuarios u ON u.id = a.usuario_id
+ORDER BY a.fecha DESC;
+
+-- XP de los ultimos 7 dias por usuario
+SELECT u.nombre, SUM(a.xp) AS xp_semana
+FROM actividad_diaria a
+JOIN usuarios u ON u.id = a.usuario_id
+WHERE a.fecha >= CURDATE() - INTERVAL 7 DAY
+GROUP BY u.id, u.nombre
+ORDER BY xp_semana DESC;
+
+
+-- desafios_diarios
+SELECT * FROM desafios_diarios;
+
+SELECT clave, COUNT(*) AS veces_completado
+FROM desafios_diarios
+GROUP BY clave;
+
+SELECT u.nombre, d.clave, d.fecha
+FROM desafios_diarios d
+JOIN usuarios u ON u.id = d.usuario_id
+WHERE d.fecha = CURDATE();
+
+
+-- puntos_desafio
+SELECT * FROM puntos_desafio;
+
+SELECT u.nombre, pd.mes, pd.puntos, pd.premio_dado
+FROM puntos_desafio pd
+JOIN usuarios u ON u.id = pd.usuario_id
+ORDER BY pd.mes DESC, pd.puntos DESC;
+
+-- Ranking del mes actual
+SELECT u.nombre, pd.puntos
+FROM puntos_desafio pd
+JOIN usuarios u ON u.id = pd.usuario_id
+WHERE pd.mes = DATE_FORMAT(CURDATE(), '%Y-%m-01')
+ORDER BY pd.puntos DESC;
+
+
+-- ======================== TIENDA =====================================
+
+-- articulos_tienda
+SELECT * FROM articulos_tienda;
+
+SELECT nombre, descripcion, precio, moneda
+FROM articulos_tienda
+WHERE activo = 1
+ORDER BY orden;
+
+-- Articulos agrupados por moneda
+SELECT moneda, COUNT(*) AS articulos, MIN(precio) AS precio_min, MAX(precio) AS precio_max
+FROM articulos_tienda
+GROUP BY moneda;
+
+
+-- compras
+SELECT * FROM compras;
+
+SELECT u.nombre, a.nombre AS articulo, c.precio, c.moneda, c.creada_en
+FROM compras c
+JOIN usuarios u ON u.id = c.usuario_id
+JOIN articulos_tienda a ON a.id = c.articulo_id
+ORDER BY c.creada_en DESC;
+
+-- Articulos mas vendidos
+SELECT a.nombre, COUNT(*) AS ventas, SUM(c.precio) AS total_gastado, c.moneda
+FROM compras c
+JOIN articulos_tienda a ON a.id = c.articulo_id
+GROUP BY a.id, a.nombre, c.moneda
+ORDER BY ventas DESC;
+
+
+-- ======================== SOCIAL =====================================
+
+-- amistades
+SELECT * FROM amistades;
+
+SELECT ud.nombre AS solicita, ua.nombre AS recibe, am.estado, am.creada_en
+FROM amistades am
+JOIN usuarios ud ON ud.id = am.de_usuario_id
+JOIN usuarios ua ON ua.id = am.a_usuario_id
+ORDER BY am.creada_en DESC;
+
+-- Solicitudes pendientes
+SELECT ud.nombre AS solicita, ua.nombre AS recibe
+FROM amistades am
+JOIN usuarios ud ON ud.id = am.de_usuario_id
+JOIN usuarios ua ON ua.id = am.a_usuario_id
+WHERE am.estado = 'pendiente';
+
+-- Cantidad de amigos aceptados por usuario (en cualquier direccion)
+SELECT u.nombre, COUNT(*) AS amigos
+FROM usuarios u
+JOIN amistades am
+  ON (am.de_usuario_id = u.id OR am.a_usuario_id = u.id)
+ AND am.estado = 'aceptada'
+GROUP BY u.id, u.nombre
+ORDER BY amigos DESC;
+
+
+-- mensajes
+SELECT * FROM mensajes;
+
+SELECT m.id, ua.nombre AS autor, m.texto, m.leido, m.creado_en
+FROM mensajes m
+JOIN usuarios ua ON ua.id = m.autor_id
+ORDER BY m.creado_en DESC;
+
+-- Conversacion de una amistad (cambia el 1 por el id de la amistad)
+SELECT u.nombre AS autor, m.texto, m.creado_en
+FROM mensajes m
+JOIN usuarios u ON u.id = m.autor_id
+WHERE m.amistad_id = 1
+ORDER BY m.creado_en;
+
+-- Mensajes sin leer por amistad
+SELECT amistad_id, COUNT(*) AS sin_leer
+FROM mensajes
+WHERE leido = 0
+GROUP BY amistad_id;
+
+
+-- ======================== TUTOR IA ===================================
+
+-- uso_tutor
+SELECT * FROM uso_tutor;
+
+-- Consultas al tutor por usuario (NULL = usuario eliminado)
+SELECT COALESCE(u.nombre, '(eliminado)') AS usuario, COUNT(*) AS consultas
+FROM uso_tutor t
+LEFT JOIN usuarios u ON u.id = t.usuario_id
+GROUP BY t.usuario_id, u.nombre
+ORDER BY consultas DESC;
+
+-- Consultas de las ultimas 24 horas por IP (control de limite de uso)
+SELECT ip, COUNT(*) AS consultas
+FROM uso_tutor
+WHERE creado_en >= NOW() - INTERVAL 1 DAY
+GROUP BY ip
+ORDER BY consultas DESC;
+
+
+-- ======================== RESUMEN GENERAL ============================
+
+-- Cantidad de filas en cada tabla
+SELECT 'usuarios' AS tabla, COUNT(*) AS filas FROM usuarios
+UNION ALL SELECT 'cursos', COUNT(*) FROM cursos
+UNION ALL SELECT 'etapas', COUNT(*) FROM etapas
+UNION ALL SELECT 'secciones', COUNT(*) FROM secciones
+UNION ALL SELECT 'niveles', COUNT(*) FROM niveles
+UNION ALL SELECT 'retos', COUNT(*) FROM retos
+UNION ALL SELECT 'perfiles', COUNT(*) FROM perfiles
+UNION ALL SELECT 'niveles_completados', COUNT(*) FROM niveles_completados
+UNION ALL SELECT 'lecciones_hechas', COUNT(*) FROM lecciones_hechas
+UNION ALL SELECT 'actividad_diaria', COUNT(*) FROM actividad_diaria
+UNION ALL SELECT 'desafios_diarios', COUNT(*) FROM desafios_diarios
+UNION ALL SELECT 'puntos_desafio', COUNT(*) FROM puntos_desafio
+UNION ALL SELECT 'articulos_tienda', COUNT(*) FROM articulos_tienda
+UNION ALL SELECT 'compras', COUNT(*) FROM compras
+UNION ALL SELECT 'amistades', COUNT(*) FROM amistades
+UNION ALL SELECT 'mensajes', COUNT(*) FROM mensajes
+UNION ALL SELECT 'uso_tutor', COUNT(*) FROM uso_tutor;

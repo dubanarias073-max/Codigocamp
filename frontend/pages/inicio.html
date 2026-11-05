@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inicio · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/inicio.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body class="cargando">
+  <div class="app">
+    <nav class="lado" id="lado" aria-label="Principal"></nav>
+    <main class="centro" id="contenido">
+      <div class="cabecera-fija" id="cabecera">
+        <div class="top-curso">
+          <button type="button" class="curso-sel" id="cursoSel" aria-haspopup="dialog" aria-expanded="false" aria-controls="panelCursos">
+            <span id="cursoLogo"></span>
+            <span class="curso-sel-txt"><small>Mi curso</small><b id="cursoNombre">…</b></span>
+            <span class="flecha" aria-hidden="true">▾</span>
+          </button>
+          <div class="top-prog" id="topProg" aria-live="polite"></div>
+        </div>
+        <div class="banner-etapa" id="banner" hidden>
+          <div class="banner-txt"><small id="banEtapa"></small><h2 id="banTitulo"></h2></div>
+          <button type="button" class="banner-btn" id="verEtapas" aria-label="Ver todas las etapas" title="Etapas del curso">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="camino" aria-live="polite"></div>
+    </main>
+    <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
+  </div>
+  <nav class="inf" id="inf" aria-label="Principal"></nav>
+  <div class="panel-fondo" id="panelCursos" hidden>
+    <div class="panel-cursos" role="dialog" aria-modal="true" aria-label="Elige tu curso" id="panelCont"></div>
+  </div>
+  <section class="pantalla-etapas" id="pantallaEtapas" role="dialog" aria-modal="true" aria-labelledby="etapasTit" hidden>
+    <header class="pe-cab">
+      <button type="button" class="pe-x" id="cerrarEtapas" aria-label="Cerrar">✕</button>
+      <h2 id="etapasTit">Etapas</h2>
+    </header>
+    <div class="pe-lista" id="etapasLista"></div>
+  </section>
+  <script type="module" src="/js/inicio.js"></script>
+</body>
+</html>

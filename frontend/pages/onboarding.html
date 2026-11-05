@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Configura tu ruta · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/onboarding.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body class="onb">
+  <header class="onb-top">
+    <a class="onb-brand" href="/" aria-label="CódigoCamp, volver al inicio"><img src="/img/logo-icon.png" alt="" width="34" height="34"><span>código<span>camp</span></span></a>
+    <div class="onb-progress-wrap">
+      <button type="button" class="onb-atras oculto" id="atras" aria-label="Volver a la pregunta anterior">←</button>
+      <div class="onb-prog" id="barra" role="progressbar" aria-label="Progreso de las preguntas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="progreso"></div>
+      </div>
+      <span class="onb-step-count" id="paso-numero">PASO 01 / 06</span>
+    </div>
+  </header>
+
+  <main class="onb-main" id="main">
+    <form id="onb" novalidate>
+
+      <!-- 1 · Quién eres -->
+      <section class="paso" data-paso="rol">
+        <div class="tutor"><span class="avatar" aria-hidden="true">01</span><h1 class="burbuja" tabindex="-1">¿Cuál describe mejor tu punto de partida?</h1></div>
+        <fieldset class="opciones">
+          <legend class="sr-only">¿Quién eres?</legend>
+          <label class="op"><input type="radio" name="rol" value="estudiante"><span class="caja"><span class="ico">🎓</span><span class="txt">Soy estudiante</span></span></label>
+          <label class="op"><input type="radio" name="rol" value="cambio"><span class="caja"><span class="ico">💼</span><span class="txt">Trabajo y quiero cambiar de rumbo</span></span></label>
+          <label class="op"><input type="radio" name="rol" value="programador"><span class="caja"><span class="ico">💻</span><span class="txt">Ya programo y quiero mejorar</span></span></label>
+          <label class="op"><input type="radio" name="rol" value="curioso"><span class="caja"><span class="ico">🔍</span><span class="txt">Solo tengo curiosidad</span></span></label>
+        </fieldset>
+      </section>
+
+      <!-- 2 · Intereses -->
+      <section class="paso" data-paso="intereses" hidden>
+        <div class="tutor"><span class="avatar" aria-hidden="true">02</span><h1 class="burbuja" tabindex="-1">¿Qué proyectos quieres crear?</h1></div>
+        <fieldset class="opciones multi">
+          <legend class="sr-only">¿Qué te gustaría crear?</legend>
+          <label class="op"><input type="checkbox" name="intereses" value="web"><span class="caja"><span class="ico">🌐</span><span class="txt">Páginas web</span></span></label>
+          <label class="op"><input type="checkbox" name="intereses" value="movil"><span class="caja"><span class="ico">📱</span><span class="txt">Apps para el móvil</span></span></label>
+          <label class="op"><input type="checkbox" name="intereses" value="juegos"><span class="caja"><span class="ico">🎮</span><span class="txt">Videojuegos</span></span></label>
+          <label class="op"><input type="checkbox" name="intereses" value="datos"><span class="caja"><span class="ico">📊</span><span class="txt">Datos e inteligencia artificial</span></span></label>
+          <label class="op"><input type="checkbox" name="intereses" value="auto"><span class="caja"><span class="ico">⚙️</span><span class="txt">Automatizar tareas</span></span></label>
+          <label class="op"><input type="checkbox" name="intereses" value="bd"><span class="caja"><span class="ico">🗄️</span><span class="txt">Bases de datos</span></span></label>
+        </fieldset>
+      </section>
+
+      <!-- 3 · Nivel -->
+      <section class="paso" data-paso="nivel" hidden>
+        <div class="tutor"><span class="avatar" aria-hidden="true">03</span><h1 class="burbuja" tabindex="-1">¿Qué experiencia tienes programando?</h1></div>
+        <fieldset class="opciones">
+          <legend class="sr-only">Tu nivel</legend>
+          <label class="op"><input type="radio" name="nivel" value="cero"><span class="caja"><span class="ico">🌱</span><span class="txt">Empiezo desde cero<small>Nunca he escrito código</small></span></span></label>
+          <label class="op"><input type="radio" name="nivel" value="probado"><span class="caja"><span class="ico">🌿</span><span class="txt">He probado algo<small>Sé qué es una variable</small></span></span></label>
+          <label class="op"><input type="radio" name="nivel" value="basico"><span class="caja"><span class="ico">🌳</span><span class="txt">Sé lo básico<small>Hago programas sencillos</small></span></span></label>
+          <label class="op"><input type="radio" name="nivel" value="avanzado"><span class="caja"><span class="ico">🚀</span><span class="txt">Tengo experiencia<small>Quiero aprender algo nuevo</small></span></span></label>
+        </fieldset>
+      </section>
+
+      <!-- 4 · Curso -->
+      <section class="paso" data-paso="curso" data-ancho hidden>
+        <div class="tutor"><span class="avatar" aria-hidden="true">04</span><h1 class="burbuja" tabindex="-1">Selecciona un lenguaje para iniciar.</h1></div>
+        <fieldset class="opciones cursos">
+          <legend class="sr-only">Elige tu primer curso</legend>
+          <label class="op"><input type="radio" name="curso" value="html"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#f97316">HTML</span><span class="txt">HTML<small>La estructura de las páginas web</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="css"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#2dd4bf">CSS</span><span class="txt">CSS<small>Estilos y diseño de páginas</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="bd"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#f472b6">BD</span><span class="txt">Bases de datos<small>SQL, MongoDB, Redis y más</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="javascript"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#fbbf24">JS</span><span class="txt">JavaScript<small>El lenguaje de la web</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="python"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#60a5fa">PY</span><span class="txt">Python<small>Datos, IA y automatización</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="typescript"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#38bdf8">TS</span><span class="txt">TypeScript<small>JavaScript con tipos</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="java"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#fb923c">JV</span><span class="txt">Java<small>Apps y sistemas grandes</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="csharp"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#a78bfa">C#</span><span class="txt">C#<small>Videojuegos con Unity</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="kotlin"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#c084fc">KT</span><span class="txt">Kotlin<small>Apps para Android</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="swift"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#fb7185">SW</span><span class="txt">Swift<small>Apps para iPhone</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="php"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#a5b4fc">PHP</span><span class="txt">PHP<small>Páginas con servidor</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="ruby"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#f87171">RB</span><span class="txt">Ruby<small>Código fácil de leer</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="go"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#22d3ee">GO</span><span class="txt">Go<small>Servidores rápidos</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="rust"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#fdba74">RS</span><span class="txt">Rust<small>Rápido y seguro</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="c"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#94a3b8">C</span><span class="txt">C<small>Cerca de la máquina</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="cpp"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#818cf8">C++</span><span class="txt">C++<small>Rendimiento y videojuegos</small></span></span></label>
+        </fieldset>
+      </section>
+
+      <!-- 5 · Meta diaria -->
+      <section class="paso" data-paso="meta" hidden>
+        <div class="tutor"><span class="avatar" aria-hidden="true">05</span><h1 class="burbuja" tabindex="-1">Define tu ritmo de práctica.</h1></div>
+        <fieldset class="opciones">
+          <legend class="sr-only">Meta diaria</legend>
+          <label class="op"><input type="radio" name="meta" value="5"><span class="caja"><span class="ico">☕</span><span class="txt">5 minutos al día<small>Tranquilo</small></span></span></label>
+          <label class="op"><input type="radio" name="meta" value="10"><span class="caja"><span class="ico">📖</span><span class="txt">10 minutos al día<small>Constante</small></span></span></label>
+          <label class="op"><input type="radio" name="meta" value="15"><span class="caja"><span class="ico">💪</span><span class="txt">15 minutos al día<small>Intenso</small></span></span></label>
+          <label class="op"><input type="radio" name="meta" value="30"><span class="caja"><span class="ico">🔥</span><span class="txt">30 minutos al día<small>Máximo</small></span></span></label>
+        </fieldset>
+      </section>
+
+      <!-- 6 · Listo -->
+      <section class="paso listo" data-paso="listo" hidden>
+        <div class="tutor"><span class="avatar" aria-hidden="true">06</span><h1 class="burbuja" tabindex="-1">Tu ruta de aprendizaje está lista.</h1></div>
+        <div class="resumen" aria-live="polite">
+          <p><span>Tu primer curso</span><b id="resCurso">—</b></p>
+          <p><span>Tu meta diaria</span><b id="resMeta">—</b></p>
+        </div>
+        <p class="nota">Comienza con retos breves, gana experiencia y desbloquea nuevas etapas.</p>
+      </section>
+    </form>
+  </main>
+
+  <footer class="onb-pie">
+    <div class="in"><button type="button" class="onb-sig" id="sig" disabled>Continuar</button></div>
+  </footer>
+
+  <script src="/js/onboarding.js"></script>
+</body>
+</html>

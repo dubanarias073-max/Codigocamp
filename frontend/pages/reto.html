@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reto · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/reto.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body>
+  <header class="r-top">
+    <button class="r-x" id="salir" type="button" aria-label="Salir de la lección">✕</button>
+    <div class="barra r-barra" id="barra" role="progressbar" aria-label="Progreso de la lección" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="prog" style="width:0"></i></div>
+    <span class="r-cuenta" id="cuenta" aria-live="polite">0/0</span>
+    <span class="r-vidas" title="Vidas">❤️ <span id="vidas">–</span></span>
+  </header>
+  <main class="r-cuerpo" id="cuerpo"><p class="vacio">Cargando…</p></main>
+  <footer class="r-pie" id="pie" hidden><div><div id="mensaje"></div><button class="bj" id="accion" type="button" disabled>Comprobar</button></div></footer>
+  <div class="capa" id="confirmarSalida" role="dialog" aria-modal="true" aria-labelledby="salirTit" hidden><div>
+    <p style="font-size:56px;margin:0">🚪</p><h2 id="salirTit">¿Seguro que quieres salir?</h2>
+    <p class="nota">Si sales ahora perderás el avance de esta lección.</p>
+    <button class="bj" id="seguir" type="button">Seguir aprendiendo</button>
+    <a class="bj sec" id="salirYa" href="/pages/inicio.html">Salir de la lección</a>
+  </div></div>
+  <div class="capa" id="sinVidas" hidden><div>
+    <p style="font-size:56px;margin:0">💔</p><h2>¡Te quedaste sin vidas!</h2>
+    <p class="nota">Recupera una vida cada 30 minutos, gana recompensas practicando o compra vidas con diamantes.</p>
+    <a class="bj" href="/pages/tienda.html">Ir a la tienda</a><a class="bj sec" href="/pages/recompensas.html">Ver desafíos</a><a class="bj sec" href="/pages/inicio.html">Salir</a>
+  </div></div>
+
+  <script type="module" src="/js/reto.js"></script>
+</body>
+</html>

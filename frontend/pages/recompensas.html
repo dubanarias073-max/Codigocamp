@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recompensas · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/recompensas.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body class="cargando">
+  <div class="app">
+    <nav class="lado" id="lado" aria-label="Principal"></nav>
+    <main class="centro" id="contenido">
+      <header class="misiones-head">
+        <div><p class="misiones-kicker">CENTRO DE OPERACIONES <span>·</span> TEMPORADA ACTUAL</p>
+          <h1 class="titulo-pag">Tu tablero de misiones</h1>
+          <p class="sub">Practica a tu ritmo. Todas las recompensas son diamantes 💎 y se acreditan solas.</p></div>
+        <div class="misiones-stamp" aria-hidden="true"><span>CC</span><small>BUILD<br>STREAK</small></div>
+      </header>
+      <section class="d-mes" aria-label="Desafío del mes">
+        <div class="d-mes-art" aria-hidden="true"><span>✳</span><i>01</i><b>OBJETIVO<br>DE TEMPORADA</b></div>
+        <div class="d-mes-main">
+          <div class="d-mes-meta"><span class="d-tag">MISIÓN LARGA</span><span id="mesDias"></span></div>
+          <h2 id="mesTitulo">Desafío del mes</h2>
+          <p class="d-mes-copy">Encadena tus misiones diarias para desbloquear la recompensa especial.</p>
+          <div class="d-card">
+            <div class="d-mes-objective"><h3>Acumula 60 puntos de misión</h3><span id="mesTexto">0 / 60</span></div>
+            <div class="pbar" style="--c:#e09a47"><i id="mesBarra" style="width:0"></i><span class="sr-only">Progreso de temporada</span></div>
+            <small id="mesNota"></small>
+          </div>
+        </div>
+      </section>
+      <section class="misiones-diarias" aria-labelledby="daily-title">
+        <div class="d-cab"><div><p class="misiones-kicker">CHECKLIST / 03</p><h2 id="daily-title">Encargos de hoy</h2></div><span class="d-cierre" id="horas"></span></div>
+        <div id="hoy" class="d-lista" aria-live="polite"></div>
+        <p class="nota">Cada encargo completado suma a tu objetivo de temporada. Gasta tus diamantes en la <a href="/pages/tienda.html">tienda 💎</a>.</p>
+      </section>
+    </main>
+    <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
+  </div>
+  <nav class="inf" id="inf" aria-label="Principal"></nav>
+  <script type="module" src="/js/recompensas.js"></script>
+</body>
+</html>

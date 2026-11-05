@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aprende · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/aprende.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body class="cargando">
+  <div class="app ancho">
+    <nav class="lado" id="lado" aria-label="Menú principal"></nav>
+
+    <main class="centro" id="contenido">
+      <div class="aula">
+
+        <aside class="ruta" id="ruta" aria-label="Ruta de aprendizaje">
+          <div class="ruta-cab">
+            <p class="ruta-t">Elige un lenguaje</p>
+            <button class="btn soft sm" id="rutaCerrar" type="button" aria-controls="ruta" aria-expanded="true" title="Ocultar este panel">◀ Ocultar</button>
+          </div>
+          <div class="langs" id="langs"></div>
+
+          <p class="ruta-t" id="rutaTit"></p>
+          <input class="buscar" id="buscar" type="search" placeholder="Buscar lección…" aria-label="Buscar lección" autocomplete="off">
+          <div id="pasos"></div>
+
+          <div class="prog" id="prog" role="progressbar" aria-label="Progreso del curso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="progBar"></div>
+          </div>
+          <span id="progTxt"></span>
+
+          <p class="otro">¿Otro lenguaje? <a href="aprende.html">Pregúntale al tutor</a></p>
+        </aside>
+
+        <section class="leccion" aria-label="Lección">
+          <button class="btn soft sm" id="rutaAbrir" type="button" aria-controls="ruta" aria-expanded="false" title="Mostrar lenguajes y lecciones">▶ Lenguajes y lecciones</button>
+          <article class="teoria" id="teoria" aria-live="polite"></article>
+
+          <section class="lab" aria-label="Práctica">
+            <div class="lab-top">
+              <strong>Pruébalo tú</strong>
+              <span class="modo" id="modo"></span>
+              <button class="btn soft sm" id="reset" type="button">Restablecer</button>
+              <button class="btn pri sm" id="run" type="button">▶ Ejecutar</button>
+            </div>
+            <textarea id="ed" spellcheck="false" aria-label="Editor de código"></textarea>
+            <p class="sal-t">Resultado</p>
+            <pre id="out" aria-live="polite">Pulsa «Ejecutar» (o Ctrl + Enter) para ver el resultado.</pre>
+            <iframe id="vista" sandbox="allow-scripts" title="Vista previa" hidden></iframe>
+          </section>
+
+          <div class="pie">
+            <button class="btn ghost" id="prev" type="button">← Anterior</button>
+            <button class="btn pri" id="next" type="button">Marcar como hecha y seguir</button>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <aside class="der" id="der"></aside>
+  </div>
+
+  <nav class="inf" id="inf" aria-label="Menú principal móvil"></nav>
+
+  <script type="module" src="/js/aprende.js"></script>
+</body>
+</html>

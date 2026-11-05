@@ -1,0 +1,31 @@
+/* ===== Portada (index.html) ===== */
+.portada{position:relative;overflow:hidden;padding:clamp(30px,7vw,90px) clamp(16px,4vw,40px) 70px}
+.portada h1{margin-bottom:18px;font-size:clamp(38px,5.6vw,68px);font-weight:300;letter-spacing:-.02em}
+.portada h1 strong,.lado h1 strong{font-weight:800;color:transparent;background:linear-gradient(90deg,var(--cy),var(--acc));-webkit-background-clip:text;background-clip:text}
+.cursor{display:inline-block;width:9px;height:1.1em;margin-left:2px;vertical-align:text-bottom;background:var(--acc);animation:parpadeo 1s steps(2) infinite}
+@keyframes parpadeo{50%{opacity:0}}
+@media (max-width:900px){
+  .llaves{display:none}
+}
+/* CódigoCamp studio: software workshop, editorial palette and squared geometry. */
+:root{--bg:#f4f2eb;--panel:#fffefa;--panel2:#ece9df;--borde:#d9d5c9;--txt:#252c33;--sub:#737a7e;
+  --acc:#ef7047;--acc2:#c94c2b;--cy:#267e86;color-scheme:light}
+body{color:var(--txt);background-color:var(--bg);background-image:linear-gradient(rgba(38,126,134,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(38,126,134,.04) 1px,transparent 1px);background-size:28px 28px}
+.btn.pri,.btn.grad{border-color:#c94c2b;background:#ef7047;color:#fff}
+.btn.grad{background:linear-gradient(120deg,#267e86,#ef7047)}
+.btn.ghost,.btn.out{color:#252c33}
+.bar.scrolled{border-bottom-color:#d9d5c9;background:rgba(244,242,235,.92)}
+.logo-txt{color:#267e86}
+.eyebrow{border-radius:4px;color:#267e86;background:#e8f0eb}
+.portada h1{font-weight:750;letter-spacing:-.055em}
+.portada h1 strong,.lado h1 strong{background:linear-gradient(90deg,#267e86,#ef7047);-webkit-background-clip:text;background-clip:text}
+/* Neon terminal landing page */
+:root{--bg:#070812;--panel:#0e1222;--panel2:#151b30;--borde:#29304b;--txt:#f2f4ff;--sub:#929bb9;--acc:#c4ff3d;--acc2:#78a91c;--cy:#39e7ff;color-scheme:dark}
+body{color:var(--txt);background-color:var(--bg);background-image:radial-gradient(ellipse at 15% 20%,rgba(117,64,255,.16),transparent 38%),radial-gradient(ellipse at 88% 40%,rgba(0,224,255,.1),transparent 34%),linear-gradient(rgba(139,155,201,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(139,155,201,.025) 1px,transparent 1px);background-size:auto,auto,32px 32px,32px 32px}
+.btn.pri,.btn.grad{border-color:#d6ff72;background:linear-gradient(110deg,#caff4e,#90ed64);color:#111508;box-shadow:0 0 24px rgba(196,255,61,.14)}
+.btn.grad{border-color:#39e7ff;background:linear-gradient(115deg,#39e7ff,#8962ff);color:#080b16}
+.btn.ghost,.btn.out{color:var(--txt)}
+.bar.scrolled{border-bottom-color:var(--borde);background:rgba(7,8,18,.9)}
+.logo-txt{color:var(--cy)}
+.eyebrow{border:1px solid rgba(57,231,255,.28);border-radius:5px;color:var(--cy);background:rgba(57,231,255,.08)}
+.portada h1 strong,.lado h1 strong{background:linear-gradient(90deg,#39e7ff,#c4ff3d 58%,#b465ff);-webkit-background-clip:text;background-clip:text}

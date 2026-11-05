@@ -1,0 +1,58 @@
+/* ===== Login y registro ===== */
+.acceso-pag{position:relative;overflow:hidden;display:grid;align-items:center;min-height:calc(100vh - 70px);padding:30px clamp(16px,4vw,40px) 50px}
+.acceso-in{position:relative;display:grid;grid-template-columns:1fr minmax(320px,440px);gap:56px;align-items:center;width:100%;max-width:1080px;margin:0 auto}
+.lado h1{margin-bottom:16px;font-size:clamp(32px,4.6vw,54px);font-weight:300;letter-spacing:-.02em}
+.beneficios{display:grid;gap:12px;margin:26px 0 0;padding:0;list-style:none}
+.beneficios li{display:flex;align-items:center;gap:14px}
+.beneficios span{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;font-size:22px;background:rgba(74,222,128,.12)}
+.authbox h2{margin-bottom:4px;font-size:26px}
+.authform{display:grid;gap:14px;margin:16px 0 6px}
+.authform label{display:grid;gap:6px;font-size:14px;font-weight:700}
+.authform small{font-weight:400;color:var(--sub)}
+.authform input{width:100%;padding:13px 14px;border:2px solid var(--borde);border-radius:12px;background:var(--bg);color:var(--txt);font:inherit}
+.authform input:focus{outline:0;border-color:var(--cy)}
+.authform input[aria-invalid=true]{border-color:var(--rojo)}
+.pw{position:relative;display:block}.pw input{padding-right:48px}
+.pw-ver{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:10px;background:none;color:var(--sub);cursor:pointer}
+.pw-ver:hover{color:var(--txt)}
+.pw-ver svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pw-ver svg[hidden]{display:none}
+#reglasPw{margin:-4px 0 0;padding-left:20px}
+#reglasPw li{transition:color .2s}
+#reglasPw li.ok{color:var(--acc)}
+#reglasPw li.ok::marker{content:"✓ "}
+.cambio{margin:16px 0 0;text-align:center;color:var(--sub)}
+.cambio a{color:var(--acc);font-weight:700}
+@media (max-width:860px){.acceso-in{grid-template-columns:1fr;gap:28px}.beneficios{display:none}}
+
+/* Matching the CodeCamp studio interface. */
+:root{--bg:#f4f2eb;--panel:#fffefa;--panel2:#ece9df;--borde:#d9d5c9;--txt:#252c33;--sub:#737a7e;
+  --acc:#ef7047;--acc2:#c94c2b;--cy:#267e86;--rojo:#c94c45;color-scheme:light}
+body{color:var(--txt);background-color:var(--bg);background-image:linear-gradient(rgba(38,126,134,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(38,126,134,.04) 1px,transparent 1px);background-size:28px 28px}
+body::before{background:radial-gradient(ellipse at 82% 32%,rgba(38,126,134,.09),transparent 43%)}
+.bar.scrolled{border-bottom-color:#d9d5c9;background:rgba(244,242,235,.92)}
+.logo-txt{color:#267e86}
+.eyebrow{border-radius:4px;color:#267e86;background:#e8f0eb}
+.btn.pri{border-color:#c94c2b;background:#ef7047;color:#fff}
+.btn.ghost{color:#252c33}
+.authbox{border:1px solid #d9d5c9;border-radius:10px;background:#fffefa;box-shadow:0 18px 50px rgba(37,44,51,.09)}
+.lado h1{font-weight:750;letter-spacing:-.055em}
+.beneficios span{border-radius:8px;color:#267e86;background:#e8f0eb}
+.authform input{border:1px solid #d9d5c9;border-radius:7px;background:#f4f2eb}
+.authform input:focus{border-color:#267e86}
+.cambio a{color:#267e86}
+
+/* Neon access console */
+:root{--bg:#070812;--panel:#0e1222;--panel2:#151b30;--borde:#29304b;--txt:#f2f4ff;--sub:#929bb9;--acc:#c4ff3d;--acc2:#78a91c;--cy:#39e7ff;--rojo:#ff557a;color-scheme:dark}
+body{color:var(--txt);background-color:var(--bg);background-image:radial-gradient(ellipse at 12% 15%,rgba(117,64,255,.16),transparent 40%),radial-gradient(ellipse at 90% 62%,rgba(0,224,255,.09),transparent 34%),linear-gradient(rgba(139,155,201,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(139,155,201,.025) 1px,transparent 1px);background-size:auto,auto,32px 32px,32px 32px}
+.bar.scrolled{border-color:var(--borde);background:rgba(7,8,18,.92)}
+.logo-txt{color:var(--cy)}
+.eyebrow{border:1px solid rgba(57,231,255,.28);border-radius:5px;color:var(--cy);background:rgba(57,231,255,.08)}
+.btn.pri{border-color:#d6ff72;background:linear-gradient(110deg,#caff4e,#90ed64);color:#111508}
+.btn.ghost{color:var(--txt)}
+.authbox{border:1px solid #313a5a;border-radius:14px;background:linear-gradient(145deg,#12172b,#0c1020);box-shadow:0 24px 70px rgba(0,0,0,.42),0 0 34px rgba(117,64,255,.08)}
+.lado h1 strong{background:linear-gradient(90deg,#39e7ff,#c4ff3d 58%,#b465ff);-webkit-background-clip:text;background-clip:text}
+.beneficios span{border:1px solid rgba(57,231,255,.22);border-radius:9px;color:var(--cy);background:rgba(57,231,255,.08)}
+.authform input{border:1px solid #333c5a;border-radius:9px;background:#090d19;color:var(--txt)}
+.authform input:focus{border-color:var(--cy);box-shadow:0 0 0 3px rgba(57,231,255,.08)}
+.cambio a{color:var(--cy)}

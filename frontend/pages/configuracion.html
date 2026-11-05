@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Configuración · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/configuracion.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body class="cargando">
+  <div class="app">
+    <nav class="lado" id="lado" aria-label="Principal"></nav>
+    <main class="centro" id="contenido">
+      <h1 class="titulo-pag">Configuración</h1>
+      <form id="f" class="tarjeta" style="margin-top:16px">
+        <label class="campo">Nombre<input id="nombre" maxlength="50" required></label>
+        <label class="campo">Nombre de usuario <small>(para que tus amigos te encuentren; 3 a 20 letras, números o _)</small><input id="alias" maxlength="20" required autocapitalize="off" spellcheck="false"></label>
+        <p class="nota" style="margin-top:-6px">Tu ID: <b id="codigo"></b></p>
+        <label class="campo">Curso que estudias<select id="curso"></select></label>
+        <label class="campo">Meta diaria<select id="meta"><option value="5">5 minutos</option><option value="10">10 minutos</option><option value="15">15 minutos</option><option value="30">30 minutos</option></select></label>
+        <label class="campo">Tema visual<select id="tema"><option value="auto">Predeterminado (según tu dispositivo)</option><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select></label>
+        <button class="bj" type="submit">Guardar cambios</button>
+      </form>
+      <p><button class="bj rojo" id="salir" type="button">Cerrar sesión</button></p>
+    </main>
+    <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
+  </div>
+  <nav class="inf" id="inf" aria-label="Principal"></nav>
+  <script type="module" src="/js/configuracion.js"></script>
+</body>
+</html>

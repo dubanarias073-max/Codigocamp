@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tienda · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/tienda.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body class="cargando">
+  <div class="app">
+    <nav class="lado" id="lado" aria-label="Principal"></nav>
+    <main class="centro" id="contenido">
+      <h1 class="titulo-pag">Tienda de diamantes 💎</h1>
+      <p class="sub">Completa tus misiones en Recompensas, junta diamantes y cámbialos por cofres, impulsos y objetos de colección.</p>
+      <section class="billetera" aria-label="Tu saldo de diamantes">
+        <div class="saldo-mineral diamante"><span>💎</span><div><small>Diamantes</small><strong id="saldo-diamante">0</strong></div></div>
+      </section>
+      <div class="tienda-categorias" aria-label="Categorías de la tienda">
+        <span>💎 Todo se paga con diamantes</span><span>🎯 Gana más en Recompensas</span>
+      </div>
+      <div class="rejilla" id="items"></div>
+      <p class="nota"><a href="/pages/recompensas.html">¿Te faltan diamantes? Completa tus misiones →</a></p>
+      <div class="cofre-fondo" id="cofreFondo" hidden><div class="cofre-caja" id="cofreCaja" role="dialog" aria-modal="true" aria-label="Resultado de la compra"></div></div>
+    </main>
+    <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
+  </div>
+  <nav class="inf" id="inf" aria-label="Principal"></nav>
+  <script type="module" src="/js/tienda.js"></script>
+</body>
+</html>

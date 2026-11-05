@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chats · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/chats.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body class="cargando">
+  <div class="app ancho">
+    <nav class="lado" id="lado" aria-label="Principal"></nav>
+    <main class="centro" id="contenido">
+      <h1 class="titulo-pag">Chats</h1>
+      <p class="sub">Busca personas por nombre o usuario, agrégalas y charla con ellas. También puedes mandarles tu enlace de invitación.</p>
+      <div class="chats-grid" id="cg">
+        <aside class="tarjeta c-lista" aria-label="Amigos">
+          <div class="c-yo"><div class="c-yo-fila"><span class="c-av" id="miAv">?</span><div><small>Tu ID</small><br><b id="miCodigo">······</b><br><small id="miAlias"></small></div></div>
+            <div class="c-yo-btn"><button class="btn sm" id="copiar" type="button">Copiar ID</button><button class="btn sm pri" id="invitar" type="button">🔗 Copiar enlace de invitación</button></div></div>
+          <form class="c-add" id="fAgregar"><input id="quien" maxlength="30" placeholder="Busca por nombre, @usuario o ID" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Buscar personas por nombre, usuario o ID"><button class="bj" type="submit">Agregar</button></form>
+          <div id="resultados" class="c-res" aria-live="polite"></div>
+          <div id="solicitudes"></div>
+          <div id="amigos"></div>
+        </aside>
+        <section class="tarjeta chat c-conv" aria-label="Conversación">
+          <p class="vacio c-vacio" id="vacio">Elige un amigo para chatear.</p>
+          <div class="c-cab" id="cab" hidden><button class="btn sm c-volver" id="volver" type="button" aria-label="Volver a la lista">←</button><b id="cNombre"></b><button class="btn ghost sm" id="quitar" type="button">Quitar amigo</button></div>
+          <div class="chat-log" id="log" aria-live="polite" hidden></div>
+          <div class="c-emojis" id="emojis" hidden aria-label="Emojis rápidos"></div>
+          <form class="chat-form" id="fMsg" hidden><input id="texto" maxlength="300" placeholder="Escribe un mensaje… (usa `código` entre comillas invertidas)" autocomplete="off" aria-label="Mensaje"><button class="bj" type="submit">Enviar</button></form>
+        </section>
+      </div>
+    </main>
+    <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
+  </div>
+  <nav class="inf" id="inf" aria-label="Principal"></nav>
+  <script type="module" src="/js/chats.js"></script>
+</body>
+</html>

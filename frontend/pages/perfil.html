@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perfil · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/perfil.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body class="cargando">
+  <div class="app">
+    <nav class="lado" id="lado" aria-label="Principal"></nav>
+    <main class="centro" id="contenido">
+      <div class="cab-p"><div class="avatar-p" id="av">?</div><div class="cab-t"><h1 class="titulo-pag" id="nom">…</h1><small id="desde"></small><br><small id="ident"></small></div>
+        <button class="bj" id="editar" type="button" aria-expanded="false" aria-controls="formPerfil">✏️ Editar perfil</button></div>
+      <form id="formPerfil" class="tarjeta form-perfil" hidden>
+        <fieldset class="av-sel"><legend>Tu avatar</legend><div id="avatares" role="radiogroup" aria-label="Elige tu avatar"></div></fieldset>
+        <label class="campo">Nombre<input id="fNombre" maxlength="50" required></label>
+        <label class="campo">Nombre de usuario <small>(3 a 20 letras, números o _)</small><input id="fAlias" maxlength="20" required autocapitalize="off" spellcheck="false"></label>
+        <label class="campo">Curso que estudias<select id="fCurso"></select></label>
+        <label class="campo">Meta diaria<select id="fMeta"><option value="5">5 minutos</option><option value="10">10 minutos</option><option value="15">15 minutos</option><option value="30">30 minutos</option></select></label>
+        <label class="campo">¿Qué te describe mejor?<select id="fRol"><option value="estudiante">🎓 Soy estudiante</option><option value="cambio">💼 Quiero cambiar de rumbo</option><option value="programador">💻 Ya programo y quiero mejorar</option><option value="curioso">🔍 Solo tengo curiosidad</option></select></label>
+        <label class="campo">Tu nivel<select id="fNivel"><option value="cero">🌱 Empiezo desde cero</option><option value="probado">🌿 He probado algo</option><option value="basico">🌳 Sé lo básico</option><option value="avanzado">🚀 Tengo experiencia</option></select></label>
+        <div class="fila-btn"><button class="bj" type="submit">Guardar cambios</button><button class="btn ghost" id="cancelar" type="button">Cancelar</button></div>
+      </form>
+      <div class="stats-p" id="stats"></div>
+      <h2>Mi colección</h2><div id="coleccion" class="nota"></div>
+      <h2>Lecciones estudiadas</h2><div id="cursos" class="nota"></div>
+    </main>
+    <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
+  </div>
+  <nav class="inf" id="inf" aria-label="Principal"></nav>
+  <script type="module" src="/js/perfil.js"></script>
+</body>
+</html>
