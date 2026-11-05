@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CódigoCamp · Aprende a programar desde cero con un tutor de IA</title>
+  <meta name="description" content="Aprende HTML, CSS y más de 16 lenguajes de programación con lecciones breves, un laboratorio en vivo y un tutor de inteligencia artificial en español.">
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/portada.css">
+  <style>
+    .bar{display:flex;align-items:center;gap:16px}
+    .bar .userbar{margin-left:auto;display:flex;align-items:center;gap:10px}
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <a class="logo" href="index.html"><img src="img/logo-icon.png" alt="" width="38" height="38"><span class="logo-txt">codigocamp</span></a>
+    <div class="userbar">
+      <a class="btn ghost sm" href="login.html">Iniciar sesión</a>
+      <a class="btn pri sm" href="registro.html">Crear cuenta</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== Portada (parte principal) ===== -->
+    <section id="inicio" class="portada">
+      <div class="llaves" aria-hidden="true">{ }</div>
+      <div class="portada-in">
+
+        <div class="portada-txt">
+          <p class="eyebrow">Gratis · En español · A tu ritmo</p>
+          <h1>Aprende a programar <strong>desde cero</strong> con un tutor de IA</h1>
+          <p class="lead">Lecciones breves de más de 16 lenguajes, un laboratorio donde ves el resultado al instante y un tutor que responde tus dudas cuando te atascas.</p>
+          <div class="cta">
+            <a class="btn grad" href="lenguajes.html">Empezar a aprender</a>
+            <a class="btn out" href="aprende.html">Preguntar al tutor</a>
+          </div>
+          <ul class="chips-tec" aria-label="Qué vas a aprender">
+            <li>HTML</li><li>CSS</li><li>JavaScript</li><li>Python</li><li>Java</li><li>SQL</li>
+          </ul>
+        </div>
+
+        <div class="portada-vis" role="img" aria-label="Vista previa: un editor de código con su resultado y el tutor de IA explicando un error">
+          <div class="ventana">
+            <div class="ed-top"><i></i><i></i><i></i><span class="ed-tab on">script.js</span><span class="ed-tab">index.html</span></div>
+            <pre class="ed-code"><span class="t-c">// ¿Es par?</span>
+<span class="t-k">function</span> <span class="t-f">esPar</span>(n) {
+  <span class="t-k">return</span> n % <span class="t-n">2</span> === <span class="t-n">0</span>;
+}<span class="cursor"></span></pre>
+            <div class="ed-test">
+              <p><span class="t-ok">✓</span> esPar(4) → true</p>
+              <p><span class="t-ok">✓</span> esPar(7) → false</p>
+            </div>
+            <div class="ed-res">✓ Resultado al instante, sin instalar nada</div>
+          </div>
+
+          <div class="flot flot-tutor"><span class="ico">🤖</span><div>Tutor IA<small>«Te explico el código línea por línea»</small></div></div>
+          <div class="flot flot-racha"><span class="ico">🧪</span><div>Laboratorio en vivo<small>HTML, CSS y JavaScript</small></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <a class="logo" href="index.html"><img src="img/logo-icon.png" alt="" width="30" height="30"><span class="logo-txt">codigocamp</span></a>
+    <span>© 2026 CódigoCamp · Aprende a programar en español</span>
+  </footer>
+
+  <script>
+    // Al bajar, la barra recibe la clase "scrolled" (fondo sólido) igual que en login y registro
+    (function () {
+      var barra = document.querySelector('.bar');
+      function revisar() { barra.classList.toggle('scrolled', window.scrollY > 10); }
+      revisar();
+      window.addEventListener('scroll', revisar, { passive: true });
+    })();
+  </script>
+</body>
+</html>

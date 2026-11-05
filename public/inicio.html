@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inicio · CódigoCamp</title>
+  <script src="js/tema.js"></script>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* ===== Panel de inicio ===== */
+    .panel-inicio{position:relative;isolation:isolate;max-width:1100px;margin:0 auto;padding-left:24px;padding-right:24px;padding-bottom:90px}
+    .panel-inicio::before{content:"";position:absolute;inset:-140px -12% auto -12%;height:560px;z-index:-1;pointer-events:none;
+      background:radial-gradient(520px 320px at 15% 25%,color-mix(in srgb,var(--cy,#22d3ee) 26%,transparent),transparent 70%),
+                 radial-gradient(480px 300px at 88% 10%,color-mix(in srgb,var(--acc,#4ade80) 22%,transparent),transparent 70%)}
+
+    /* Saludo */
+    .panel-inicio .hero{position:relative;padding:34px 0 6px;animation:entra .7s ease both}
+    .panel-inicio .hero::after{content:"{ }";position:absolute;right:0;top:-8px;font:700 150px/1 ui-monospace,Consolas,monospace;color:transparent;
+      -webkit-text-stroke:2px color-mix(in srgb,var(--acc,#4ade80) 24%,transparent);pointer-events:none}
+    .panel-inicio #saludo{font-size:clamp(34px,5.6vw,60px);font-weight:300;line-height:1.08;letter-spacing:-.02em;margin:0 0 10px}
+    .panel-inicio .hero .note{font-size:clamp(17px,2vw,21px);margin:0;opacity:.8}
+    @keyframes entra{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+    /* Aviso de invitado */
+    .panel-inicio .banner{margin:24px 0 0;padding:14px 18px;border-radius:14px;line-height:1.5;
+      border:1px dashed color-mix(in srgb,var(--acc,#4ade80) 55%,transparent);background:color-mix(in srgb,var(--acc,#4ade80) 9%,transparent)}
+    .panel-inicio .banner a{color:var(--acc,#4ade80);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+
+    /* Progreso: una sola tira dividida en cuatro */
+    .panel-inicio .stats-bar{display:grid;grid-template-columns:repeat(4,1fr);margin:28px 0 22px;border-radius:20px;overflow:hidden;
+      border:1px solid color-mix(in srgb,currentColor 14%,transparent);background:color-mix(in srgb,currentColor 5%,transparent);backdrop-filter:blur(6px)}
+    .panel-inicio .stat{position:relative;display:flex;align-items:center;gap:14px;margin:0;padding:20px 22px;border:0;border-radius:0;background:none;box-shadow:none}
+    .panel-inicio .stat+.stat::before{content:"";position:absolute;left:0;top:22%;bottom:22%;width:1px;background:color-mix(in srgb,currentColor 14%,transparent)}
+    .panel-inicio .stat:nth-child(1){--c:#fb923c}
+    .panel-inicio .stat:nth-child(2){--c:#fbbf24}
+    .panel-inicio .stat:nth-child(3){--c:#a78bfa}
+    .panel-inicio .stat:nth-child(4){--c:#4ade80}
+    .panel-inicio .stat > .ico{flex:none;width:48px;height:48px;display:grid;place-items:center;font-size:24px;border-radius:14px;
+      background:color-mix(in srgb,var(--c) 18%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 42%,transparent)}
+    .panel-inicio .stat b{display:block;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+    .panel-inicio .stat > div > span{display:block;margin-top:2px;font-size:13px;opacity:.7}
+    .panel-inicio .stat.nivel > div{min-width:0;flex:1}
+    .panel-inicio .barra.mini{height:8px;margin-top:9px;border-radius:99px;overflow:hidden;min-width:100px;background:color-mix(in srgb,currentColor 14%,transparent)}
+    .panel-inicio #barraNivel{height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--cy,#22d3ee),var(--acc,#4ade80));transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+
+    /* Continuar: lo más llamativo de la página */
+    .panel-inicio .continuar{position:relative;display:flex;align-items:center;gap:22px;padding:28px 32px;border-radius:24px;overflow:hidden;
+      text-decoration:none;color:#04130d;background:linear-gradient(110deg,var(--cy,#22d3ee),var(--acc,#4ade80));
+      box-shadow:0 20px 54px -20px color-mix(in srgb,var(--acc,#4ade80) 75%,transparent);transition:transform .2s,box-shadow .2s}
+    .panel-inicio .continuar::before{content:"</>";position:absolute;right:90px;top:50%;transform:translateY(-50%);font:700 96px/1 ui-monospace,Consolas,monospace;opacity:.12;pointer-events:none}
+    .panel-inicio .continuar::after{content:"›";margin-left:auto;font-size:44px;line-height:1;font-weight:700;transition:transform .2s}
+    .panel-inicio .continuar:hover{transform:translateY(-3px);box-shadow:0 26px 60px -20px color-mix(in srgb,var(--acc,#4ade80) 85%,transparent)}
+    .panel-inicio .continuar:hover::after{transform:translateX(6px)}
+    .panel-inicio .continuar > .ico{flex:none;width:62px;height:62px;display:grid;place-items:center;border-radius:50%;
+      background:#04130d;color:var(--acc,#4ade80);font-size:22px;animation:anillo 2.4s ease-out infinite}
+    .panel-inicio .continuar b{font-size:clamp(19px,2.4vw,25px)}
+    .panel-inicio #continuarTxt{opacity:.75;font-size:15px}
+    @keyframes anillo{0%{box-shadow:0 0 0 0 rgba(4,19,13,.45)}100%{box-shadow:0 0 0 20px rgba(4,19,13,0)}}
+
+    /* Títulos de sección con línea */
+    .panel-inicio .sec-tit{display:flex;align-items:center;gap:16px;margin:46px 0 18px;font-size:22px}
+    .panel-inicio .sec-tit::after{content:"";flex:1;height:1px;background:color-mix(in srgb,currentColor 16%,transparent)}
+
+    /* Tarjetas de destino */
+    .panel-inicio .grid.destinos{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}
+    .panel-inicio .destino{--c:var(--acc,#4ade80);display:flex;flex-direction:column;gap:6px;padding:24px;border-radius:18px;text-decoration:none;color:inherit;
+      border:1px solid color-mix(in srgb,currentColor 14%,transparent);
+      background:linear-gradient(160deg,color-mix(in srgb,var(--c) 12%,transparent),color-mix(in srgb,currentColor 4%,transparent) 58%);
+      transition:transform .2s,border-color .2s,box-shadow .2s}
+    .panel-inicio .destino:hover{transform:translateY(-4px);border-color:var(--c);box-shadow:0 18px 40px -22px var(--c)}
+    .panel-inicio .destino > .ico{width:54px;height:54px;display:grid;place-items:center;margin-bottom:10px;font-size:28px;border-radius:16px;
+      background:color-mix(in srgb,var(--c) 18%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 42%,transparent)}
+    .panel-inicio .destino h3{margin:0;font-size:20px}
+    .panel-inicio .destino p{margin:0;max-width:34ch;font-size:15px;line-height:1.5;opacity:.78}
+    .panel-inicio .destino small{align-self:flex-start;margin-top:14px;padding:4px 12px;border-radius:99px;font-size:12px;font-weight:600;
+      color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
+    .panel-inicio .destino small:empty{display:none}
+
+    .panel-inicio a:focus-visible{outline:3px solid var(--cy,#22d3ee);outline-offset:3px}
+
+    @media (max-width:760px){
+      .panel-inicio{padding-left:16px;padding-right:16px}
+      .panel-inicio .hero::after{display:none}
+      .panel-inicio .stats-bar{grid-template-columns:1fr 1fr}
+      .panel-inicio .stat:nth-child(3)::before{display:none}
+      .panel-inicio .stat:nth-child(n+3){border-top:1px solid color-mix(in srgb,currentColor 14%,transparent)}
+      .panel-inicio .continuar{padding:22px 20px;gap:16px}
+      .panel-inicio .continuar::before{display:none}
+    }
+    @media (prefers-reduced-motion:reduce){
+      .panel-inicio *,.panel-inicio *::after{animation:none!important;transition:none!important}
+    }
+  </style>
+</head>
+<body class="cargando" data-pagina="inicio">
+  <header class="bar">
+    <a class="logo" href="index.html"><img src="img/logo-icon.png" alt="" width="38" height="38"><span class="logo-txt">codigocamp</span></a>
+    <nav class="nav-sec" id="nav" aria-label="Secciones"></nav>
+    <div class="userbar" id="userbar"></div>
+    <button class="tema-btn" id="temaBtn" type="button" aria-label="Cambiar tema">☀️</button>
+  </header>
+
+  <main class="panel-inicio">
+    <div class="hero">
+      <h1 id="saludo">Hola 👋</h1>
+      <p class="note">¿Qué quieres aprender hoy?</p>
+    </div>
+
+    <div id="bannerInvitado" class="banner" hidden>
+      Estás en <b>modo invitado</b>: puedes usar todo, pero con menos preguntas por minuto al tutor.
+      <a href="registro.html">Crea una cuenta gratis</a>
+    </div>
+
+    <section class="stats-bar" aria-label="Tu progreso">
+      <div class="stat"><span class="ico">🔥</span><div><b id="stRacha">0</b><span>días de racha</span></div></div>
+      <div class="stat"><span class="ico">⭐</span><div><b id="stXp">0</b><span>XP total</span></div></div>
+      <div class="stat nivel"><span class="ico">🎖️</span><div><b>Nivel <span id="stNivel">1</span></b><div class="barra mini"><div id="barraNivel"></div></div></div></div>
+      <div class="stat"><span class="ico">🏆</span><div><b id="stRetos">0/0</b><span>niveles superados</span></div></div>
+    </section>
+
+    <a class="continuar" href="retos.html">
+      <span class="ico">▶</span>
+      <span><b>Continuar con los retos</b><br><span id="continuarTxt"></span></span>
+    </a>
+
+    <h2 class="sec-tit">Aprende</h2>
+    <div class="grid destinos">
+      <a class="destino" style="--c:#22d3ee" href="lenguajes.html"><span class="ico">💻</span><h3>Lenguajes</h3><p>Python, JavaScript, Java, C, Go, Rust y más.</p><small data-cuenta="lenguajes"></small></a>
+      <a class="destino" style="--c:#fb923c" href="html-css.html"><span class="ico">🌐</span><h3>HTML y CSS</h3><p>Crea páginas web desde cero, con laboratorio en vivo.</p><small data-cuenta="htmlcss"></small></a>
+      <a class="destino" style="--c:#a78bfa" href="bases-de-datos.html"><span class="ico">🗄️</span><h3>Bases de datos</h3><p>SQL, MongoDB, Redis, grafos y más.</p><small data-cuenta="bd"></small></a>
+    </div>
+
+    <h2 class="sec-tit">Practica y pregunta</h2>
+    <div class="grid destinos">
+      <a class="destino" style="--c:#fbbf24" href="retos.html"><span class="ico">🏆</span><h3>Retos</h3><p>Niveles tipo Duolingo: de fácil a pruebas de software.</p><small>XP, vidas y racha diaria</small></a>
+      <a class="destino" style="--c:#4ade80" href="aprende.html"><span class="ico">🤖</span><h3>Chat con el tutor IA</h3><p>Pregunta lo que quieras y pega tu código para que lo revise.</p><small>Siempre en español</small></a>
+    </div>
+  </main>
+
+  <script type="module" src="js/inicio.js"></script>
+</body>
+</html>

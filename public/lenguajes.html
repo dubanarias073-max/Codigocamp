@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lenguajes · CódigoCamp</title>
+  <script src="js/tema.js"></script>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .aula{display:grid;grid-template-columns:290px minmax(0,1fr);gap:28px;max-width:1220px;margin:0 auto;padding:24px 24px 80px;align-items:start}
+    .aula .ruta{position:sticky;top:84px;display:flex;flex-direction:column;gap:12px;max-height:calc(100vh - 100px);overflow:auto;padding:18px;border-radius:18px;
+      border:1px solid color-mix(in srgb,currentColor 14%,transparent);background:color-mix(in srgb,currentColor 5%,transparent)}
+    .aula .ruta-t{margin:6px 0 0;font-size:13px;font-weight:700;opacity:.7}
+    .aula .langs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .aula .lg{--c:var(--acc,#4ade80);display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;font:inherit;font-size:14px;color:inherit;cursor:pointer;text-align:left;
+      border:1px solid color-mix(in srgb,currentColor 14%,transparent);background:none;transition:border-color .15s,background .15s}
+    .aula .lg b{flex:none;min-width:30px;padding:3px 0;border-radius:8px;text-align:center;font:700 11px ui-monospace,Consolas,monospace;color:#04130d;background:var(--c)}
+    .aula .lg:hover{border-color:var(--c)}
+    .aula .lg.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);font-weight:700}
+    .aula .pasos{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+    .aula .pasos button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:12px;border:0;background:none;color:inherit;font:inherit;font-size:14px;text-align:left;cursor:pointer}
+    .aula .pasos button:hover{background:color-mix(in srgb,currentColor 8%,transparent)}
+    .aula .pasos button.on{background:color-mix(in srgb,var(--acc,#4ade80) 16%,transparent);font-weight:700}
+    .aula .pasos span{flex:none;width:26px;height:26px;display:grid;place-items:center;border-radius:50%;font-size:12px;font-weight:700;border:1.5px solid color-mix(in srgb,currentColor 35%,transparent)}
+    .aula .pasos .ok span{border-color:var(--acc,#4ade80);background:var(--acc,#4ade80);color:#04130d}
+    .aula .prog{height:8px;border-radius:99px;overflow:hidden;background:color-mix(in srgb,currentColor 14%,transparent)}
+    .aula #progBar{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--cy,#22d3ee),var(--acc,#4ade80));transition:width .5s}
+    .aula #progTxt{font-size:12px;opacity:.7}
+    .aula .otro{font-size:13px;opacity:.8}.aula .otro a{color:var(--acc,#4ade80);font-weight:700}
+
+    .aula .leccion{display:flex;flex-direction:column;gap:20px;min-width:0}
+    .aula .teoria{padding:28px 30px;border-radius:20px;border:1px solid color-mix(in srgb,currentColor 14%,transparent);
+      background:linear-gradient(160deg,color-mix(in srgb,var(--c) 11%,transparent),color-mix(in srgb,currentColor 4%,transparent) 60%)}
+    .aula .etq{display:inline-block;margin-bottom:10px;padding:4px 12px;border-radius:99px;font-size:12px;font-weight:700;color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent)}
+    .aula .teoria h1{margin:0 0 10px;font-size:clamp(26px,3.4vw,36px);line-height:1.15}
+    .aula .teoria p{margin:0 0 14px;max-width:68ch;font-size:17px;line-height:1.6;opacity:.9}
+    .aula .teoria h2{margin:0 0 8px;font-size:15px}
+    .aula .teoria ul{margin:0;padding-left:20px;display:grid;gap:6px;line-height:1.5}
+
+    .aula .lab{border-radius:20px;overflow:hidden;border:1px solid color-mix(in srgb,currentColor 16%,transparent);background:color-mix(in srgb,currentColor 4%,transparent)}
+    .aula .lab-top{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid color-mix(in srgb,currentColor 14%,transparent)}
+    .aula .lab-top strong{margin-right:auto}
+    .aula .modo{font-size:12px;opacity:.7}
+    .aula #ed{display:block;width:100%;min-height:200px;padding:16px 18px;border:0;resize:vertical;box-sizing:border-box;tab-size:2;
+      font:15px/1.6 ui-monospace,Consolas,monospace;color:#d9f5ea;background:#07131a}
+    .aula #ed:focus{outline:2px solid var(--cy,#22d3ee);outline-offset:-2px}
+    .aula .sal-t{margin:0;padding:8px 18px;font-size:12px;font-weight:700;opacity:.7;border-top:1px solid color-mix(in srgb,currentColor 14%,transparent)}
+    .aula #out{margin:0;min-height:90px;padding:14px 18px;white-space:pre-wrap;overflow:auto;font:14px/1.6 ui-monospace,Consolas,monospace;color:#b8f7d4;background:#04100f}
+    .aula #out.err{color:#fca5a5}
+    .aula #vista{display:block;width:100%;height:300px;border:0;background:#fff}
+    .aula #vista[hidden]{display:none}
+    .aula .pie{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    @media (max-width:900px){
+      .aula{grid-template-columns:1fr;padding:16px 14px 70px}
+      .aula .ruta{position:static;max-height:none}
+      .aula .teoria{padding:22px 18px}
+    }
+  </style>
+</head>
+<body class="cargando" data-pagina="lenguajes">
+  <header class="bar">
+    <a class="logo" href="index.html"><img src="img/logo-icon.png" alt="" width="38" height="38"><span class="logo-txt">codigocamp</span></a>
+    <nav class="nav-sec" id="nav" aria-label="Secciones"></nav>
+    <div class="userbar" id="userbar"></div>
+    <button class="tema-btn" id="temaBtn" type="button" aria-label="Cambiar tema">☀️</button>
+  </header>
+
+  <div class="aula">
+    <aside class="ruta" aria-label="Ruta de aprendizaje">
+      <p class="ruta-t">Elige un lenguaje</p>
+      <div class="langs" id="langs"></div>
+      <p class="ruta-t" id="rutaTit"></p>
+      <ol class="pasos" id="pasos"></ol>
+      <div class="prog" role="progressbar" aria-label="Progreso del curso"><div id="progBar"></div></div>
+      <span id="progTxt"></span>
+      <p class="otro">¿Otro lenguaje? <a href="aprende.html">Pregúntale al tutor</a></p>
+    </aside>
+
+    <main class="leccion">
+      <article class="teoria" id="teoria" aria-live="polite"></article>
+
+      <section class="lab" aria-label="Practica">
+        <div class="lab-top">
+          <strong>Pruébalo tú</strong>
+          <span class="modo" id="modo"></span>
+          <button class="btn soft sm" id="reset" type="button">Restablecer</button>
+          <button class="btn pri sm" id="run" type="button">▶ Ejecutar</button>
+        </div>
+        <textarea id="ed" spellcheck="false" aria-label="Editor de código"></textarea>
+        <p class="sal-t">Resultado</p>
+        <pre id="out" aria-live="polite">Pulsa «Ejecutar» (o Ctrl + Enter) para ver el resultado.</pre>
+        <iframe id="vista" sandbox="allow-scripts" title="Vista previa" hidden></iframe>
+      </section>
+
+      <div class="pie">
+        <button class="btn ghost" id="prev" type="button">← Anterior</button>
+        <button class="btn pri" id="next" type="button">Marcar como hecha y seguir</button>
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    /* Cada lección: [título, explicación, puntos clave, código de ejemplo] */
+    const LEC = {
+      js: { n:'JavaScript', i:'JS', c:'#fbbf24', run:'js', l:[
+        ['Tu primer programa','JavaScript es el lenguaje de la web. Con console.log muestras un resultado.',['Cada instrucción termina con ;','Los textos van entre comillas','Las operaciones matemáticas se calculan solas'],'console.log("¡Hola, CódigoCamp!");\nconsole.log(2 + 3);'],
+        ['Variables y tipos','Una variable guarda un dato con nombre. Usa const si no va a cambiar y let si sí.',['const: valor fijo','let: valor que puede cambiar','Tipos básicos: texto, número y booleano'],'const nombre = "Ana";\nlet edad = 20;\nedad = edad + 1;\nconsole.log(nombre + " tiene " + edad + " años");'],
+        ['Decisiones y repeticiones','if elige un camino según una condición y for repite instrucciones.',['if (condición) { ... } else { ... }','for (inicio; condición; paso)','=== compara valores'],'for (let n = 1; n <= 5; n++) {\n  if (n % 2 === 0) console.log(n + " es par");\n  else console.log(n + " es impar");\n}'],
+        ['Funciones','Una función agrupa instrucciones para reutilizarlas cuantas veces quieras.',['function nombre(parámetros) { ... }','return devuelve un resultado','Función flecha: (a, b) => a + b'],'function saludar(nombre) {\n  return "Hola, " + nombre;\n}\nconst doble = (n) => n * 2;\nconsole.log(saludar("Ana"));\nconsole.log(doble(21));'],
+        ['Arreglos','Un arreglo guarda varios valores en orden.',['push añade al final','Los índices empiezan en 0','map crea un arreglo nuevo transformado'],'const frutas = ["manzana", "pera"];\nfrutas.push("uva");\nconsole.log(frutas.length);\nfor (const f of frutas) console.log(f);\nconsole.log(frutas.map((f) => f.toUpperCase()));'],
+        ['Objetos','Un objeto agrupa datos relacionados en pares clave: valor.',['Se accede con punto: alumno.nombre','Puedes añadir propiedades nuevas','Sirven para representar cosas reales'],'const alumno = { nombre: "Ana", nota: 9 };\nalumno.curso = "JavaScript";\nconsole.log(alumno.nombre, alumno.nota);\nconsole.log(alumno);'],
+        ['Texto','Los textos tienen métodos para medirlos, cambiarlos y partirlos.',['length cuenta las letras','toUpperCase pasa a mayúsculas','split divide el texto en un arreglo'],'const frase = "Aprender a programar";\nconsole.log(frase.length);\nconsole.log(frase.toUpperCase());\nconsole.log(frase.split(" "));\nconsole.log(`Tiene ${frase.length} letras`);'],
+        ['filter y reduce','filter se queda con los elementos que cumplen una condición y reduce los combina en un solo valor.',['filter devuelve un arreglo nuevo','reduce acumula un resultado','Ninguno modifica el arreglo original'],'const notas = [4, 7, 9, 5, 10];\nconst aprobadas = notas.filter((n) => n >= 5);\nconst suma = notas.reduce((a, n) => a + n, 0);\nconsole.log(aprobadas);\nconsole.log(suma / notas.length);'],
+        ['Errores con try y catch','try prueba un código y catch atrapa el error para que el programa no se detenga.',['finally se ejecuta siempre','e.name y e.message describen el error','Úsalo cuando algo puede fallar'],'try {\n  const dato = JSON.parse("{ esto no es JSON }");\n  console.log(dato);\n} catch (e) {\n  console.log("Algo falló:", e.name);\n} finally {\n  console.log("Siempre se ejecuta");\n}'],
+        ['Clases','Una clase es un molde para crear objetos con los mismos datos y acciones.',['constructor prepara el objeto','this se refiere al objeto actual','new crea un objeto a partir de la clase'],'class Perro {\n  constructor(nombre) {\n    this.nombre = nombre;\n  }\n  ladrar() {\n    return this.nombre + " dice guau";\n  }\n}\nconst p = new Perro("Toby");\nconsole.log(p.ladrar());']]},
+      py: { n:'Python', i:'PY', c:'#60a5fa', run:'py', l:[
+        ['Tu primer programa','Python se lee casi como el español. print muestra un resultado.',['No necesita ; al final','Los textos van entre comillas','La sangría (espacios) es parte del código'],'print("¡Hola, CódigoCamp!")\nprint(2 + 3)'],
+        ['Variables y operaciones','No hace falta declarar el tipo: Python lo deduce. Las f-strings mezclan texto y variables.',['f"texto {variable}"','** es potencia y // división entera','Los nombres distinguen mayúsculas'],'nombre = "Ana"\nedad = 20\nprint(f"{nombre} tiene {edad} años")\nprint("El año que viene tendrá", edad + 1)'],
+        ['Condiciones y bucles','if, elif y else deciden; for recorre una secuencia.',['Termina la línea con :','Lo de dentro lleva sangría','range(1, 6) va de 1 a 5'],'for n in range(1, 6):\n    if n % 2 == 0:\n        print(n, "es par")\n    else:\n        print(n, "es impar")'],
+        ['Listas','Una lista guarda varios valores en orden y puede crecer.',['append añade al final','len cuenta los elementos','for recorre la lista'],'frutas = ["manzana", "pera"]\nfrutas.append("uva")\nprint(len(frutas))\nfor f in frutas:\n    print(f.upper())'],
+        ['Funciones','def crea una función. Puede tener valores por defecto.',['return devuelve un resultado','Los parámetros pueden tener valor por defecto','Llama a la función por su nombre'],'def doble(n):\n    return n * 2\n\ndef saludar(nombre, saludo="Hola"):\n    return f"{saludo}, {nombre}"\n\nprint(doble(21))\nprint(saludar("Ana"))'],
+        ['Diccionarios','Un diccionario guarda pares clave: valor.',['Se accede con corchetes: d["clave"]','items() da clave y valor','Las claves no se repiten'],'alumno = {"nombre": "Ana", "nota": 9}\nalumno["curso"] = "Python"\nprint(alumno["nombre"])\nfor clave, valor in alumno.items():\n    print(clave, "->", valor)'],
+        ['Texto','Los textos tienen métodos para medirlos y transformarlos.',['len cuenta los caracteres','upper pasa a mayúsculas','split divide el texto en una lista'],'frase = "Aprender a programar"\nprint(len(frase))\nprint(frase.upper())\nprint(frase.split())\nprint(frase.replace("programar", "crear"))'],
+        ['Comprensión de listas','Una comprensión crea una lista nueva en una sola línea.',['[expresión for x in secuencia]','Se puede añadir if al final','Es más corta que un bucle normal'],'cuadrados = [n ** 2 for n in range(1, 6)]\npares = [n for n in range(1, 11) if n % 2 == 0]\nprint(cuadrados)\nprint(pares)'],
+        ['Errores con try y except','try prueba un código y except atrapa el error para que el programa siga.',['except ValueError atrapa un tipo concreto','finally se ejecuta siempre','Evita que el programa se caiga'],'try:\n    numero = int("abc")\nexcept ValueError:\n    print("No es un número válido")\nfinally:\n    print("Fin")'],
+        ['Clases','Una clase es un molde para crear objetos con datos y acciones.',['__init__ prepara el objeto','self es el objeto actual','Cada objeto es una instancia de la clase'],'class Perro:\n    def __init__(self, nombre):\n        self.nombre = nombre\n\n    def ladrar(self):\n        return f"{self.nombre} dice guau"\n\np = Perro("Toby")\nprint(p.ladrar())']]},
+      sql: { n:'SQL', i:'SQL', c:'#f472b6', run:'sql', l:[
+        ['Leer datos con SELECT','SQL consulta bases de datos. Aquí practicas con la tabla alumnos(id, nombre, curso, nota).',['SELECT elige columnas','FROM indica la tabla','* significa todas las columnas'],'SELECT * FROM alumnos;'],
+        ['Filtrar y ordenar','WHERE filtra filas y ORDER BY las ordena.',['WHERE nota >= 7','ORDER BY nota DESC: de mayor a menor','LIMIT 3 devuelve solo 3 filas'],'SELECT nombre, nota\nFROM alumnos\nWHERE nota >= 7\nORDER BY nota DESC;'],
+        ['Contar y promediar','Las funciones de agregación resumen muchas filas en un solo dato.',['COUNT(*) cuenta filas','AVG calcula el promedio','AS le pone nombre al resultado'],'SELECT COUNT(*) AS total, AVG(nota) AS promedio\nFROM alumnos;'],
+        ['Agrupar con GROUP BY','GROUP BY junta las filas que comparten un valor y calcula un resumen de cada grupo.',['Una fila por cada curso','Combina GROUP BY con COUNT o AVG','HAVING filtra grupos'],'SELECT curso, COUNT(*) AS alumnos, AVG(nota) AS promedio\nFROM alumnos\nGROUP BY curso;'],
+        ['Insertar y modificar','INSERT añade filas y UPDATE cambia las que ya existen. Aquí los cambios solo duran mientras se ejecuta el código.',['INSERT INTO tabla (columnas) VALUES (...)','UPDATE ... SET ... WHERE ...','Sin WHERE se modifican todas las filas'],'INSERT INTO alumnos (nombre, curso, nota)\nVALUES ("Eva", "SQL", 9.5);\n\nUPDATE alumnos SET nota = 7 WHERE nombre = "Sara";\n\nSELECT * FROM alumnos;'],
+        ['Buscar con LIKE','LIKE busca textos que siguen un patrón.',['% es cualquier cantidad de letras','_ es exactamente una letra','No distingue mayúsculas en SQLite'],'SELECT nombre, curso\nFROM alumnos\nWHERE nombre LIKE "M%" OR curso LIKE "%y%";'],
+        ['MAX, MIN y subconsultas','Una subconsulta es una consulta dentro de otra. Sirve para comparar contra un resultado calculado.',['MAX y MIN dan el mayor y el menor','La subconsulta va entre paréntesis','Se ejecuta primero la de dentro'],'SELECT nombre, nota\nFROM alumnos\nWHERE nota = (SELECT MAX(nota) FROM alumnos);'],
+        ['Crear tablas','CREATE TABLE define una tabla nueva con sus columnas y sus tipos.',['PRIMARY KEY identifica cada fila','NOT NULL obliga a dar un valor','Tipos comunes: INTEGER, TEXT, REAL'],'CREATE TABLE cursos (\n  id INTEGER PRIMARY KEY,\n  nombre TEXT NOT NULL\n);\nINSERT INTO cursos (nombre) VALUES ("HTML"), ("Python");\nSELECT * FROM cursos;'],
+        ['Unir tablas con JOIN','JOIN combina filas de dos tablas que comparten un dato.',['ON indica la condición de unión','Se pueden usar alias: alumnos a','Es la base de las bases de datos relacionales'],'CREATE TABLE cursos (nombre TEXT, horas INTEGER);\nINSERT INTO cursos VALUES ("HTML", 20), ("Python", 40), ("SQL", 15);\n\nSELECT a.nombre, c.horas\nFROM alumnos a\nJOIN cursos c ON c.nombre = a.curso;']]},
+      ts: { n:'TypeScript', i:'TS', c:'#38bdf8', run:'srv', l:[
+        ['Hola mundo','TypeScript es JavaScript con tipos que detectan errores antes de ejecutar.',['Se compila a JavaScript','Usa console.log para mostrar'],'console.log("¡Hola, CódigoCamp!");'],
+        ['Tipos','Indicas el tipo con dos puntos.',['number, string, boolean','Un tipo equivocado da error'],'const nombre: string = "Ana";\nlet edad: number = 20;\nconsole.log(nombre, edad + 1);'],
+        ['Funciones con tipos','Puedes indicar el tipo de cada parámetro y del resultado.',['Tipos en parámetros y en el resultado','El compilador avisa si te equivocas'],'function sumar(a: number, b: number): number {\n  return a + b;\n}\nconsole.log(sumar(2, 3));'],
+        ['Interfaces','Una interface describe la forma que debe tener un objeto.',['Define nombres y tipos de propiedades','Si falta una propiedad, hay error'],'interface Alumno {\n  nombre: string;\n  nota: number;\n}\nconst a: Alumno = { nombre: "Ana", nota: 9 };\nconsole.log(a.nombre, a.nota);']]},
+      java: { n:'Java', i:'JV', c:'#fb923c', run:'srv', l:[
+        ['Hola mundo','Todo programa Java vive dentro de una clase y empieza en main.',['La clase se llama Main','System.out.println imprime una línea'],'public class Main {\n  public static void main(String[] args) {\n    System.out.println("¡Hola, CódigoCamp!");\n  }\n}'],
+        ['Variables y decisiones','Java exige indicar el tipo de cada variable.',['int, double, String, boolean','if (condición) { ... }'],'public class Main {\n  public static void main(String[] args) {\n    int edad = 20;\n    if (edad >= 18) System.out.println("Eres mayor de edad");\n    else System.out.println("Eres menor de edad");\n  }\n}'],
+        ['Bucles','for repite un bloque un número conocido de veces.',['for (inicio; condición; paso)','i++ suma 1 en cada vuelta'],'public class Main {\n  public static void main(String[] args) {\n    for (int i = 1; i <= 5; i++) {\n      System.out.println("Vuelta " + i);\n    }\n  }\n}'],
+        ['Métodos','Un método agrupa instrucciones. static permite llamarlo sin crear un objeto.',['Indica el tipo que devuelve','return devuelve el resultado'],'public class Main {\n  static int doble(int n) {\n    return n * 2;\n  }\n  public static void main(String[] args) {\n    System.out.println(doble(21));\n  }\n}']]},
+      c: { n:'C', i:'C', c:'#94a3b8', run:'srv', l:[
+        ['Hola mundo','C es un lenguaje rápido y cercano a la máquina.',['#include trae funciones','printf imprime; \\n es salto de línea'],'#include <stdio.h>\n\nint main() {\n  printf("¡Hola, CódigoCamp!\\n");\n  return 0;\n}'],
+        ['Variables y decisiones','Cada variable lleva su tipo y printf usa marcadores como %d.',['int guarda enteros','%d imprime un entero'],'#include <stdio.h>\n\nint main() {\n  int edad = 20;\n  if (edad >= 18) printf("Mayor de edad: %d\\n", edad);\n  return 0;\n}'],
+        ['Bucles','for repite un bloque un número conocido de veces.',['for (inicio; condición; paso)','%d muestra un entero'],'#include <stdio.h>\n\nint main() {\n  for (int i = 1; i <= 5; i++) {\n    printf("Vuelta %d\\n", i);\n  }\n  return 0;\n}'],
+        ['Funciones','Una función agrupa instrucciones y puede devolver un valor.',['Indica el tipo que devuelve','Se define antes de usarla'],'#include <stdio.h>\n\nint doble(int n) {\n  return n * 2;\n}\n\nint main() {\n  printf("%d\\n", doble(21));\n  return 0;\n}']]},
+      cpp: { n:'C++', i:'C++', c:'#818cf8', run:'srv', l:[
+        ['Hola mundo','C++ amplía C con clases y una biblioteca muy completa.',['cout imprime en pantalla','<< encadena los datos'],'#include <iostream>\nusing namespace std;\n\nint main() {\n  cout << "¡Hola, CódigoCamp!" << endl;\n  return 0;\n}'],
+        ['Variables y decisiones','Igual que en C, pero la salida es más cómoda.',['int, double, string','if / else como en C'],'#include <iostream>\nusing namespace std;\n\nint main() {\n  int edad = 20;\n  if (edad >= 18) cout << "Mayor de edad" << endl;\n  return 0;\n}'],
+        ['Bucles','for repite un bloque un número conocido de veces.',['for (inicio; condición; paso)','endl termina la línea'],'#include <iostream>\nusing namespace std;\n\nint main() {\n  for (int i = 1; i <= 5; i++) {\n    cout << "Vuelta " << i << endl;\n  }\n  return 0;\n}'],
+        ['Funciones','Una función agrupa instrucciones y puede devolver un valor.',['Indica el tipo que devuelve','return devuelve el resultado'],'#include <iostream>\nusing namespace std;\n\nint doble(int n) {\n  return n * 2;\n}\n\nint main() {\n  cout << doble(21) << endl;\n  return 0;\n}']]},
+      cs: { n:'C#', i:'C#', c:'#a78bfa', run:'srv', l:[
+        ['Hola mundo','C# se usa en aplicaciones, videojuegos (Unity) y web.',['Console.WriteLine imprime una línea','using System; trae la clase Console'],'using System;\n\nclass Program {\n  static void Main() {\n    Console.WriteLine("¡Hola, CódigoCamp!");\n  }\n}'],
+        ['Variables y decisiones','Los tipos se indican antes del nombre.',['int, string, bool','var deduce el tipo'],'using System;\n\nclass Program {\n  static void Main() {\n    int edad = 20;\n    if (edad >= 18) Console.WriteLine("Mayor de edad");\n  }\n}'],
+        ['Bucles','for repite un bloque un número conocido de veces.',['for (inicio; condición; paso)','Se puede unir texto con +'],'using System;\n\nclass Program {\n  static void Main() {\n    for (int i = 1; i <= 5; i++) {\n      Console.WriteLine("Vuelta " + i);\n    }\n  }\n}'],
+        ['Métodos','Un método agrupa instrucciones y puede devolver un valor.',['static permite llamarlo desde Main','Por convención empiezan en mayúscula'],'using System;\n\nclass Program {\n  static int Doble(int n) {\n    return n * 2;\n  }\n  static void Main() {\n    Console.WriteLine(Doble(21));\n  }\n}']]},
+      php: { n:'PHP', i:'PHP', c:'#a5b4fc', run:'srv', l:[
+        ['Hola mundo','PHP funciona en el servidor y genera páginas web.',['Empieza con <?php','echo muestra texto'],'<?php\necho "¡Hola, CódigoCamp!";'],
+        ['Variables y decisiones','Las variables empiezan con $.',['$nombre = "Ana";','. une textos'],'<?php\n$edad = 20;\nif ($edad >= 18) {\n  echo "Mayor de edad";\n}'],
+        ['Bucles','for repite un bloque un número conocido de veces.',['for ($i = 1; $i <= 5; $i++)','Las comillas dobles reemplazan $variables'],'<?php\nfor ($i = 1; $i <= 5; $i++) {\n  echo "Vuelta $i\\n";\n}'],
+        ['Funciones','function agrupa instrucciones y puede devolver un valor.',['return devuelve el resultado','Los parámetros también llevan $'],'<?php\nfunction doble($n) {\n  return $n * 2;\n}\necho doble(21);']]},
+      go: { n:'Go', i:'GO', c:'#22d3ee', run:'srv', l:[
+        ['Hola mundo','Go es simple y rápido, creado en Google.',['package main es obligatorio','fmt.Println imprime'],'package main\n\nimport "fmt"\n\nfunc main() {\n  fmt.Println("¡Hola, CódigoCamp!")\n}'],
+        ['Variables y decisiones',':= crea una variable deduciendo el tipo.',['var o :=','if sin paréntesis'],'package main\n\nimport "fmt"\n\nfunc main() {\n  edad := 20\n  if edad >= 18 {\n    fmt.Println("Mayor de edad")\n  }\n}'],
+        ['Bucles','En Go solo existe for, y sirve para todo tipo de repetición.',['for inicio; condición; paso','No lleva paréntesis'],'package main\n\nimport "fmt"\n\nfunc main() {\n  for i := 1; i <= 5; i++ {\n    fmt.Println("Vuelta", i)\n  }\n}'],
+        ['Funciones','func define una función. Los tipos van después del nombre.',['Indica el tipo del resultado al final','return devuelve el valor'],'package main\n\nimport "fmt"\n\nfunc doble(n int) int {\n  return n * 2\n}\n\nfunc main() {\n  fmt.Println(doble(21))\n}']]},
+      rs: { n:'Rust', i:'RS', c:'#fdba74', run:'srv', l:[
+        ['Hola mundo','Rust es muy rápido y seguro con la memoria.',['fn main es el inicio','println! lleva signo de exclamación'],'fn main() {\n  println!("¡Hola, CódigoCamp!");\n}'],
+        ['Variables y decisiones','Las variables son inmutables salvo que uses mut.',['let crea una variable','let mut permite cambiarla'],'fn main() {\n  let mut edad = 20;\n  edad += 1;\n  if edad >= 18 {\n    println!("Mayor de edad: {}", edad);\n  }\n}'],
+        ['Bucles','for recorre un rango. 1..=5 incluye el 5.',['1..5 llega hasta el 4','1..=5 llega hasta el 5'],'fn main() {\n  for i in 1..=5 {\n    println!("Vuelta {}", i);\n  }\n}'],
+        ['Funciones','fn define una función. La última expresión sin ; es el resultado.',['-> indica el tipo que devuelve','Sin ; al final se devuelve el valor'],'fn doble(n: i32) -> i32 {\n  n * 2\n}\n\nfn main() {\n  println!("{}", doble(21));\n}']]},
+      swift: { n:'Swift', i:'SW', c:'#fb7185', run:'srv', l:[
+        ['Hola mundo','Swift es el lenguaje de las apps de Apple.',['print imprime','No necesita ;'],'print("¡Hola, CódigoCamp!")'],
+        ['Variables y decisiones','let es fijo y var puede cambiar.',['let nombre = "Ana"','if condición { ... }'],'let nombre = "Ana"\nvar edad = 20\nedad += 1\nif edad >= 18 {\n  print(nombre, "es mayor de edad")\n}'],
+        ['Bucles','for recorre un rango. 1...5 incluye el 5.',['1...5 llega hasta el 5','1..<5 llega hasta el 4'],'for i in 1...5 {\n  print("Vuelta", i)\n}'],
+        ['Funciones','func define una función. Indica el tipo que devuelve con ->.',['_ permite llamarla sin nombre de parámetro','return devuelve el valor'],'func doble(_ n: Int) -> Int {\n  return n * 2\n}\nprint(doble(21))']]},
+      kt: { n:'Kotlin', i:'KT', c:'#c084fc', run:'srv', l:[
+        ['Hola mundo','Kotlin se usa en Android y en servidores.',['fun main es el inicio','println imprime'],'fun main() {\n  println("¡Hola, CódigoCamp!")\n}'],
+        ['Variables y decisiones','val es fijo y var puede cambiar.',['Los textos aceptan $variable','if es una expresión'],'fun main() {\n  val nombre = "Ana"\n  var edad = 20\n  edad += 1\n  if (edad >= 18) println("$nombre es mayor de edad")\n}'],
+        ['Bucles','for recorre un rango. 1..5 incluye el 5.',['1..5 llega hasta el 5','until excluye el último'],'fun main() {\n  for (i in 1..5) {\n    println("Vuelta $i")\n  }\n}'],
+        ['Funciones','fun define una función. El tipo va después de los dos puntos.',['Indica el tipo que devuelve','return devuelve el valor'],'fun doble(n: Int): Int {\n  return n * 2\n}\n\nfun main() {\n  println(doble(21))\n}']]},
+      rb: { n:'Ruby', i:'RB', c:'#f87171', run:'srv', l:[
+        ['Hola mundo','Ruby está pensado para que programar sea agradable.',['puts imprime una línea','No lleva ; ni paréntesis obligatorios'],'puts "¡Hola, CódigoCamp!"'],
+        ['Variables y decisiones','Las variables se crean al asignarlas.',['"texto #{variable}"','if ... end'],'nombre = "Ana"\nedad = 20\nif edad >= 18\n  puts "#{nombre} es mayor de edad"\nend'],
+        ['Bucles','each recorre un rango o una lista ejecutando un bloque.',['(1..5) es un rango','|i| recibe cada valor'],'(1..5).each do |i|\n  puts "Vuelta #{i}"\nend'],
+        ['Métodos','def define un método. La última línea se devuelve sola.',['No hace falta return','end cierra el método'],'def doble(n)\n  n * 2\nend\n\nputs doble(21)']]}
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const ed = $('ed'), out = $('out');
+    let lang = location.hash.slice(1) in LEC ? location.hash.slice(1) : 'js', idx = 0;
+    let hechas = {};
+    try { hechas = JSON.parse(localStorage.getItem('cc_hechas')) || {}; } catch {}
+    const guardar = () => { try { localStorage.setItem('cc_hechas', JSON.stringify(hechas)); } catch {} };
+    const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+    function pintar() {
+      const L = LEC[lang], x = L.l[idx], hs = hechas[lang] || [];
+      $('langs').innerHTML = Object.entries(LEC).map(([k, v]) =>
+        `<button type="button" class="lg${k === lang ? ' on' : ''}" data-k="${k}" style="--c:${v.c}"><b>${v.i}</b>${v.n}</button>`).join('');
+      $('rutaTit').textContent = 'Lecciones de ' + L.n;
+      $('pasos').innerHTML = L.l.map((y, i) =>
+        `<li><button type="button" data-i="${i}" class="${i === idx ? 'on' : ''}${hs.includes(i) ? ' ok' : ''}"><span>${hs.includes(i) ? '✓' : i + 1}</span>${esc(y[0])}</button></li>`).join('');
+      $('progBar').style.width = (hs.length / L.l.length * 100) + '%';
+      $('progTxt').textContent = hs.length + ' de ' + L.l.length + ' lecciones hechas';
+      const t = $('teoria');
+      t.style.setProperty('--c', L.c);
+      t.innerHTML = `<span class="etq">${L.n} · lección ${idx + 1} de ${L.l.length}</span><h1>${esc(x[0])}</h1><p>${esc(x[1])}</p><h2>Puntos clave</h2><ul>${x[2].map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`;
+      ed.value = x[3];
+      out.className = ''; out.textContent = 'Pulsa «Ejecutar» (o Ctrl + Enter) para ver el resultado.';
+      $('modo').textContent = L.run === 'srv' ? 'Se ejecuta en el servidor' : L.run === 'web' ? 'Se ve al instante' : 'Se ejecuta en tu navegador';
+      $('vista').hidden = true; $('vista').removeAttribute('srcdoc'); out.hidden = false;
+      $('prev').disabled = idx === 0;
+      $('next').textContent = idx === L.l.length - 1 ? 'Marcar como hecha y terminar' : 'Marcar como hecha y seguir';
+      history.replaceState(null, '', '#' + lang);
+    }
+
+    $('langs').onclick = (e) => { const b = e.target.closest('[data-k]'); if (b) { lang = b.dataset.k; idx = 0; pintar(); } };
+    $('pasos').onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) { idx = +b.dataset.i; pintar(); } };
+    $('prev').onclick = () => { if (idx > 0) { idx--; pintar(); } };
+    $('next').onclick = () => {
+      (hechas[lang] ||= []); if (!hechas[lang].includes(idx)) hechas[lang].push(idx); guardar();
+      if (idx < LEC[lang].l.length - 1) idx++;
+      pintar(); scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    $('reset').onclick = () => { ed.value = LEC[lang].l[idx][3]; };
+    ed.onkeydown = (e) => {
+      if (e.key === 'Tab') { e.preventDefault(); const s = ed.selectionStart; ed.setRangeText('  ', s, ed.selectionEnd, 'end'); }
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ejecutar(); }
+    };
+    $('run').onclick = ejecutar;
+
+    /* ===== Ejecutores ===== */
+    const cargar = (u) => new Promise((ok, ko) => {
+      const s = document.createElement('script'); s.src = u; s.onload = ok;
+      s.onerror = () => ko(new Error('No se pudo descargar el motor. Revisa tu conexión.')); document.head.appendChild(s);
+    });
+    let pyo, SQL;
+    const RUN = {
+      // HTML y CSS: se ven en un recuadro aislado
+      web: async (code) => { const v = $('vista'); v.srcdoc = code; v.hidden = false; out.hidden = true; return ['', 0]; },
+      // JavaScript: en un iframe aislado, sin acceso a la página
+      js: (code) => new Promise((ok) => {
+        const f = document.createElement('iframe'); f.sandbox = 'allow-scripts'; f.hidden = true;
+        const fin = (t, e) => { removeEventListener('message', rec); clearTimeout(tm); f.remove(); ok([t, e]); };
+        const rec = (ev) => { if (ev.source === f.contentWindow && ev.data?.cc) fin(ev.data.t, ev.data.e); };
+        const tm = setTimeout(() => fin('Tiempo agotado: ¿hay un bucle infinito?', 1), 4000);
+        addEventListener('message', rec);
+        f.srcdoc = '<script>const L=[];let E=0;const fmt=(a)=>a.map(x=>typeof x==="object"?JSON.stringify(x):String(x)).join(" ");' +
+          'console.log=(...a)=>L.push(fmt(a));console.error=console.log;' +
+          'try{new Function(' + JSON.stringify(code).replace(/</g, '\\u003c') + ')()}catch(e){L.push("Error: "+e.message);E=1}' +
+          'setTimeout(()=>parent.postMessage({cc:1,t:L.join("\\n"),e:E},"*"),300)<\/script>';
+        document.body.appendChild(f);
+      }),
+      // Python: Pyodide (se descarga la primera vez)
+      async py(code) {
+        if (!pyo) { await cargar('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js'); pyo = await loadPyodide(); }
+        let t = '', e = 0;
+        pyo.setStdout({ batched: (s) => (t += s + '\n') }); pyo.setStderr({ batched: (s) => (t += s + '\n') });
+        try { await pyo.runPythonAsync(code); } catch (x) { t += String(x.message).trim().split('\n').slice(-3).join('\n'); e = 1; }
+        return [t, e];
+      },
+      // SQL: SQLite en el navegador con una tabla de práctica
+      async sql(code) {
+        if (!SQL) { await cargar('https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js'); SQL = await initSqlJs({ locateFile: (f) => 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/' + f }); }
+        const db = new SQL.Database();
+        db.run("CREATE TABLE alumnos(id INTEGER PRIMARY KEY,nombre TEXT,curso TEXT,nota REAL);INSERT INTO alumnos VALUES(1,'Ana','HTML',9.1),(2,'Luis','Python',6.4),(3,'Marta','SQL',8.2),(4,'Pablo','Python',7.5),(5,'Sara','HTML',5.8);");
+        try {
+          const rs = db.exec(code);
+          if (!rs.length) return ['Consulta ejecutada. No devolvió filas.', 0];
+          return [rs.map((r) => [r.columns.join(' | '), ...r.values.map((v) => v.join(' | '))].join('\n')).join('\n\n'), 0];
+        } catch (x) { return [x.message, 1]; } finally { db.close(); }
+      },
+      // Resto de lenguajes: los ejecuta el servidor
+      async srv(code, k) {
+        const r = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lenguaje: k, codigo: code }) });
+        if (r.status === 404) throw new Error('El ejecutor de ' + LEC[k].n + ' corre en el servidor y todavía no está activado (falta la ruta /api/run).');
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'No se pudo ejecutar el código.');
+        return [d.salida || '', !!d.error];
+      }
+    };
+
+    async function ejecutar() {
+      const b = $('run'); b.disabled = true; $('vista').hidden = true; out.hidden = false; out.className = ''; out.textContent = 'Ejecutando…';
+      try { const [t, e] = await RUN[LEC[lang].run](ed.value, lang); out.className = e ? 'err' : ''; out.textContent = t.trim() || '(el programa no mostró nada)'; }
+      catch (x) { out.className = 'err'; out.textContent = x.message; }
+      b.disabled = false;
+    }
+
+    /* ===== Barra superior ===== */
+    const sec = [['inicio.html', 'Inicio'], ['lenguajes.html', 'Lenguajes'], ['html-css.html', 'HTML y CSS'], ['bases-de-datos.html', 'Bases de datos'], ['retos.html', 'Retos'], ['aprende.html', 'Tutor IA']];
+    $('nav').innerHTML = sec.map(([h, t]) => `<a href="${h}"${h === 'lenguajes.html' ? ' class="on"' : ''}>${t}</a>`).join('');
+    import('./js/auth.js').then(async (m) => {
+      const u = await m.getUser();
+      $('userbar').innerHTML = u ? `<a class="btn ghost sm" href="inicio.html">${esc(u.nombre)}</a>` : '<a class="btn ghost sm" href="login.html">Iniciar sesión</a>';
+    }).catch(() => {});
+
+    document.body.classList.remove('cargando');
+    pintar();
+  </script>
+</body>
+</html>

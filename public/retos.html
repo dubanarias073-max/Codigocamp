@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Retos · CódigoCamp</title>
+  <script src="js/tema.js"></script>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="cargando" data-pagina="retos">
+  <header class="bar">
+    <a class="logo" href="index.html"><img src="img/logo-icon.png" alt="" width="38" height="38"><span class="logo-txt">codigocamp</span></a>
+    <nav class="nav-sec" id="nav" aria-label="Secciones"></nav>
+    <div class="userbar" id="userbar"></div>
+    <button class="tema-btn" id="temaBtn" type="button" aria-label="Cambiar tema">☀️</button>
+  </header>
+
+  <main class="retos">
+    <section class="stats-bar" aria-label="Tu progreso">
+      <div class="stat"><span class="ico">🔥</span><div><b id="stRacha">0</b><span>días de racha</span></div></div>
+      <div class="stat"><span class="ico">⭐</span><div><b id="stXp">0</b><span>XP total</span></div></div>
+      <div class="stat nivel"><span class="ico">🎖️</span><div><b>Nivel <span id="stNivel">1</span></b><div class="barra mini"><div id="barraNivel"></div></div></div></div>
+    </section>
+    <h1 class="tit">Retos</h1>
+    <p class="note tit-sub">Supera niveles, gana XP y mantén tu racha. Empieza por donde quieras: cada ruta tiene su propia dificultad.</p>
+    <div id="mapa"></div>
+  </main>
+
+  <!-- Pantalla de juego -->
+  <div id="juego" class="juego" hidden>
+    <div class="juego-top">
+      <button id="salirJ" class="cerrar" type="button" aria-label="Salir del nivel">✕</button>
+      <div class="barra"><div id="barraJ"></div></div>
+      <span id="vidas" class="vidas" aria-label="Vidas"></span>
+    </div>
+    <div class="juego-cuerpo"><div id="cuerpoJ" class="juego-in"></div></div>
+    <div id="pieJ" class="pie">
+      <div class="pie-in">
+        <div id="msgJ" class="pie-msg" aria-live="polite"></div>
+        <button id="btnJ" class="btn pri lg" type="button">Comprobar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/retos.js"></script>
+</body>
+</html>

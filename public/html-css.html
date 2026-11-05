@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HTML y CSS · CódigoCamp</title>
+  <script src="js/tema.js"></script>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="cargando" data-pagina="htmlcss">
+  <header class="bar">
+    <a class="logo" href="index.html"><img src="img/logo-icon.png" alt="" width="38" height="38"><span class="logo-txt">codigocamp</span></a>
+    <nav class="nav-sec" id="nav" aria-label="Secciones"></nav>
+    <div class="userbar" id="userbar"></div>
+    <button class="tema-btn" id="temaBtn" type="button" aria-label="Cambiar tema">☀️</button>
+  </header>
+
+  <div class="app">
+    <aside class="side">
+      <div class="seg" id="cursoSel" hidden></div>
+      <div id="langsWrap" class="langsel" hidden>
+        <label for="langSel">Lenguaje</label>
+        <select id="langSel"></select>
+        <p class="note">¿Otro lenguaje? Pregúntale al tutor.</p>
+      </div>
+      <p class="side-t" id="sideTitle"></p>
+      <div class="lista" id="steps"></div>
+    </aside>
+
+    <main class="content">
+      <article class="card" id="lesson"></article>
+    </main>
+
+    <section class="panel" id="panel">
+      <div class="ptabs">
+        <button type="button" id="tabLab" class="on">🧪 Laboratorio</button>
+        <button type="button" id="tabTutor">🤖 Tutor IA</button>
+      </div>
+
+      <div id="paneLab" class="pane">
+        <p class="note">Escribe código y mira el resultado al instante.</p>
+        <label class="modelabel">Modo
+          <select id="mode"><option value="html">HTML y CSS</option><option value="js">JavaScript (consola)</option></select>
+        </label>
+        <textarea class="ed" id="ed" spellcheck="false" aria-label="Editor de código"></textarea>
+        <div class="row">
+          <button class="btn pri" id="run" type="button">▶ Ejecutar</button>
+          <button class="btn soft" id="fix" type="button">Pedir ayuda al tutor</button>
+        </div>
+        <iframe id="out" sandbox="allow-scripts" title="Resultado"></iframe>
+      </div>
+
+      <div id="paneTutor" class="pane chat" hidden>
+        <p class="note">Conoce HTML, CSS, todos los lenguajes y bases de datos. <a href="aprende.html">Abrir el chat completo</a></p>
+        <div class="chips" id="chips"></div>
+        <div id="log" aria-live="polite"></div>
+        <form class="send" id="f">
+          <textarea id="q" rows="1" placeholder="Escribe tu pregunta…" maxlength="3500"></textarea>
+          <button class="btn pri" id="b" type="submit">Enviar</button>
+        </form>
+        <p class="note" id="st"></p>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="js/leccion.js"></script>
+</body>
+</html>
