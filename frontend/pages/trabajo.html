@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trabajo · CódigoCamp</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <script src="/js/tema.js"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/trabajo.css">
+  <link rel="stylesheet" href="/css/tema.css">
+</head>
+<body class="cargando trabajo-pagina">
+  <div class="app trabajo-app ide" id="ide">
+    <!-- Barra de actividad: es el menú principal de la plataforma -->
+    <nav class="lado" id="lado" aria-label="Menú principal"></nav>
+
+    <!-- Explorador -->
+    <aside class="explorador" id="explorador" aria-label="Explorador">
+      <header class="exp-cab">
+        <span class="exp-titulo">EXPLORADOR</span>
+        <div class="exp-acciones">
+          <button type="button" class="icono-btn" id="nuevoArchivo" title="Nuevo archivo" aria-label="Nuevo archivo"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 1.5H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5zM9 1.5v4h4M8 8v4M6 10h4" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="icono-btn" id="nuevaCarpeta" title="Nueva carpeta" aria-label="Nueva carpeta"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.3c0-.4.3-.8.8-.8h3.4l1.2 1.6h6.3c.4 0 .8.3.8.8v7.8c0 .4-.3.8-.8.8H2.3c-.5 0-.8-.4-.8-.8zM8 7v4M6 9h4" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="icono-btn" id="colapsarTodo" title="Contraer carpetas" aria-label="Contraer carpetas"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h11v11h-11zM5 8h6" fill="none" stroke="currentColor" stroke-width="1.1"/></svg></button>
+        </div>
+      </header>
+      <div class="exp-seccion"><svg class="chev abierta" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><b>MI-PROYECTO</b><span class="exp-nube" id="expNube" title="Guardado en tu cuenta">CUENTA</span></div>
+      <div id="arbol" class="arbol"></div>
+    </aside>
+    <div class="sash sash-v" id="sashExp" role="separator" aria-orientation="vertical" aria-label="Cambiar el ancho del explorador" tabindex="0"></div>
+
+    <!-- Editor + panel inferior -->
+    <main class="centro trabajo-centro" id="contenido">
+      <div class="pestanas-barra">
+        <div class="pestanas" id="pestanas" role="tablist" aria-label="Archivos abiertos"></div>
+        <div class="pestanas-acciones">
+          <button type="button" class="icono-btn" id="ejecutar" title="Ejecutar archivo (Ctrl+Enter)" aria-label="Ejecutar archivo"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.8v10.4L13 8z" fill="currentColor"/></svg></button>
+          <button type="button" class="icono-btn" id="vistaPrevia" title="Abrir vista previa de la página" aria-label="Abrir vista previa"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.1"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.1"/></svg></button>
+          <button type="button" class="icono-btn" id="guardar" title="Guardar ahora (Ctrl+S)" aria-label="Guardar ahora"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h8.2l2.8 2.8v8.2h-11zM5 2.5v3.5h5V2.5M5 13.5V9h6v4.5" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg></button>
+        </div>
+      </div>
+      <div class="migas" id="migas" aria-label="Ruta del archivo"></div>
+
+      <div class="area-editor" id="areaEditor">
+        <div class="editores" id="editores"></div>
+        <section class="bienvenida" id="bienvenida" aria-label="Bienvenida">
+          <div class="bienvenida-marca" aria-hidden="true">CC</div>
+          <h1>Tu espacio de trabajo</h1>
+          <p>Crea archivos, escríbelos aquí y ejecútalos desde la terminal. Todo se guarda en tu cuenta.</p>
+          <ul>
+            <li><button type="button" data-accion="nuevo-archivo">Nuevo archivo</button><kbd>explorador ＋</kbd></li>
+            <li><button type="button" data-accion="terminal">Abrir la terminal</button><kbd>Ctrl + `</kbd></li>
+            <li><button type="button" data-accion="guardar">Guardar ahora</button><kbd>Ctrl + S</kbd></li>
+            <li><span>Ejecutar el archivo abierto</span><kbd>Ctrl + Enter</kbd></li>
+          </ul>
+        </section>
+        <section class="vista-panel" id="panelVista" hidden aria-label="Vista previa del proyecto">
+          <div class="vista-cab">
+            <span id="vistaRuta">Vista previa</span>
+            <button type="button" class="icono-btn" id="vistaRecargar" title="Recargar la vista previa" aria-label="Recargar la vista previa"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></button>
+          </div>
+          <iframe id="vista" title="Vista previa del proyecto" sandbox="allow-scripts allow-popups"></iframe>
+        </section>
+      </div>
+
+      <div class="sash sash-h" id="sashPanel" role="separator" aria-orientation="horizontal" aria-label="Cambiar la altura del panel" tabindex="0" hidden></div>
+      <section id="terminalPanel" hidden aria-label="Panel inferior"></section>
+    </main>
+
+    <!-- Asistente de IA -->
+    <aside class="asistente" id="asistente" aria-label="Asistente de programación">
+      <header class="asistente-cab"><div class="asistente-marca">CC</div><div><h2>Asistente</h2><small id="cursoAsistente">Tutor de CódigoCamp</small></div></header>
+      <div class="asistente-contexto">La IA verá el archivo que tengas abierto para poder ayudarte con él.</div>
+      <div class="asistente-chat" id="chat" aria-live="polite"></div>
+      <form class="asistente-form" id="preguntar">
+        <textarea id="pregunta" rows="3" maxlength="900" placeholder="Pregunta sobre tu código…" aria-label="Pregunta para el asistente"></textarea>
+        <button class="btn pri" id="enviar" type="submit">Preguntar</button>
+      </form>
+      <p class="asistente-nota">Las respuestas usan el tutor de IA configurado en CódigoCamp.</p>
+    </aside>
+
+    <!-- Barra de estado -->
+    <footer class="estado-barra" id="estadoBar" role="contentinfo">
+      <div class="estado-izq">
+        <button type="button" class="estado-item" id="estRama" title="Rama de Git (abre la terminal)" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.5" fill="none" stroke="currentColor"/><circle cx="4.5" cy="12.5" r="1.5" fill="none" stroke="currentColor"/><circle cx="11.5" cy="5.5" r="1.5" fill="none" stroke="currentColor"/><path d="M4.5 5v6M11.5 7c0 2-2 2.5-7 3.5" fill="none" stroke="currentColor"/></svg><span id="estRamaNombre">main</span></button>
+        <button type="button" class="estado-item" id="estadoGuardado" role="status" aria-live="polite" title="Estado del guardado (clic para guardar ahora)">Sincronizando…</button>
+      </div>
+      <div class="estado-der">
+        <span class="estado-item" id="posicionCursor">Ln 1, Col 1</span>
+        <span class="estado-item" id="estIndent">Espacios: 2</span>
+        <span class="estado-item">UTF-8</span>
+        <span class="estado-item">LF</span>
+        <span class="estado-item" id="lenguajeArchivo">Texto sin formato</span>
+        <button type="button" class="estado-item" id="terminalToggle" aria-expanded="false" aria-controls="terminalPanel" title="Mostrar u ocultar el panel (Ctrl+`)">Terminal</button>
+        <button type="button" class="estado-item" id="asistenteToggle" aria-expanded="true" aria-controls="asistente" title="Mostrar u ocultar el asistente">Asistente</button>
+      </div>
+    </footer>
+  </div>
+
+  <nav class="inf" id="inf" aria-label="Menú principal móvil"></nav>
+  <script type="module" src="/js/trabajo.js"></script>
+</body>
+</html>

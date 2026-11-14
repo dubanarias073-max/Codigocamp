@@ -1,0 +1,20 @@
+// Iconos de archivo y carpeta (insignias de color, al estilo de los temas de VS Code).
+import { extension, nombreBase } from "./fs.js";
+
+const POR_EXT = {
+  html: ["‹›", "html"], htm: ["‹›", "html"], css: ["#", "css"], scss: ["#", "css"], js: ["JS", "js"], mjs: ["JS", "js"], cjs: ["JS", "js"], jsx: ["⚛", "ts"],
+  ts: ["TS", "ts"], tsx: ["⚛", "ts"], json: ["{}", "json"], py: ["Py", "py"], md: ["M↓", "md"], java: ["J", "java"], c: ["C", "c"], h: ["H", "c"],
+  cpp: ["C+", "c"], cc: ["C+", "c"], cs: ["C#", "cs"], go: ["Go", "go"], rs: ["Rs", "rs"], php: ["php", "php"], rb: ["Rb", "rb"], sql: ["SQL", "sql"],
+  sh: ["$", "sh"], bash: ["$", "sh"], swift: ["Sw", "rs"], kt: ["Kt", "kt"], svg: ["◇", "md"], yml: ["!", "sh"], yaml: ["!", "sh"], txt: ["≡", "txt"], gitignore: ["◆", "git"], env: ["⚙", "git"],
+};
+
+export function iconoArchivo(ruta) {
+  const [texto, clase] = POR_EXT[extension(ruta)] ?? (nombreBase(ruta) === ".gitignore" ? ["◆", "git"] : ["≡", "txt"]);
+  return `<span class="fi fi-${clase}" aria-hidden="true">${texto}</span>`;
+}
+
+export const iconoCarpeta = (abierta) => abierta
+  ? '<svg class="fi-carpeta" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8.2c0 .4.3.8.8.8h10.9l1.8-5.7H5.2L3.6 12.6M1.5 4.5V3.3c0-.4.3-.8.8-.8h3.4l1.2 1.6h5.6c.4 0 .8.3.8.8v1.6" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>'
+  : '<svg class="fi-carpeta" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.3c0-.4.3-.8.8-.8h3.4l1.2 1.6h6.3c.4 0 .8.3.8.8v7.8c0 .4-.3.8-.8.8H2.3c-.5 0-.8-.4-.8-.8z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>';
+
+export const chevron = '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';

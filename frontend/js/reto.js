@@ -15,6 +15,60 @@ else {
 
 // cola: las preguntas falladas vuelven al final hasta acertarlas
 let datos, cola = [], total = 0, hechas = 0, fallos = 0, vidas = 0, fase = "preguntar", render = null, ultimoOk = false, enCurso = false;
+let sonidoActivo = true, audioContext = null, audioDisponible = Boolean(window.AudioContext || window.webkitAudioContext), animacionRespuesta;
+try { sonidoActivo = localStorage.getItem("cc_sonido") !== "0"; } catch {}
+sonidoActivo = sonidoActivo && audioDisponible;
+
+function prepararAudio() {
+  if (!sonidoActivo || !audioDisponible) return;
+  try {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    audioContext ||= new AudioCtor();
+    const activacion = audioContext.resume();
+    if (activacion?.catch) activacion.catch(() => {
+      sonidoActivo = false;
+      audioDisponible = false;
+    });
+  } catch {
+    sonidoActivo = false;
+    audioDisponible = false;
+  }
+}
+
+function reproducirTono(frecuencia, inicio, duracion, forma, frecuenciaFinal = frecuencia) {
+  const oscilador = audioContext.createOscillator();
+  const volumen = audioContext.createGain();
+  oscilador.type = forma;
+  oscilador.frequency.setValueAtTime(frecuencia, inicio);
+  oscilador.frequency.exponentialRampToValueAtTime(frecuenciaFinal, inicio + duracion);
+  volumen.gain.setValueAtTime(0.0001, inicio);
+  volumen.gain.exponentialRampToValueAtTime(0.11, inicio + 0.015);
+  volumen.gain.exponentialRampToValueAtTime(0.0001, inicio + duracion);
+  oscilador.connect(volumen);
+  volumen.connect(audioContext.destination);
+  oscilador.start(inicio);
+  oscilador.stop(inicio + duracion + 0.02);
+}
+
+function reproducirRespuesta(correcta) {
+  if (!sonidoActivo || !audioContext || audioContext.state !== "running") return;
+  const ahora = audioContext.currentTime;
+  if (correcta) {
+    reproducirTono(720, ahora, 0.12, "sine", 880);
+    reproducirTono(990, ahora + 0.09, 0.18, "sine", 1320);
+  } else {
+    reproducirTono(410, ahora, 0.18, "triangle", 300);
+    reproducirTono(290, ahora + 0.13, 0.2, "triangle", 190);
+  }
+}
+
+function animarRespuesta(correcta) {
+  document.body.classList.remove("respuesta-correcta", "respuesta-incorrecta");
+  void document.body.offsetWidth;
+  document.body.classList.add(correcta ? "respuesta-correcta" : "respuesta-incorrecta");
+  clearTimeout(animacionRespuesta);
+  animacionRespuesta = setTimeout(() => document.body.classList.remove("respuesta-correcta", "respuesta-incorrecta"), 700);
+}
 
 // Barra de progreso animada + contador "3/10". `pulso` hace brillar la barra cuando avanza.
 function progreso(pulso) {
@@ -110,6 +164,9 @@ async function main() {
   try { datos = await api("/api/nivel/" + new URLSearchParams(location.search).get("nivel") + "/"); }
   catch (e) { $("cuerpo").innerHTML = ""; $("cuerpo").append(el("p", e.message, "vacio")); return; }
   vidas = datos.vidas; $("vidas").textContent = vidas;
+  if (/^#[0-9a-f]{6}$/i.test(datos.curso.color || "")) {
+    document.documentElement.style.setProperty("--curso", datos.curso.color);
+  }
   if (vidas <= 0) { enCurso = false; $("sinVidas").hidden = false; return; }
   cola = datos.retos.map((q) => ({ q, ultimo: null })); total = cola.length;
   document.title = datos.nivel.titulo + " · CódigoCamp";
@@ -141,6 +198,7 @@ async function comprobar() {
   const valor = render.obtener();
   if (valor == null) return;
   $("accion").disabled = true;
+  prepararAudio();
   try {
     let extra = null, cuerpo = { respuesta: valor };
     if (render.local) {
@@ -151,6 +209,8 @@ async function comprobar() {
     }
     const r = await api(`/api/reto/${cola[0].q.id}/responder/`, cuerpo);
     vidas = r.vidas; $("vidas").textContent = vidas; ultimoOk = r.correcto;
+    reproducirRespuesta(ultimoOk);
+    animarRespuesta(ultimoOk);
     if (!r.correcto) fallos++;
     render.bloquear(); feedback(r.correcto, r, extra);
     $("accion").textContent = "Continuar"; $("accion").className = "bj" + (r.correcto ? "" : " rojo"); $("accion").disabled = false; fase = "feedback";

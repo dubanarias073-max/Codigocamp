@@ -1,0 +1,253 @@
+"""TypeScript · Etapa 1: Primeros pasos con tipos."""
+from ..generador import K
+
+LISTA = [
+K("Qué es TypeScript",
+  d="lenguaje que añade tipos a JavaScript y detecta errores antes de ejecutar",
+  u="encontrar errores mientras escribes el código",
+  mas="TypeScript es un superconjunto de JavaScript: todo JavaScript válido también lo es. Los tipos solo existen al programar; al final el código se convierte en JavaScript normal.",
+  k=["TypeScript añade tipos a JavaScript.", "Todo código JavaScript válido es TypeScript válido.", "Los tipos se eliminan al compilar a JavaScript."],
+  sit="Tu proyecto JavaScript tiene errores por pasar texto donde iba un número y quieres detectarlos antes de ejecutar. ¿Qué usarías?",
+  cod="""const edad: number = 20;   // el tipo number detecta errores antes de ejecutar
+console.log("Edad:", edad);""",
+  h="guarda una edad con tipo number y la muestra",
+  pr=("TypeScript es JavaScript con ___. (5 letras: tipos)", "tipos"),
+  ec="creer que los tipos de TypeScript existen al ejecutar el programa"),
+K("Compilar con tsc",
+  d="paso que convierte el código TypeScript en JavaScript",
+  u="obtener un archivo que el navegador o Node puedan ejecutar",
+  mas="El compilador tsc lee los archivos .ts, revisa los tipos y genera archivos .js. Si hay errores de tipos te los muestra, y según la configuración puede generar el JS igualmente.",
+  k=["tsc compila TypeScript a JavaScript.", "El compilador revisa los tipos y muestra errores.", "Los archivos de TypeScript terminan en .ts."],
+  sit="Escribiste un archivo .ts y el navegador no lo entiende. ¿Qué paso necesitas?",
+  cod="""// En la terminal:  tsc hola.ts   -> crea hola.js
+const mensaje: string = "Compilado con tsc";
+console.log(mensaje);""",
+  h="muestra un mensaje que luego se compilaría con tsc",
+  pr=("El compilador de TypeScript se llama ___. (3 letras)", "tsc"),
+  ec="intentar ejecutar un archivo .ts directamente en el navegador"),
+K("console.log",
+  d="función que muestra valores en la consola",
+  u="ver resultados y depurar mientras programas",
+  mas="console.log acepta uno o varios valores separados por comas y los imprime. Es la herramienta más rápida para comprobar qué vale una variable.",
+  k=["console.log muestra valores en la consola.", "console.log acepta varios valores separados por comas.", "console.log ayuda a depurar el código."],
+  sit="Quieres ver el valor de una variable mientras pruebas tu programa. ¿Qué usas?",
+  cod="""const nombre: string = "Ana";
+console.log("Hola", nombre);   // muestra: Hola Ana""",
+  h="muestra un saludo con el nombre",
+  pr=("La función que escribe en la consola es console.___. (3 letras)", "log"),
+  ec="olvidar los paréntesis al llamar a console.log"),
+K("Anotaciones de tipo",
+  d="dos puntos y un tipo escritos después del nombre de una variable",
+  u="decir qué clase de valor guarda una variable",
+  mas="La forma es nombre: tipo. Si luego asignas un valor de otro tipo, TypeScript marca error. Así se evitan mezclas como sumar un texto con un número sin querer.",
+  k=["Una anotación de tipo se escribe con dos puntos.", "La anotación indica qué valores acepta la variable.", "Asignar un valor de otro tipo produce un error."],
+  sit="Quieres dejar claro que la variable precio solo guardará números. ¿Qué escribes?",
+  cod="""let precio: number = 9.5;   // : number es la anotación
+precio = 12;
+console.log(precio);""",
+  h="declara precio como número y cambia su valor",
+  pr=("La anotación de tipo usa el signo ___ después del nombre. (:)", ":", "dos puntos"),
+  ec="asignar un texto a una variable declarada como number",
+  err=("let edad: number = 20;\nedad = \"veinte\";\nconsole.log(edad);", 2, "edad es number y no puede recibir un texto.")),
+K("number",
+  d="tipo para todos los números, enteros o decimales",
+  u="guardar cantidades y hacer cálculos",
+  mas="TypeScript usa un solo tipo number para enteros y decimales. También incluye valores como Infinity y NaN. Permite operar con +, -, * y /.",
+  k=["number guarda enteros y decimales.", "number permite hacer cálculos aritméticos.", "NaN también es un valor de tipo number."],
+  sit="Debes guardar el precio de un producto con decimales. ¿Qué tipo usas?",
+  cod="""const precio: number = 19.99;
+const cantidad: number = 3;
+console.log(precio * cantidad);   // 59.97""",
+  h="multiplica un precio por una cantidad",
+  pr=("El tipo para los números es ___. (6 letras)", "number"),
+  ec="creer que hay un tipo distinto para enteros y decimales"),
+K("string",
+  d="tipo para guardar texto",
+  u="trabajar con nombres, mensajes y palabras",
+  mas="Un string se escribe entre comillas simples, dobles o invertidas. Tiene propiedades útiles como length y métodos como toUpperCase.",
+  k=["string guarda texto.", "Un string se escribe entre comillas.", "string tiene la propiedad length."],
+  sit="Necesitas guardar el nombre de un usuario. ¿Qué tipo usas?",
+  cod="""const nombre: string = "Luis";
+console.log(nombre.toUpperCase());   // LUIS
+console.log(nombre.length);          // 4""",
+  h="muestra el nombre en mayúsculas y su longitud",
+  pr=("El tipo para guardar texto es ___. (6 letras)", "string"),
+  ec="escribir un texto sin comillas"),
+K("boolean",
+  d="tipo con solo dos valores: true y false",
+  u="representar un sí o un no",
+  mas="Un boolean guarda verdadero o falso. Es el resultado de las comparaciones y lo que usan if y while para decidir.",
+  k=["boolean solo admite true o false.", "Las comparaciones dan un resultado boolean.", "if usa un boolean para decidir."],
+  sit="Quieres guardar si un usuario ya activó su cuenta (sí o no). ¿Qué tipo usas?",
+  cod="""const activo: boolean = true;
+const esMayor: boolean = 20 >= 18;   // resultado de comparar
+console.log(activo, esMayor);""",
+  h="guarda dos valores verdadero/falso y los muestra",
+  pr=("El tipo que solo vale true o false es ___. (7 letras)", "boolean"),
+  ec="escribir True con mayúscula inicial"),
+K("Inferencia de tipos",
+  d="capacidad de TypeScript de deducir el tipo sin que lo escribas",
+  u="escribir menos código manteniendo la seguridad de tipos",
+  mas="Si inicializas una variable con un valor, TypeScript deduce su tipo. Con let ciudad = \"Quito\" ya sabe que es string y no deja asignarle un número después.",
+  k=["La inferencia deduce el tipo a partir del valor.", "Una variable inferida también protege contra errores.", "Se puede omitir la anotación cuando el valor ya lo deja claro."],
+  sit="No quieres escribir el tipo en cada variable porque TypeScript ya lo adivina. ¿Qué capacidad aprovechas?",
+  cod="""let ciudad = "Quito";   // TypeScript infiere: string
+ciudad = "Lima";
+console.log(ciudad);""",
+  h="declara una variable sin tipo explícito y cambia su valor",
+  pr=("Cuando TypeScript deduce el tipo sin que lo escribas hay ___ de tipos. (9 letras)", "inferencia"),
+  ec="pensar que una variable sin anotación acepta cualquier tipo"),
+K("let y const",
+  d="palabras para declarar variables que cambian (let) o no cambian (const)",
+  u="elegir si el valor de una variable puede reasignarse",
+  mas="const impide reasignar la variable y es la opción por defecto. let se usa cuando el valor va a cambiar. Evita var, que tiene reglas de alcance confusas.",
+  k=["const declara variables que no se reasignan.", "let declara variables que pueden cambiar.", "Conviene usar const por defecto."],
+  sit="Declaras el valor de pi, que nunca debe cambiar. ¿Qué palabra usas?",
+  cod="""const pi: number = 3.14;   // no se puede reasignar
+let contador: number = 0;   // sí puede cambiar
+contador = contador + 1;
+console.log(pi, contador);""",
+  h="declara una constante y un contador que aumenta",
+  pr=("Para una variable que no cambia se usa ___. (5 letras)", "const"),
+  ec="reasignar una variable declarada con const",
+  err=("const total: number = 5;\ntotal = 6;\nconsole.log(total);", 2, "total es const y no se puede reasignar.")),
+K("Plantillas de texto",
+  d="textos entre comillas invertidas que permiten insertar valores con ${}",
+  u="construir mensajes mezclando texto y variables",
+  mas="Con comillas invertidas puedes escribir ${expresión} dentro del texto y se sustituye por su valor. También permiten varias líneas sin trucos.",
+  k=["Las plantillas de texto usan comillas invertidas.", "${} inserta un valor dentro del texto.", "Una plantilla puede ocupar varias líneas."],
+  sit="Quieres armar el mensaje «Hola Ana, tienes 20 años» con variables sin sumar textos a mano. ¿Qué usas?",
+  cod="""const nombre: string = "Ana";
+const edad: number = 20;
+console.log(`Hola ${nombre}, tienes ${edad} años`);   // usa comillas invertidas""",
+  h="arma un saludo con el nombre y la edad",
+  pr=("Dentro de una plantilla de texto los valores van en ${ ___ }. (una expresión)", "variable", "expresion", "expresión"),
+  ec="usar comillas normales y esperar que ${} funcione",
+  err=("const n: string = \"Ana\";\nconsole.log(\"Hola ${n}\");", 2, "Con comillas normales ${n} no se sustituye; hacen falta comillas invertidas.")),
+K("any",
+  d="tipo que desactiva la revisión de tipos para un valor",
+  u="salir del paso con datos de tipo desconocido (con cuidado)",
+  mas="Un valor any acepta cualquier cosa y TypeScript no lo comprueba. Es práctico al migrar código viejo, pero anula la protección, así que conviene evitarlo.",
+  k=["any desactiva la revisión de tipos.", "Un valor any acepta cualquier cosa.", "Usar mucho any elimina la ventaja de TypeScript."],
+  sit="Estás migrando código antiguo y no conoces el tipo de un dato, solo quieres que compile por ahora. ¿Qué usas?",
+  cod="""let dato: any = 5;   // any: sin revisión
+dato = "ahora soy texto";
+console.log(dato);""",
+  h="guarda primero un número y luego un texto en la misma variable",
+  pr=("El tipo que desactiva la revisión de tipos es ___. (3 letras)", "any"),
+  ec="usar any por costumbre en todas partes"),
+K("unknown",
+  d="tipo seguro para valores cuyo tipo aún no se conoce",
+  u="recibir datos desconocidos obligando a comprobarlos antes de usarlos",
+  mas="A diferencia de any, con unknown no puedes usar el valor hasta comprobar su tipo, por ejemplo con typeof. Es la opción segura para datos externos.",
+  k=["unknown obliga a comprobar el tipo antes de usar el valor.", "unknown es más seguro que any.", "typeof sirve para acotar un valor unknown."],
+  sit="Recibes un dato de una fuente externa y quieres obligarte a verificar su tipo antes de usarlo. ¿Qué usas?",
+  cod="""let valor: unknown = "hola";
+if (typeof valor === "string") {   // se comprueba antes de usar
+  console.log(valor.toUpperCase());
+}""",
+  h="comprueba que el valor es texto antes de pasarlo a mayúsculas",
+  pr=("El tipo seguro para datos desconocidos es ___. (7 letras)", "unknown"),
+  ec="usar un valor unknown sin comprobar su tipo antes"),
+K("null y undefined",
+  d="valores especiales que representan «sin valor» y «sin asignar»",
+  u="indicar la ausencia de un dato",
+  mas="undefined significa que la variable no tiene valor asignado; null significa vacío a propósito. Con strict activado, un number no puede ser null salvo que lo declares como number | null.",
+  k=["undefined significa que no se asignó ningún valor.", "null representa un valor vacío a propósito.", "Con strict un number no puede ser null sin declararlo."],
+  sit="Una variable aún no recibió ningún valor y quieres reflejarlo. ¿Qué valor tiene por defecto?",
+  cod="""let apodo: string | undefined;   // aún sin valor
+console.log(apodo);                // undefined
+apodo = "Pepe";
+console.log(apodo);""",
+  h="muestra una variable sin valor y luego con valor",
+  pr=("Una variable declarada sin valor es ___. (9 letras)", "undefined"),
+  ec="confundir null con undefined"),
+K("Arrays tipados",
+  d="listas donde todos los elementos son del mismo tipo",
+  u="guardar varios valores del mismo tipo juntos",
+  mas="Se escriben como number[] o Array<number>. TypeScript no deja añadir un elemento de otro tipo. Se accede por posición empezando en 0.",
+  k=["Un array tipado guarda elementos del mismo tipo.", "Se escribe como number[] o Array<number>.", "El primer elemento está en la posición 0."],
+  sit="Quieres guardar una lista de notas, todas numéricas. ¿Qué declaras?",
+  cod="""const notas: number[] = [7, 9, 8];   // lista de números
+notas.push(10);
+console.log(notas.length, notas[0]);""",
+  h="crea una lista de notas, añade una y muestra su tamaño y la primera",
+  pr=("Un array de números se escribe number___. ([])", "[]"),
+  ec="añadir a un array de números un elemento de texto",
+  err=("const notas: number[] = [7, 9];\nnotas.push(\"diez\");\nconsole.log(notas);", 2, "notas solo admite números, no texto.")),
+K("Tuplas",
+  d="arrays de longitud fija con un tipo para cada posición",
+  u="agrupar pocos valores de tipos distintos en orden fijo",
+  mas="Una tupla como [string, number] exige un texto primero y un número después. Es útil para pares como nombre y edad.",
+  k=["Una tupla tiene longitud fija.", "Cada posición de una tupla tiene su propio tipo.", "Las tuplas se escriben con corchetes y tipos distintos."],
+  sit="Quieres guardar un par fijo: primero el nombre y después la edad. ¿Qué usas?",
+  cod="""const persona: [string, number] = ["Ana", 20];   // texto y número, en ese orden
+console.log(persona[0], persona[1]);""",
+  h="guarda un nombre y una edad en una tupla",
+  pr=("Un array de longitud fija con tipos por posición es una ___. (5 letras)", "tupla"),
+  ec="poner los elementos de una tupla en distinto orden que sus tipos"),
+K("enum",
+  d="conjunto de constantes con nombre",
+  u="dar nombres legibles a un grupo de valores relacionados",
+  mas="Un enum agrupa opciones como Direccion.Arriba o Direccion.Abajo. Por defecto se numeran desde 0, pero también pueden ser textos.",
+  k=["Un enum agrupa constantes con nombre.", "Por defecto los miembros de un enum se numeran desde 0.", "Un enum evita usar números o textos sueltos."],
+  sit="Tu programa usa los estados «pendiente», «activo» y «cerrado» y no quieres escribirlos a mano cada vez. ¿Qué usas?",
+  cod="""enum Estado { Pendiente, Activo, Cerrado }   // 0, 1, 2
+const actual: Estado = Estado.Activo;
+console.log(actual, Estado[actual]);""",
+  h="define tres estados y muestra el actual",
+  pr=("La palabra para definir un grupo de constantes con nombre es ___. (4 letras)", "enum"),
+  ec="escribir el valor numérico a mano en lugar de usar el nombre del enum"),
+K("Operador ===",
+  d="comparación estricta que revisa valor y tipo",
+  u="comparar sin conversiones sorprendentes",
+  mas="=== devuelve true solo si valor y tipo son iguales. == convierte tipos antes de comparar y da resultados raros como 0 == \"\". En TypeScript se recomienda siempre ===.",
+  k=["=== compara valor y tipo.", "== convierte tipos y puede sorprender.", "Se recomienda usar === siempre."],
+  sit="Quieres comparar dos valores sin que JavaScript convierta tipos por su cuenta. ¿Qué operador usas?",
+  cod="""console.log(5 === 5);       // true
+console.log("5" === "5");   // true
+console.log(5 === Number("6"));   // false: valores distintos""",
+  h="compara valores con igualdad estricta",
+  pr=("El operador de igualdad estricta tiene ___ signos igual. (un número)", "3", "tres"),
+  ec="usar == y confiar en la conversión automática"),
+K("if y else",
+  d="estructura que ejecuta código solo si se cumple una condición",
+  u="tomar decisiones en el programa",
+  mas="if evalúa una condición entre paréntesis. Si es verdadera ejecuta su bloque; si no, ejecuta el bloque de else. Se pueden encadenar con else if.",
+  k=["if ejecuta código solo si la condición es verdadera.", "else se ejecuta cuando la condición es falsa.", "else if permite encadenar varias condiciones."],
+  sit="Debes mostrar «Mayor» si la edad es 18 o más y «Menor» en caso contrario. ¿Qué estructura usas?",
+  cod="""const edad: number = 20;
+if (edad >= 18) {
+  console.log("Mayor");   // si se cumple
+} else {
+  console.log("Menor");   // si no se cumple
+}""",
+  h="muestra Mayor o Menor según la edad",
+  pr=("La palabra para el caso contrario de un if es ___. (4 letras)", "else"),
+  ec="olvidar las llaves o los paréntesis de la condición"),
+K("Bucle for",
+  d="estructura que repite un bloque un número conocido de veces",
+  u="recorrer rangos o listas paso a paso",
+  mas="for tiene tres partes: inicio, condición y paso, separadas por punto y coma. También existe for...of para recorrer los elementos de un array directamente.",
+  k=["for repite un bloque varias veces.", "for tiene inicio, condición y paso.", "for...of recorre los elementos de un array."],
+  sit="Quieres mostrar los números del 1 al 5 sin escribir cinco veces el mismo código. ¿Qué usas?",
+  cod="""for (let i = 1; i <= 5; i++) {   // inicio; condición; paso
+  console.log("Vuelta", i);
+}""",
+  h="muestra las vueltas del 1 al 5",
+  pr=("El bucle que repite con inicio, condición y paso es ___. (3 letras)", "for"),
+  ec="crear un bucle cuya condición nunca deja de cumplirse"),
+K("Comentarios",
+  d="texto del código que el compilador ignora",
+  u="explicar el código a quien lo lea",
+  mas="// comenta una línea y /* ... */ comenta varias. Un buen comentario explica el porqué, no repite lo que ya dice el código.",
+  k=["Los comentarios son ignorados al compilar.", "// comenta una sola línea.", "/* */ permite comentar varias líneas."],
+  sit="Quieres dejar una nota sobre por qué hiciste un cálculo sin que afecte al programa. ¿Qué escribes?",
+  cod="""// Esto es un comentario de una línea
+/* Y este
+   ocupa varias líneas */
+console.log("Los comentarios no se ejecutan");""",
+  h="muestra un mensaje; los comentarios no se ejecutan",
+  pr=("El comentario de una línea empieza con ___. (//)", "//"),
+  ec="comentar lo obvio en lugar de explicar el motivo"),
+]

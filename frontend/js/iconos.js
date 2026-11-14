@@ -1,0 +1,41 @@
+const DIBUJOS = {
+  inicio: '<path d="m3 11 9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/><path d="m2 12 10-8 10 8"/>',
+  recompensas: '<path d="M5 8h14l-1 13H6L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2m-3 4v5m-2-2 2 2 2-2"/>',
+  chats: '<path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9h8m-8 4h5"/>',
+  aprende: '<path d="M3 5.5C6 4 9 4.5 12 6v14c-3-1.5-6-2-9-.5v-14Zm18 0C18 4 15 4.5 12 6v14c3-1.5 6-2 9-.5v-14Z"/><path d="M6 9h3m-3 3h3m6-3h3m-3 3h3"/>',
+  ia: '<path d="M12 3v3m0 12v3M3 12h3m12 0h3"/><rect x="6" y="7" width="12" height="10" rx="3"/><circle cx="10" cy="12" r="1"/><circle cx="14" cy="12" r="1"/><path d="M9 15h6"/>',
+  tienda: '<path d="M4 9h16l-1 12H5L4 9Z"/><path d="M8 9V6a4 4 0 0 1 8 0v3m-8 5h8"/>',
+  perfil: '<circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2H5Z"/>',
+  configuracion: '<path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1"/><circle cx="12" cy="12" r="4"/>',
+  trabajo: '<path d="M3 7h7l2 2h9v10H3V7Z"/><path d="M3 10h18m-12 3h6m-6 3h4"/>',
+  archivo: '<path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v5h5m-9 4h4m-4 4h4"/>',
+  carpeta: '<path d="M3 6h7l2 2h9v11H3V6Z"/><path d="M3 10h18"/>',
+  calendario: '<rect x="4" y="6" width="16" height="15" rx="2"/><path d="M8 3v6m8-6v6M4 11h16m-11 4h2m3 0h2m-7 3h2"/>',
+  diamante: '<path d="m12 2 8 8-8 12L4 10l8-8Z"/><path d="M4 10h16M8 3l4 7 4-7"/>',
+  impulso_xp: '<path d="m13 2-9 12h7l-1 8 10-13h-7l1-7Z"/>',
+  moneda_xp: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5c-.7-.8-1.8-1.2-3.1-1.2-1.6 0-2.7.8-2.7 2 0 3 5.2 1.4 5.2 4.2 0 1.2-1.1 2.2-2.9 2.2-1.4 0-2.7-.5-3.5-1.5M12 5.5v13"/>',
+  racha: '<path d="M13 2c1 4-2 5-1 8 1.4-1 2-2.2 2-4 4 3 6 6.1 5 10a7 7 0 0 1-14 0c0-3.2 1.8-5.8 5-8-.3 2.7.2 4.2 1.4 5.2C13 10.5 14 7 13 2Z"/><path d="M12 14c2 1.5 2.3 3.8 0 5-2.3-1.2-2-3.5 0-5Z"/>',
+  vidas: '<path d="M20.5 8.8c0 5-8.5 10.2-8.5 10.2S3.5 13.8 3.5 8.8A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 8.5 1.8Z"/><path d="M7.5 12h3l1.5-2.5 2 5 1.3-2.5h2.2"/>',
+  mega_vidas: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M10 7h4m-2-2v4m-2 4h4m-2-2v4"/>',
+  cofre_misterioso: '<path d="M3 9h18v11H3zM2 6h20v4H2z"/><path d="M10 10v3h4v-3m-2-7v3"/>',
+  cofre_legendario: '<path d="M3 9h18v11H3zM2 6h20v4H2z"/><path d="M10 10v3h4v-3m-2-8 1.2 2.4L16 5l-2.8 1.2L12 9l-1.2-2.8L8 5l2.8-.6L12 2Z"/>',
+  gafas_pro: '<path d="M3 12h3l2 5h4l2-5h3l2 5h2l2-8h-5l-2 2H8l-2-2H2l1 3Z"/>',
+  marco_dorado: '<rect x="4" y="3" width="16" height="18" rx="1"/><rect x="7" y="6" width="10" height="12" rx="1"/>',
+  estela_cohete: '<path d="M12 15 9 18H6v-3l3-3m3 3c3-1 6-4 7-11-7 1-10 4-11 7l4 4Z"/><path d="m6 18-3 3m6-4-1 4"/>',
+  aura_neon: '<circle cx="12" cy="12" r="8"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2m0-14-2 2M7 17l-2 2"/>',
+  corona_campeon: '<path d="m3 7 5 4 4-7 4 7 5-4-2 13H5L3 7Z"/><path d="M7 17h10"/>',
+  mascota_dragon: '<path d="M4 18c1-5 3-9 8-11l2-4 2 4 4 2-3 2 2 3-4 1-3-2-4 1-4 4Z"/><circle cx="15" cy="9" r="1"/>',
+  titulo_leyenda: '<path d="m12 2 2.6 6.1L21 9l-4.8 4.2 1.3 6.5-5.5-3.3-5.5 3.3 1.3-6.5L3 9l6.4-.9L12 2Z"/>',
+  xp15: '<circle cx="12" cy="12" r="9"/><path d="M14 7H9v5h4a2.5 2.5 0 1 1 0 5H8m4-13v16"/>',
+  xp30: '<path d="m12 2 2.2 6.8L21 11l-6.8 2.2L12 20l-2.2-6.8L3 11l6.8-2.2L12 2Z"/><path d="m19 16 .8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z"/>',
+  xp60: '<circle cx="12" cy="12" r="9"/><path d="M16 7H9v4h5a3 3 0 1 1 0 6H8m4-14v2m0 14v2"/>',
+  niveles2: '<path d="m12 2 9 5v10l-9 5-9-5V7l9-5Z"/><path d="M8 12h8m-4-4v8"/>',
+  niveles4: '<path d="m12 2 9 5v10l-9 5-9-5V7l9-5Z"/><path d="m8 12 2.5 2.5L16 9"/>',
+  perfecto: '<path d="m5 12 4 4L19 6"/>',
+  perfectos3: '<path d="m5 12 4 4L19 6"/><path d="M3 3v4m-2-2h4M19 17v4m-2-2h4"/>',
+};
+
+export function iconoSVG(clave, clase = "") {
+  const dibujo = DIBUJOS[clave] || '<path d="M4 4h16v16H4z"/><path d="M8 9h8m-8 4h8m-8 4h5"/>';
+  return `<svg class="${clase}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${dibujo}</svg>`;
+}

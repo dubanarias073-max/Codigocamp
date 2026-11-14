@@ -2,4 +2,4 @@
 from .conceptos.css import ETAPAS_CONCEPTOS
 from .generador import construir_etapas
 
-ETAPAS = construir_etapas(ETAPAS_CONCEPTOS)
+ETAPAS = construir_etapas(ETAPAS_CONCEPTOS, repaso=False)

@@ -6,7 +6,7 @@ Estructura (como Duolingo):
       └─ etapa      "Primeros pasos", "Fundamentos"...   -> tabla `etapas`
            └─ sección  "Estructura de la página"         -> tabla `secciones`
                 └─ lección  "Tu primera página"          -> tabla `niveles`
-                     └─ pregunta (unas 10 por lección)   -> tabla `retos`
+                     └─ pregunta (4 o más por lección)    -> tabla `retos`
 
 Cómo se escribe (ejemplo mínimo):
 
@@ -23,7 +23,7 @@ Cómo se escribe (ejemplo mínimo):
 """
 
 XP_ETAPA = [15, 20, 25, 30, 35]   # cada etapa da más XP que la anterior
-PREGUNTAS_POR_LECCION = 4          # mínimo recomendado (antes 10); `flask check-retos` avisa si una lección se aleja
+PREGUNTAS_POR_LECCION = 4          # mínimo validado; los cursos generados crean 5 por lección
 
 
 def _reto(tipo, enunciado, opciones, respuesta, codigo="", explicacion="", datos=None):
@@ -33,21 +33,29 @@ def _reto(tipo, enunciado, opciones, respuesta, codigo="", explicacion="", datos
 
 def O(pregunta, correcta, *falsas, codigo="", explicacion=""):
     """Elegir una opción. La primera es la correcta; el servidor baraja el orden."""
+    if not explicacion:
+        explicacion = f"La respuesta correcta es «{correcta}»."
     return _reto("opcion", pregunta, [correcta, *falsas], correcta, codigo, explicacion)
 
 
 def C(pregunta, *validas, codigo="", explicacion=""):
     """Escribir la respuesta. Se aceptan varias respuestas válidas (sin importar mayúsculas ni espacios)."""
+    if not explicacion and validas:
+        explicacion = f"Respuesta: {validas[0]}."
     return _reto("completar", pregunta, [], "|".join(validas), codigo, explicacion)
 
 
 def E(pregunta, codigo, linea, explicacion=""):
     """Encontrar la línea con el error (la línea se cuenta desde 1)."""
+    if not explicacion:
+        explicacion = f"El error está en la línea {linea}."
     return _reto("error", pregunta, [], str(linea), codigo, explicacion)
 
 
 def ORD(pregunta, *piezas, explicacion=""):
     """Ordenar piezas: se escriben en el orden CORRECTO; el servidor las baraja."""
+    if not explicacion:
+        explicacion = "Las piezas están ordenadas para formar el código correcto."
     return _reto("ordenar", pregunta, [], "", "", explicacion, {"piezas": list(piezas)})
 
 

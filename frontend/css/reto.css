@@ -19,6 +19,16 @@
 .capa .bj{display:block;margin-top:10px}
 .capa[hidden]{display:none}
 .r-tipo{margin:6px 0 0;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--cy)}
+.pantalla-reto{position:relative;min-height:100vh;background-image:radial-gradient(ellipse at 50% 0,color-mix(in srgb,var(--curso,var(--cy)) 17%,transparent),transparent 58%),linear-gradient(135deg,transparent 48%,color-mix(in srgb,var(--curso,var(--cy)) 4%,transparent) 50%,transparent 52%);background-size:100% 100%,32px 32px}
+.pantalla-reto::after{position:fixed;inset:0;z-index:0;content:"";pointer-events:none;opacity:0}
+.pantalla-reto>.r-top,.pantalla-reto>.r-cuerpo,.pantalla-reto>.r-pie{position:relative;z-index:1}
+.pantalla-reto.respuesta-correcta::after{background:radial-gradient(ellipse at 50% 50%,color-mix(in srgb,var(--acc) 18%,transparent),transparent 64%);animation:r-destello .65s ease-out}
+.pantalla-reto.respuesta-incorrecta::after{background:radial-gradient(ellipse at 50% 50%,color-mix(in srgb,var(--rojo) 17%,transparent),transparent 64%);animation:r-destello .65s ease-out}
+.r-barra{box-shadow:0 0 22px color-mix(in srgb,var(--curso,var(--cy)) 15%,transparent)}
+.r-barra i{background:linear-gradient(90deg,var(--curso,var(--cy)),var(--acc))}
+.r-cuerpo h1{animation:r-titulo .35s ease both}
+.r-pie.bien{box-shadow:0 -8px 44px color-mix(in srgb,var(--acc) 18%,transparent)}
+.r-pie.mal{box-shadow:0 -8px 44px color-mix(in srgb,var(--rojo) 18%,transparent)}
 .lineas{display:grid;gap:4px;margin-bottom:12px}
 .zona-resp,.banco{display:flex;flex-wrap:wrap;gap:8px;min-height:54px;padding:10px;margin-bottom:14px;border:2px dashed var(--borde);border-radius:14px}
 .banco{border-style:solid;background:var(--panel)}
@@ -42,9 +52,11 @@
 .r-cuerpo.entra{animation:r-entra .35s ease both}
 @media (prefers-reduced-motion:reduce){
   .r-barra i{transition:none}
-  .r-barra i::after,.r-barra.pulso,.r-cuerpo.entra{animation:none}
+  .r-barra i::after,.r-barra.pulso,.r-cuerpo.entra,.r-cuerpo h1,.pantalla-reto::after{animation:none}
 }
 .capa .bj{width:100%}
 @keyframes r-brillo{from{background-position:220% 0}to{background-position:-220% 0}}
 @keyframes r-pulso{0%{transform:scaleY(1)}40%{transform:scaleY(1.45);box-shadow:0 0 18px color-mix(in srgb,var(--acc) 65%,transparent)}100%{transform:scaleY(1)}}
 @keyframes r-entra{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes r-titulo{from{opacity:0;transform:translateY(8px);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
+@keyframes r-destello{0%{opacity:0;transform:scale(.88)}35%{opacity:1}100%{opacity:0;transform:scale(1.12)}}

@@ -27,6 +27,18 @@ if (yaDentro) {
   location.replace(yaDentro.onboarding ? "/pages/inicio.html" : "/pages/onboarding.html");
 } else {
   document.body.classList.remove("cargando");
+  const erroresGoogle = {
+    google_config: "El acceso con Google aún no está configurado. Puedes entrar con tu correo.",
+    google: "No se pudo completar el acceso con Google. Inténtalo otra vez.",
+    google_email: "Google no confirmó el correo de esta cuenta.",
+    google_conflict: "No se pudo vincular esta cuenta de Google. Contacta con soporte.",
+    google_inactive: "Esta cuenta está desactivada.",
+  };
+  const errorGoogle = erroresGoogle[new URLSearchParams(location.search).get("error")];
+  if (errorGoogle) {
+    mostrarError(errorGoogle);
+    history.replaceState(null, "", location.pathname);
+  }
 
   // Mostrar / ocultar contraseña: cada ojito controla su propio campo
   document.querySelectorAll(".pw-ver").forEach((boton) => {

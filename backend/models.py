@@ -15,11 +15,23 @@ class User(UserMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(150), unique=True, nullable=False, index=True)
+    google_id = db.Column(db.String(255), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     nombre = db.Column(db.String(50), nullable=False)
     activo = db.Column(db.Boolean, nullable=False, default=True)
     creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
     profile = db.relationship("Profile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+
+
+class UserWorkspace(db.Model):
+    __tablename__ = "espacios_trabajo"
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), unique=True, nullable=False)
+    archivos = db.Column(db.JSON, nullable=False, default=dict)
+    carpetas = db.Column(db.JSON, nullable=False, default=list)
+    git = db.Column(db.JSON, nullable=False, default=dict)
+    actualizado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
 
 class Course(db.Model):
@@ -102,7 +114,7 @@ class Section(db.Model):
 
 
 class Level(db.Model):
-    """Nodo del camino: lección (10 preguntas), práctica (repaso de la sección), cofre o trofeo (examen de la etapa)."""
+    """Nodo del camino: lección con preguntas, práctica, cofre o trofeo de etapa."""
     __tablename__ = "niveles"
     __table_args__ = (db.UniqueConstraint("seccion_id", "orden", name="uq_nivel_orden"),)
 

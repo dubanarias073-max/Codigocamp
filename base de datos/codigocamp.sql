@@ -35,14 +35,30 @@ SET NAMES utf8mb4;
 CREATE TABLE usuarios (
   id            INT          NOT NULL AUTO_INCREMENT,
   email         VARCHAR(150) NOT NULL,
+  google_id     VARCHAR(255) NULL,
   password_hash VARCHAR(255) NOT NULL,
   nombre        VARCHAR(50)  NOT NULL,
   activo        TINYINT(1)   NOT NULL DEFAULT 1,
   creado_en     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_usuarios_email (email)
+  UNIQUE KEY uq_usuarios_email (email),
+  UNIQUE KEY uq_usuarios_google_id (google_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Cuentas de acceso';
+
+CREATE TABLE espacios_trabajo (
+  id              INT          NOT NULL AUTO_INCREMENT,
+  usuario_id      INT          NOT NULL,
+  archivos        JSON         NOT NULL,
+  carpetas        JSON         NOT NULL,
+  git             JSON         NOT NULL,
+  actualizado_en  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_espacios_trabajo_usuario (usuario_id),
+  CONSTRAINT fk_espacios_trabajo_usuario FOREIGN KEY (usuario_id)
+    REFERENCES usuarios (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Archivos y estado didactico del espacio de trabajo personal';
 
 
 -- ======================== CATALOGO ===================================

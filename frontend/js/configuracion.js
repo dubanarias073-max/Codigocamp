@@ -8,6 +8,11 @@ $("codigo").textContent = user.codigo || "";
 $("meta").value = String(prog.perfil.meta_minutos);
 $("tema").value = user.tema || "auto";
 $("tema").onchange = () => aplicarTema($("tema").value); // vista previa al instante
+try { $("sonido").checked = localStorage.getItem("cc_sonido") !== "0"; } catch { $("sonido").checked = true; }
+$("sonido").onchange = () => {
+  try { localStorage.setItem("cc_sonido", $("sonido").checked ? "1" : "0"); }
+  catch { aviso("No se pudo guardar la preferencia de sonido en este navegador.", true); }
+};
 $("curso").innerHTML = (await api("/api/cursos/")).cursos.map((c) => `<option value="${c.slug}"${c.slug === prog.curso_actual?.slug ? " selected" : ""}>${esc(c.nombre)}</option>`).join("");
 $("f").onsubmit = async (e) => {
   e.preventDefault();

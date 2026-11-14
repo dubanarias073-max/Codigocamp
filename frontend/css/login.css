@@ -25,6 +25,11 @@
 #reglasPw li.ok::marker{content:"✓ "}
 .cambio{margin:16px 0 0;text-align:center;color:var(--sub)}
 .cambio a{color:var(--acc);font-weight:700}
+.google-acceso{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;margin-top:16px;padding:11px 14px;border:1px solid var(--borde);border-radius:9px;background:var(--panel);font-weight:700;text-decoration:none}
+.google-acceso:hover{border-color:var(--cy);background:var(--panel2)}
+.google-acceso span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#fff;color:#4285f4;font-weight:900}
+.separador-acceso{display:flex;align-items:center;gap:12px;margin:12px 0;color:var(--sub);font-size:12px}
+.separador-acceso::before,.separador-acceso::after{content:"";height:1px;flex:1;background:var(--borde)}
 @media (max-width:860px){.acceso-in{grid-template-columns:1fr;gap:28px}.beneficios{display:none}}
 /* Matching the CodeCamp studio interface. */
 :root{--bg:#f4f2eb;--panel:#fffefa;--panel2:#ece9df;--borde:#d9d5c9;--txt:#252c33;--sub:#737a7e;

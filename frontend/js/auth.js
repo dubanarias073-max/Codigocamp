@@ -2,9 +2,9 @@
 const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || "";
 
 // api(url) hace GET; api(url, datos) hace POST con JSON. Lanza Error con el mensaje del servidor.
-export async function api(url, datos) {
+export async function api(url, datos, metodo) {
   const r = await fetch(url, {
-    method: datos === undefined ? "GET" : "POST",
+    method: metodo || (datos === undefined ? "GET" : "POST"),
     credentials: "same-origin",
     headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
     body: datos === undefined ? undefined : JSON.stringify(datos),

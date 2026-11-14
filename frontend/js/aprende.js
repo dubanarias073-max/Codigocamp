@@ -1,42 +1,58 @@
 // Lógica de aprende.html
-import { iniciar, api, elegirCurso } from "/js/app.js";
+import { iniciar, api, elegirCurso, aviso } from "/js/app.js";
 import { logo } from "/js/logos.js";
 const { prog } = await iniciar("aprende");
 
-/* Cada lenguaje tiene su archivo en js/lecciones/ (se carga al elegirlo).
-   Para añadir un lenguaje: crea su archivo y agrega una línea aquí. */
-const LEC = {
-  html:  { n: "HTML",           i: "HTML", c: "#f97316", run: "web", f: "html",       l: [] },
-  css:   { n: "CSS",            i: "CSS",  c: "#2dd4bf", run: "web", f: "css",        l: [] },
-  bd:    { n: "Bases de datos", i: "BD",   c: "#f472b6", run: "ver", f: "bd",         l: [] },
-  js:    { n: "JavaScript",     i: "JS",   c: "#fbbf24", run: "js",  f: "javascript", l: [] },
-  py:    { n: "Python",         i: "PY",   c: "#60a5fa", run: "py",  f: "python",     l: [] },
-  sql:   { n: "SQL",            i: "SQL",  c: "#f472b6", run: "sql", f: "sql",        l: [] },
-  ts:    { n: "TypeScript",     i: "TS",   c: "#38bdf8", run: "ts",  f: "typescript", l: [] },
-  java:  { n: "Java",           i: "JV",   c: "#fb923c", run: "srv", f: "java",       l: [] },
-  c:     { n: "C",              i: "C",    c: "#94a3b8", run: "srv", f: "c",          l: [] },
-  cpp:   { n: "C++",            i: "C++",  c: "#818cf8", run: "srv", f: "cpp",        l: [] },
-  cs:    { n: "C#",             i: "C#",   c: "#a78bfa", run: "srv", f: "csharp",     l: [] },
-  php:   { n: "PHP",            i: "PHP",  c: "#a5b4fc", run: "srv", f: "php",        l: [] },
-  go:    { n: "Go",             i: "GO",   c: "#22d3ee", run: "srv", f: "go",         l: [] },
-  rs:    { n: "Rust",           i: "RS",   c: "#fdba74", run: "srv", f: "rust",       l: [] },
-  swift: { n: "Swift",          i: "SW",   c: "#fb7185", run: "srv", f: "swift",      l: [] },
-  kt:    { n: "Kotlin",         i: "KT",   c: "#c084fc", run: "srv", f: "kotlin",     l: [] },
-  rb:    { n: "Ruby",           i: "RB",   c: "#f87171", run: "srv", f: "ruby",       l: [] },
+/* Los cursos activos vienen de la API; esta tabla solo define el motor y los alias de archivos. */
+const CONFIG = {
+  html:       { k: "html", n: "HTML", c: "#f97316", run: "web" },
+  css:        { k: "css", n: "CSS", c: "#2dd4bf", run: "web" },
+  bd:         { k: "bd", n: "Bases de datos", c: "#f472b6", run: "ver" },
+  javascript: { k: "js", n: "JavaScript", c: "#fbbf24", run: "js" },
+  python:     { k: "py", n: "Python", c: "#60a5fa", run: "py" },
+  sql:        { k: "sql", n: "SQL", c: "#f472b6", run: "sql" },
+  typescript: { k: "ts", n: "TypeScript", c: "#38bdf8", run: "ts" },
+  java:       { k: "java", n: "Java", c: "#fb923c", run: "srv" },
+  c:          { k: "c", n: "C", c: "#94a3b8", run: "srv" },
+  cpp:        { k: "cpp", n: "C++", c: "#818cf8", run: "srv" },
+  csharp:     { k: "cs", n: "C#", c: "#a78bfa", run: "srv" },
+  php:        { k: "php", n: "PHP", c: "#a5b4fc", run: "srv" },
+  go:         { k: "go", n: "Go", c: "#22d3ee", run: "srv" },
+  rust:       { k: "rs", n: "Rust", c: "#fdba74", run: "srv" },
+  swift:      { k: "swift", n: "Swift", c: "#fb7185", run: "srv" },
+  kotlin:     { k: "kt", n: "Kotlin", c: "#c084fc", run: "srv" },
+  ruby:       { k: "rb", n: "Ruby", c: "#f87171", run: "srv" },
 };
 
 const $ = (id) => document.getElementById(id);
 const ed = $('ed'), out = $('out');
 const TXT_INICIAL = 'Pulsa «Ejecutar» (o Ctrl + Enter) para ver el resultado.';
 const ALIAS = { javascript: 'js', python: 'py', typescript: 'ts', csharp: 'cs', rust: 'rs', kotlin: 'kt', ruby: 'rb', htmlcss: 'html' };
+let cursos = [];
+try { cursos = (await api("/api/cursos/")).cursos || []; }
+catch { aviso("No se pudo cargar el catálogo de cursos. Se mostrarán los cursos disponibles en esta versión.", true); }
+if (!cursos.length) cursos = Object.entries(CONFIG).map(([slug, curso]) => ({ slug, nombre: curso.n, sigla: curso.k }));
+const LEC = Object.create(null);
+cursos.forEach((curso) => {
+  if (!/^[a-z0-9_-]+$/.test(curso.slug || "")) return;
+  const config = CONFIG[curso.slug] || {};
+  const clave = config.k || curso.slug;
+  const color = /^#[\da-f]{6}$/i.test(curso.color || "") ? curso.color : config.c || "#4ade80";
+  LEC[clave] = { n: curso.nombre || config.n || curso.slug, i: curso.sigla || config.k || curso.slug.toUpperCase(),
+    c: color, run: config.run || "srv", f: curso.slug, l: [] };
+});
 const hash = location.hash.slice(1);
 // Sin #lenguaje en la dirección, se abre el curso que elegiste (el mismo que ves en Inicio).
 const claveDe = (slug) => Object.keys(LEC).find((k) => LEC[k].f === slug);
-let lang = Object.hasOwn(LEC, hash) ? hash : (ALIAS[hash] || claveDe(prog.curso_actual?.slug) || 'js');
+const cursoInicial = Object.hasOwn(LEC, hash) ? hash : (ALIAS[hash] || claveDe(prog.curso_actual?.slug) || 'js');
+let lang = LEC[cursoInicial] ? cursoInicial : Object.keys(LEC)[0];
 let idx = 0;
 let hechas = {};
+let codigosEditados = {};
 try { hechas = JSON.parse(localStorage.getItem('cc_hechas')) || {}; } catch {}
+try { codigosEditados = JSON.parse(localStorage.getItem('cc_codigos_aprende')) || {}; } catch {}
 const guardar = () => { try { localStorage.setItem('cc_hechas', JSON.stringify(hechas)); } catch {} };
+const guardarCodigo = () => { try { localStorage.setItem('cc_codigos_aprende', JSON.stringify(codigosEditados)); } catch {} };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /* ===== Selector de lenguajes (se dibuja siempre, aunque falle la carga) ===== */
@@ -105,7 +121,8 @@ function pintar() {
     (x[5] ? `<div class="nota-r"><b>🎯 Ahora tú</b><p>${esc(x[5])}</p></div>` : '') +
     `<a class="practicar" href="/pages/inicio.html?curso=${encodeURIComponent(L.f)}">Practicar ${esc(L.n)} con retos →</a>`;
 
-  ed.value = x[3];
+  const claveCodigo = lang + ':' + idx;
+  ed.value = typeof codigosEditados[claveCodigo] === 'string' ? codigosEditados[claveCodigo] : x[3];
   out.className = ''; out.textContent = TXT_INICIAL;
   $('modo').textContent = L.run === 'srv' ? 'Muestra el resultado esperado'
     : L.run === 'web' ? 'Se ve al instante'
@@ -135,7 +152,17 @@ $('next').onclick = () => {
   pintar();
   scrollTo({ top: 0, behavior: 'smooth' });
 };
-$('reset').onclick = () => { ed.value = LEC[lang].l[idx][3]; };
+$('reset').onclick = () => {
+  delete codigosEditados[lang + ':' + idx];
+  guardarCodigo();
+  ed.value = LEC[lang].l[idx][3];
+  out.textContent = TXT_INICIAL;
+  out.className = '';
+};
+ed.addEventListener('input', () => {
+  codigosEditados[lang + ':' + idx] = ed.value;
+  guardarCodigo();
+});
 ed.onkeydown = (e) => {
   if (e.key === 'Tab') { e.preventDefault(); const s = ed.selectionStart; ed.setRangeText('  ', s, ed.selectionEnd, 'end'); }
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ejecutar(); }
@@ -201,7 +228,12 @@ const RUN = {
       SQL = await initSqlJs({ locateFile: (f) => 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/' + f });
     }
     const db = new SQL.Database();
-    db.run("CREATE TABLE alumnos(id INTEGER PRIMARY KEY,nombre TEXT,curso TEXT,nota REAL);INSERT INTO alumnos VALUES(1,'Ana','HTML',9.1),(2,'Luis','Python',6.4),(3,'Marta','SQL',8.2),(4,'Pablo','Python',7.5),(5,'Sara','HTML',5.8);");
+    db.run("CREATE TABLE alumnos(id INTEGER PRIMARY KEY,nombre TEXT,curso TEXT,nota REAL);INSERT INTO alumnos VALUES(1,'Ana','HTML',9.1),(2,'Luis','Python',6.4),(3,'Marta','SQL',8.2),(4,'Pablo','Python',7.5),(5,'Sara','HTML',5.8);"
+      + "CREATE TABLE instructores(id INTEGER PRIMARY KEY,nombre TEXT);INSERT INTO instructores VALUES(1,'Carla'),(2,'Diego');"
+      + "CREATE TABLE cursos(id INTEGER PRIMARY KEY,titulo TEXT,instructor_id INTEGER);INSERT INTO cursos VALUES(1,'HTML',1),(2,'Python',2),(3,'SQL',1),(4,'Rust',2);"
+      + "CREATE TABLE alumnos2(id INTEGER PRIMARY KEY,nombre TEXT,curso_id INTEGER);INSERT INTO alumnos2 VALUES(1,'Ana',1),(2,'Luis',2),(3,'Marta',3),(4,'Pablo',2),(5,'Sara',NULL);"
+      + "CREATE TABLE tallas(talla TEXT);INSERT INTO tallas VALUES('S'),('M'),('L');CREATE TABLE colores(color TEXT);INSERT INTO colores VALUES('rojo'),('azul');"
+      + "CREATE TABLE empleados(id INTEGER PRIMARY KEY,nombre TEXT,jefe_id INTEGER);INSERT INTO empleados VALUES(1,'Rosa',NULL),(2,'Iván',1),(3,'Noé',1);");
     try {
       const rs = db.exec(code);
       if (!rs.length) return ['Consulta ejecutada. No devolvió filas.', 0];

@@ -1,1 +1,5 @@
 /* Estilos de configuracion.html (lo común de la aplicación está en app.css) */
+.preferencia-sonido{display:flex;align-items:flex-start;gap:12px;margin:6px 0 20px;padding:14px;border:1px solid var(--borde);border-radius:12px;background:var(--panel2);cursor:pointer}
+.preferencia-sonido input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--acc)}
+.preferencia-sonido span{display:grid;gap:3px}
+.preferencia-sonido small{color:var(--sub);font-weight:400}
