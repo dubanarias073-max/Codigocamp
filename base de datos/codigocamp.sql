@@ -60,6 +60,21 @@ CREATE TABLE espacios_trabajo (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Archivos y estado didactico del espacio de trabajo personal';
 
+CREATE TABLE archivos_trabajo (
+  id          INT          NOT NULL AUTO_INCREMENT,
+  usuario_id  INT          NOT NULL,
+  hash        CHAR(64)     NOT NULL COMMENT 'SHA-256 del contenido',
+  tipo        VARCHAR(100) NOT NULL COMMENT 'Tipo MIME (image/png, video/mp4, application/pdf...)',
+  tamano      BIGINT       NOT NULL COMMENT 'Bytes (max 1 GB por archivo, 10 GB por cuenta; ver backend/.env)',
+  creado_en   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_archivos_trabajo_usuario_hash (usuario_id, hash),
+  KEY idx_archivos_trabajo_usuario (usuario_id),
+  CONSTRAINT fk_archivos_trabajo_usuario FOREIGN KEY (usuario_id)
+    REFERENCES usuarios (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Archivos del espacio de trabajo; los bytes estan en disco (ALMACEN_ARCHIVOS/<usuario>/<hash>)';
+
 
 -- ======================== CATALOGO ===================================
 

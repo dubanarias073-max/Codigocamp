@@ -5,6 +5,8 @@
 import { color, quitarAnsi } from "./ansi.js";
 import * as FS from "./fs.js";
 import { ejecutarGit } from "./git.js";
+import { esMarcador, leerMarcador, formatoBytes } from "./archivos.js";
+import { importarEn } from "./importar.js";
 
 // ---------------------------------------------------------------- análisis ----
 function expandirVariable(linea, i, vars) {
@@ -170,11 +172,11 @@ export function comandoParaArchivo(ruta, cwd = "") {
 }
 
 const LENGUAJE_SERVIDOR = { java: "java", c: "c", cpp: "cpp", cc: "cpp", cs: "csharp", php: "php", go: "go", rs: "rust", swift: "swift", kt: "kotlin", rb: "ruby" };
-const NO_DISPONIBLE = ["npm", "npx", "pnpm", "yarn", "pip", "pip3", "apt", "apt-get", "brew", "sudo", "curl", "wget", "ssh", "docker", "make", "cmake", "cargo", "composer", "gem", "bundle", "vim", "nano", "vi", "emacs", "chmod", "chown", "kill", "ps", "top", "man"];
+const NO_DISPONIBLE = ["pnpm", "yarn", "apt", "apt-get", "brew", "sudo", "curl", "wget", "ssh", "docker", "make", "cmake", "cargo", "composer", "gem", "bundle", "vim", "nano", "vi", "emacs", "chmod", "chown", "kill", "ps", "top", "man"];
 
 export const NOMBRES_COMANDOS = [
   "cat", "cd", "clear", "cls", "code", "cp", "date", "echo", "env", "exit", "export", "find", "gcc", "g++", "gh", "git", "go", "grep", "head", "help",
-  "history", "java", "javac", "kotlinc", "ls", "mkdir", "mv", "node", "php", "pwd", "python", "python3", "rm", "rmdir", "ruby", "run", "rustc", "sqlite3",
+  "history", "java", "javac", "kotlinc", "ls", "vite", "mkdir", "mv", "node", "npm", "npx", "php", "pip", "pip3", "pwd", "python", "python3", "rm", "rmdir", "ruby", "run", "rustc", "sqlite3",
   "swift", "tail", "tree", "touch", "ts-node", "wc", "whoami", "dotnet", "py", "dir", "type", "ll",
 ];
 
@@ -183,12 +185,14 @@ const AYUDA = [
   "",
   color.azul("Archivos") + "   ls  cd  pwd  cat  touch  mkdir  rm  rmdir  mv  cp  tree  find  head  tail  wc  grep  echo  code <archivo>",
   color.azul("Shell") + "      comillas, $VARIABLES, comodines (*.js), pipes ( | ), encadenar ( && ; || ) y redirigir ( > >> )",
-  color.azul("Git") + "        git init | status | add | commit -m | log | diff | restore | branch | switch -c | remote | push   (git help)",
+  color.azul("Git") + "        git init | status | add | commit -m | log | diff | restore | branch | switch -c | remote | push · git clone <url> [carpeta|.]",
   color.azul("Ejecutar") + "   node archivo.js      python archivo.py      ts-node archivo.ts      sqlite3 archivo.sql",
+  color.azul("Paquetes") + "   pip install numpy      npm install dayjs react bootstrap… (se usan con import)      npm run <script>      npm init -y",
+  color.azul("React") + "      npm create vite@latest mi-app -- --template react   (o react-ts, vanilla, preact) → cd mi-app → npm run dev",
   "            go run · php · ruby · swift · java Archivo.java · gcc/g++ archivo -o prog && ./prog · rustc · kotlinc   (se ejecutan en el servidor)",
   color.azul("Atajos") + "     ↑/↓ historial · Tab completar · Ctrl+C cancelar · Ctrl+L limpiar · Ctrl+D salir",
   "",
-  color.gris("No hay sistema operativo real: npm, pip, sudo, curl, editores de terminal, etc. no están disponibles."),
+  color.gris("No es un sistema operativo real: sudo, curl, ssh, editores de terminal, etc. no están disponibles."),
 ].join("\n");
 
 // ----------------------------------------------------------------------- shell ----
@@ -201,8 +205,10 @@ export class Shell {
    * @param {(ruta:string)=>void} o.abrir     abre un archivo en el editor (comando `code`)
    * @param {object} o.ejecutores   { node, python, ts, servidor, sql } (ver ejecucion.js)
    */
-  constructor({ proyecto, cambio = () => {}, usuario = "estudiante", abrir = () => {}, ejecutores = {}, ahora = () => new Date() }) {
-    Object.assign(this, { proyecto, cambio, usuario, abrir, ejecutores, ahora });
+  constructor({ proyecto, cambio = () => {}, usuario = "estudiante", abrir = () => {}, ejecutores = {}, ahora = () => new Date(), github = null, paquetes = null,
+    importar = (origen, opciones) => importarEn(this.proyecto(), origen, opciones), leerArchivo = null, abrirVista = null }) {
+    Object.assign(this, { proyecto, cambio, usuario, abrir, ejecutores, ahora, github, paquetes, importar, leerArchivo, abrirVista });
+    this.tokenGitHub = null; // solo en memoria: se pierde al recargar la página y no se guarda en ningún sitio
   }
 
   nuevaSesion(extra = {}) {
@@ -257,10 +263,11 @@ export class Shell {
         destino = { ruta, anexar: etapa.redir.anexar, texto: d };
       }
       const alTerminal = ultima && !destino;
+      const senal = sesion.senal; // la de ESTE comando: si se cancela, lo que llegue tarde se descarta
       const io = {
         sesion, entrada, py: () => this.proyecto(),
-        out: (t) => { if (alTerminal) sesion.out(t); else buffer += t; },
-        err: (t) => sesion.err(t),
+        out: (t) => { if (senal?.aborted) return; if (alTerminal) sesion.out(t); else buffer += t; },
+        err: (t) => { if (!senal?.aborted) sesion.err(t); },
       };
       codigo = await this.#comando(argv, io);
       if (destino) {
@@ -279,7 +286,7 @@ export class Shell {
     if (nombre === undefined) return 0;
     const fn = COMANDOS[nombre];
     try {
-      if (fn) return (await fn.call(this, a, io)) ?? 0;
+      if (fn) return (await conCancelacion(fn.call(this, a, io), io.sesion.senal)) ?? 0;
       if (nombre.includes("/")) return await this.#ejecutarBinario(nombre, io);
       if (NO_DISPONIBLE.includes(nombre)) {
         io.err(`${nombre}: no está disponible en esta terminal.\nEs una terminal del navegador (no un sistema operativo): trabaja con tus archivos y ejecuta node, python, git y más. Escribe help.\n`);
@@ -318,7 +325,7 @@ export class Shell {
       return { desde, opciones: NOMBRES_COMANDOS.filter((n) => n.startsWith(parcial)).sort().map((n) => `${n} `) };
     }
     if (previas[previas.length - 1] === "git" && previas.length === 1) {
-      const subs = ["add", "branch", "checkout", "commit", "config", "diff", "help", "init", "log", "push", "remote", "reset", "restore", "status", "switch"];
+      const subs = ["add", "branch", "checkout", "clone", "commit", "config", "diff", "help", "init", "log", "push", "remote", "reset", "restore", "status", "switch"];
       return { desde, opciones: subs.filter((n) => n.startsWith(parcial)).map((n) => `${n} `) };
     }
     const barra = parcial.lastIndexOf("/");
@@ -337,6 +344,17 @@ export class Shell {
   }
 }
 
+/** Resuelve con 130 en cuanto se cancela (Ctrl+C / Detener), aunque el comando siga esperando algo (red, entrada...). */
+function conCancelacion(promesa, senal) {
+  if (!senal) return promesa;
+  if (senal.aborted) return Promise.resolve(130);
+  return new Promise((resolver, rechazar) => {
+    const alAbortar = () => resolver(130);
+    senal.addEventListener("abort", alAbortar, { once: true });
+    Promise.resolve(promesa).then(resolver, rechazar).finally(() => senal.removeEventListener("abort", alAbortar));
+  });
+}
+
 // -------------------------------------------------------------------- comandos ----
 const sinOpciones = (a) => a.filter((x) => !(x.startsWith("-") && x.length > 1));
 const opciones = (a) => a.filter((x) => x.startsWith("-") && x.length > 1).join("").replace(/-/g, "");
@@ -352,10 +370,14 @@ function leerArchivos(io, nombre, args) {
     if (r === null) { io.err(`${nombre}: ${arg}: ${NO_EXISTE}\n`); ok = false; }
     else if (FS.esCarpeta(py, r) || r === "") { io.err(`${nombre}: ${arg}: Es un directorio\n`); ok = false; }
     else if (!FS.tieneArchivo(py, r)) { io.err(`${nombre}: ${arg}: ${NO_EXISTE}\n`); ok = false; }
+    else if (esMarcador(py.files[r])) { const m = leerMarcador(py.files[r]); io.err(`${nombre}: ${arg}: es un archivo binario (${m.tipo}, ${formatoBytes(m.tamano)}); ábrelo en el editor para verlo o descargarlo\n`); ok = false; }
     else partes.push({ nombre: arg, ruta: r, texto: py.files[r] });
   }
   return { partes, ok };
 }
+
+/** Tamaño que muestra ls -l: el real si es un archivo binario, el del texto si no. */
+const tamanoTexto = (t) => leerMarcador(t)?.tamano ?? t.length;
 
 const lineasDe = (t) => { const l = t.split("\n"); if (l[l.length - 1] === "") l.pop(); return l; };
 
@@ -421,12 +443,12 @@ const COMANDOS = {
     for (const d of destinos) {
       const r = ruta(io, d);
       if (r === null || !FS.existe(py, r)) { io.err(`ls: no se puede acceder a '${d}': ${NO_EXISTE}\n`); codigo = 2; continue; }
-      if (FS.tieneArchivo(py, r)) { bloques.push({ titulo: null, texto: largo ? lineaLarga(FS.nombreBase(r), false, py.files[r].length) : d }); continue; }
+      if (FS.tieneArchivo(py, r)) { bloques.push({ titulo: null, texto: largo ? lineaLarga(FS.nombreBase(r), false, tamanoTexto(py.files[r])) : d }); continue; }
       const { dirs, files } = FS.hijos(py, r);
       const visibles = (n) => todos || !n.startsWith(".");
       const entradas = [...dirs.filter(visibles).map((n) => ({ n, dir: true })), ...files.filter(visibles).map((n) => ({ n, dir: false }))];
       let texto;
-      if (largo) texto = [`total ${entradas.length}`, ...entradas.map((e) => lineaLarga(e.n, e.dir, e.dir ? 4096 : py.files[FS.unir(r, e.n)].length))].join("\n");
+      if (largo) texto = [`total ${entradas.length}`, ...entradas.map((e) => lineaLarga(e.n, e.dir, e.dir ? 4096 : tamanoTexto(py.files[FS.unir(r, e.n)])))].join("\n");
       else if (uno) texto = entradas.map((e) => (e.dir ? nombreDir(e.n) : e.n)).join("\n");
       else texto = enColumnas([...(todos ? [color.azul("."), color.azul("..")] : []), ...entradas.map((e) => (e.dir ? nombreDir(e.n) : e.n))], io.sesion.columnas);
       bloques.push({ titulo: destinos.length > 1 ? d : null, texto });
@@ -656,10 +678,12 @@ const COMANDOS = {
     }
   },
   gh(a, io) { io.err("GitHub CLI (gh) no está conectado en esta terminal. Para practicar el flujo usa git; para publicar de verdad usa Git y gh en tu computadora (cli.github.com/manual).\n"); return 1; },
-  git(a, io) {
+  async git(a, io) {
+    if (a[0] === "clone") return clonarDeGitHub.call(this, a.slice(1), io);
     const r = ejecutarGit(io.py(), a, { cwd: io.sesion.cwd, usuario: this.usuario, ahora: this.ahora });
     if (r.salida) (r.error ? io.err : io.out)(r.salida + "\n");
     if (r.cambio) this.cambio({ origen: "git" });
+    if (r.empujar) return empujarAGitHub.call(this, io);
     return r.error ? 1 : 0;
   },
 };
@@ -684,6 +708,122 @@ function cabezaCola(a, io, cabeza) {
     io.out(tramo.join("\n") + (tramo.length ? "\n" : ""));
   });
   return fuentes.ok ? 0 : 1;
+}
+
+// ------------------------------------------------------------------ git push real ----
+async function empujarAGitHub(io) {
+  if (!this.github) { io.err("git push no está disponible en este entorno.\n"); return 1; }
+  const { sesion } = io;
+  let token = this.tokenGitHub;
+  if (!token) {
+    io.out(color.gris("Para publicar en GitHub necesitas un token personal con permiso «Contents: Read and write» sobre este repositorio.\nSe escribe oculto, solo se usa en esta pestaña y NO se guarda en ningún sitio.\n"));
+    token = (await sesion.leerLinea("Token de GitHub: ", { secreto: true }))?.trim();
+    if (!token) { io.err("push cancelado: no se escribió ningún token.\n"); return 1; }
+    if (/\s/.test(token)) { io.err("Ese token no es válido (no puede tener espacios).\n"); return 1; }
+  }
+  const g = io.py().git;
+  io.out(color.gris(`Enviando a ${g.remote}…\n`));
+  try {
+    const r = await this.github.publicar({ py: io.py(), token, progreso: (t) => io.out(color.gris(t + "\n")), binario: this.leerArchivo });
+    this.tokenGitHub = token;
+    if (r.sinCambios) { io.out(`Everything up-to-date — ${r.url}\n`); for (const o of r.omitidos || []) io.out(color.amarillo(`No se publicó ${o.ruta}: ${o.motivo}.\n`)); return 0; }
+    io.out(`${color.verde("✔ Publicado")} en la rama ${r.rama}${r.rama_nueva ? " (rama nueva)" : ""} · ${r.archivos} archivos\n${r.url}\n`);
+    io.out(color.gris("Los archivos que borraste localmente no se borran en GitHub; hazlo allí si quieres.\n"));
+    for (const o of r.omitidos || []) io.out(color.amarillo(`No se publicó ${o.ruta}: ${o.motivo}.\n`));
+    return 0;
+  } catch (error) {
+    if (error.estado === 401 || error.estado === 403) this.tokenGitHub = null;
+    io.err(`${error.message}\n`);
+    return 1;
+  }
+}
+
+// ------------------------------------------------------------------ git clone real ----
+// git clone <url> [carpeta]   → copia los archivos en esa carpeta (por defecto, el nombre del repositorio), sin historial:
+//                               CódigoCamp tiene UN repositorio por proyecto, en la raíz.
+// git clone <url> .           → en un proyecto vacío: trae los archivos y activa Git con los últimos commits y el remoto.
+async function clonarDeGitHub(args, io) {
+  if (!this.github?.clonar) { io.err("git clone no está disponible en este entorno.\n"); return 1; }
+  const { sesion } = io;
+  let rama = null;
+  const pos = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const x = args[i];
+    if (x === "-b" || x === "--branch") { rama = args[i + 1] ?? null; i += 1; }
+    else if (x.startsWith("--branch=")) rama = x.slice(9);
+    else if (x === "--depth" || x === "--filter" || x === "--origin" || x === "-o") i += 1;
+    else if (x.startsWith("-")) { /* --single-branch, --depth=1, -q… no cambian nada aquí */ }
+    else pos.push(x);
+  }
+  const [url, carpetaArg] = pos;
+  if (!url) { io.err("uso: git clone <url> [carpeta]\n  ej.: git clone https://github.com/usuario/repositorio.git\n"); return 129; }
+  if (rama !== null && !/^[A-Za-z0-9._/-]{1,80}$/.test(rama)) { io.err(`fatal: '${rama}' no es un nombre de rama válido.\n`); return 128; }
+  const nombreRepo = (/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec(url) || [])[1] || "repositorio";
+  const py = io.py();
+  const destino = FS.resolver(sesion.cwd, carpetaArg ?? nombreRepo);
+  if (destino === null) { io.err(`fatal: '${carpetaArg ?? nombreRepo}' no es un nombre de carpeta válido aquí.\n`); return 128; }
+  const enRaiz = destino === "";
+  if (FS.tieneArchivo(py, destino)) { io.err(`fatal: la ruta de destino '${carpetaArg ?? nombreRepo}' ya existe y no es un directorio.\n`); return 128; }
+  const ocupado = enRaiz ? Object.keys(py.files).length > 0 || py.folders.length > 0 : FS.archivosEn(py, destino).length > 0 || py.folders.some((c) => c.startsWith(destino + "/"));
+  if (ocupado) {
+    io.err(`fatal: la ruta de destino '${carpetaArg ?? nombreRepo}' ya existe y no es un directorio vacío.\n`);
+    if (enRaiz) io.err(color.gris("Para clonar en la raíz, el proyecto debe estar vacío (rm -r * .gitignore). O clónalo en una carpeta: git clone <url>\n"));
+    return 128;
+  }
+  if (enRaiz && py.git.initialized && py.git.commits.length) {
+    io.err("fatal: este proyecto ya tiene un repositorio con commits. Clónalo en una carpeta: git clone <url> <carpeta>\n");
+    return 128;
+  }
+
+  io.out(`Clonando en '${enRaiz ? "." : relativa(sesion.cwd, destino)}'...\n`);
+  const progreso = (t) => io.out(color.gris(t + "\n"));
+  let r;
+  let token = this.tokenGitHub;
+  for (let intento = 0; intento < 2; intento += 1) {
+    try { r = await this.github.clonar({ url, token, rama, progreso }); break; }
+    catch (error) {
+      if (intento === 0 && !token && (error.estado === 404 || error.estado === 401) && !sesion.senal?.aborted) {
+        io.out(color.gris("Si el repositorio es privado, escribe un token personal con permiso «Contents: Read» (oculto, no se guarda). Enter para cancelar.\n"));
+        token = (await sesion.leerLinea("Token de GitHub: ", { secreto: true }))?.trim();
+        if (token && !/\s/.test(token)) continue;
+      }
+      io.err(`fatal: ${error.message}\n`);
+      return 128;
+    }
+  }
+  if (token) this.tokenGitHub = token;
+  if (r.vacio) io.out(color.amarillo("warning: Parece que clonaste un repositorio vacío.\n"));
+
+  let resultado;
+  try {
+    resultado = await this.importar({ archivos: r.archivos, omitidos: r.omitidos }, { destino, quitarRaiz: false, progreso, ignorar: false });
+  } catch (error) { io.err(`fatal: ${error.message}\n`); return 128; }
+  const { plan, escritos } = resultado;
+  if (!enRaiz) FS.crearCarpeta(io.py(), destino, { padres: true });
+  if (enRaiz) {
+    const g = io.py().git;
+    const archivos = Object.keys(io.py().files);
+    Object.assign(g, {
+      initialized: true, branch: r.rama, staged: [], tracked: archivos, committed: { ...io.py().files },
+      commits: r.commits, remote: r.remoto, branches: { [r.rama]: r.commits[0]?.hash ?? "" },
+    });
+  }
+  this.cambio({ origen: "git" });
+
+  const omitidos = plan.omitidos;
+  io.out(`${color.verde("✔")} ${escritos} ${escritos === 1 ? "archivo" : "archivos"} de ${r.owner}/${r.repo} (rama ${r.rama})${plan.renombrados.length ? ` · ${plan.renombrados.length} renombrados` : ""}${r.ignorados ? ` · ${r.ignorados} de .git/node_modules ignorados` : ""}\n`);
+  if (omitidos.length) {
+    io.out(color.amarillo(`${omitidos.length} ${omitidos.length === 1 ? "archivo no se trajo" : "archivos no se trajeron"}:\n`));
+    omitidos.slice(0, 10).forEach((o) => io.out(color.gris(`  ${o.ruta} — ${o.motivo}\n`)));
+    if (omitidos.length > 10) io.out(color.gris(`  … y ${omitidos.length - 10} más\n`));
+  }
+  plan.renombrados.slice(0, 5).forEach((x) => io.out(color.gris(`  renombrado: ${x.de} → ${x.a}\n`)));
+  if (plan.renombrados.length > 5) io.out(color.gris(`  … y ${plan.renombrados.length - 5} renombrados más (sin espacios ni tildes)\n`));
+  if (plan.comoArchivo?.length) io.out(color.gris(`${plan.comoArchivo.length} ${plan.comoArchivo.length === 1 ? "archivo de texto grande quedó guardado" : "archivos de texto grandes quedaron guardados"} como archivo de la cuenta: están completos y se pueden ver y descargar, pero no editar.\n`));
+  if (r.truncado) io.out(color.amarillo("El repositorio es tan grande que GitHub no entregó la lista completa de archivos.\n"));
+  if (enRaiz) io.out(color.gris(`Git activado: rama ${r.rama}, ${r.commits.length} commits recientes y remoto origin. Solo se trajo la última versión, no el historial completo.\n`));
+  else io.out(color.gris(`Se copió sin historial (CódigoCamp tiene un solo repositorio por proyecto, en la raíz). Para trabajar con Git sobre él: en un proyecto vacío, git clone ${url} .\n`));
+  return 0;
 }
 
 // ------------------------------------------------------- ejecutar programas ----
@@ -724,15 +864,58 @@ COMANDOS["ts-node"] = async function tsNode(a, io) {
   return f ? ej({ ...contexto(this, io), ruta: f.ruta, codigo: f.codigo, args: a.slice(1) }) : 1;
 };
 COMANDOS.python = async function python(a, io) {
+  if (a[0] === "-m" && a[1] === "pip") return COMANDOS.pip.call(this, a.slice(2), io);
   const ej = this.ejecutores.python;
   if (!ej) return ejecutorNo(io, "python");
   if (a[0] === "--version" || a[0] === "-V") { io.out("Python 3.12 (Pyodide, en el navegador)\n"); return 0; }
+  if (a[0] === "-m") {
+    if (a[1] === "pip") return COMANDOS.pip.call(this, a.slice(2), io);
+    io.err(`python: el módulo -m ${a[1] ?? ""} no está disponible aquí (solo -m pip).\n`);
+    return 1;
+  }
   if (a[0] === "-c") return ej({ ...contexto(this, io), ruta: "<cadena>", codigo: a[1] ?? "", args: [] });
   if (!a.length) { io.err("python: el modo interactivo (REPL) no está disponible. Ejecuta un archivo: python archivo.py\n"); return 1; }
   const f = archivoAEjecutar(this, io, "python", a[0], ["py"]);
   return f ? ej({ ...contexto(this, io), ruta: f.ruta, codigo: f.codigo, args: a.slice(1) }) : 1;
 };
 COMANDOS.python3 = COMANDOS.python;
+COMANDOS.pip = async function pip(a, io) {
+  if (!this.paquetes) return ejecutorNo(io, "pip");
+  return this.paquetes.pip({ args: a, proyecto: io.py(), cwd: io.sesion.cwd, out: io.out, err: io.err });
+};
+COMANDOS.pip3 = COMANDOS.pip;
+COMANDOS.npm = async function npm(a, io) {
+  if (!this.paquetes) return ejecutorNo(io, "npm");
+  return this.paquetes.npm({
+    args: a, proyecto: io.py(), out: io.out, err: io.err, cambio: () => this.cambio({ origen: "terminal" }),
+    ejecutar: (linea) => this.ejecutar(linea, io.sesion), cwd: io.sesion.cwd, leerLinea: io.sesion.leerLinea,
+  });
+};
+COMANDOS.vite = function vite(a, io) {
+  const sub = a.find((x) => !x.startsWith("-")) ?? "dev";
+  const py = io.py();
+  const cwd = io.sesion.cwd;
+  const pagina = FS.unir(cwd, "index.html");
+  if (sub === "build") {
+    io.out(color.gris("vite build empaqueta la app para publicarla. Aquí no hace falta: la vista previa ya la sirve tal cual. Para publicarla, súbela a GitHub (git push) o descárgala en .zip.\n"));
+    return 0;
+  }
+  if (!["dev", "serve", "preview"].includes(sub)) { io.err(`vite: orden desconocida «${sub}». Usa: vite, vite build o vite preview.\n`); return 1; }
+  if (!FS.tieneArchivo(py, pagina)) { io.err(`vite: no hay index.html en ${FS.rutaAbsoluta(cwd)}. Entra a la carpeta del proyecto (cd mi-app) o crea uno con: npm create vite@latest mi-app -- --template react\n`); return 1; }
+  io.out(`\n  ${color.verde("VITE")} listo (simulado en CódigoCamp)\n\n  ➜  Vista previa: ${pagina}\n\n`);
+  if (this.abrirVista) this.abrirVista(pagina);
+  else io.out(color.gris("Abre la vista previa con el botón del ojo.\n"));
+  return 0;
+};
+COMANDOS.npx = async function npx(a, io) {
+  const [orden, ...resto] = a.filter((x) => x !== "-y" && x !== "--yes");
+  if (/^create-(vite|react-app)(@.*)?$/.test(orden ?? "")) return COMANDOS.npm.call(this, ["create", orden.replace(/^create-/, ""), ...resto], io);
+  if (/^vite(@.*)?$/.test(orden ?? "")) return COMANDOS.vite.call(this, resto, io);
+  const real = { tsx: "ts-node" }[orden] ?? orden;
+  if (orden && COMANDOS[real] && !["npm", "npx"].includes(real)) return COMANDOS[real].call(this, resto, io);
+  io.err(`npx: no se puede descargar «${orden ?? ""}» en el navegador. Se pueden ejecutar con npx: ts-node, tsx, node, python y el resto de comandos de esta terminal.\n`);
+  return 127;
+};
 COMANDOS.py = COMANDOS.python;
 COMANDOS.sqlite3 = async function sqlite3(a, io) {
   const ej = this.ejecutores.sql;

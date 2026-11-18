@@ -1,7 +1,7 @@
 """Rutas de la API y del frontend. Cada archivo es un Blueprint de Flask con un tema."""
-from rutas import amigos, auth, chat, ejecucion, frontend, perfil, progreso, retos, tienda, trabajo, tutor
+from rutas import amigos, archivos, auth, chat, ejecucion, frontend, perfil, progreso, retos, tienda, trabajo, tutor
 
-BLUEPRINTS = (auth, perfil, progreso, retos, tienda, amigos, chat, trabajo, tutor, ejecucion, frontend)
+BLUEPRINTS = (auth, perfil, progreso, retos, tienda, amigos, chat, trabajo, archivos, tutor, ejecucion, frontend)
 
 
 def registrar_rutas(app):

@@ -37,7 +37,7 @@ class Terminal {
       out: (t) => this.escribir(t), err: (t) => this.escribir(t),
       limpiar: () => { this.salida.textContent = ""; this.actual = null; },
       cerrar: () => panel.matar(this),
-      leerLinea: (texto) => this.pedirLinea(texto),
+      leerLinea: (texto, opciones) => this.pedirLinea(texto, opciones),
     });
     this.sesion.historial = panel.historial;
     this.raiz = document.createElement("div");
@@ -137,11 +137,12 @@ class Terminal {
   }
 
   /** Lee una línea para un programa en ejecución (readline, input()). Devuelve null si se cierra la entrada (Ctrl+D). */
-  pedirLinea(texto) {
+  pedirLinea(texto, { secreto = false } = {}) {
     return new Promise((resolver) => {
       if (texto) this.escribir(texto);
-      this.lectura = { resolver };
-      this.#crearEntrada(this.#linea());
+      this.lectura = { resolver, secreto };
+      const input = this.#crearEntrada(this.#linea());
+      if (secreto) { input.type = "password"; input.autocomplete = "off"; input.setAttribute("aria-label", "Valor secreto (no se muestra)"); }
     });
   }
 
@@ -149,7 +150,7 @@ class Terminal {
     const input = this.entrada;
     const ctrl = e.ctrlKey || e.metaKey;
     if (this.lectura) {
-      if (e.key === "Enter") { e.preventDefault(); const v = input.value; this.#congelar(v); this.escribir("\n"); const { resolver } = this.lectura; this.lectura = null; resolver(v); }
+      if (e.key === "Enter") { e.preventDefault(); const v = input.value; this.#congelar(this.lectura.secreto ? "" : v); this.escribir("\n"); const { resolver } = this.lectura; this.lectura = null; resolver(v); }
       else if (ctrl && e.key.toLowerCase() === "d" && !input.value) { e.preventDefault(); this.#congelar(""); this.escribir("\n"); const { resolver } = this.lectura; this.lectura = null; resolver(null); }
       else if (ctrl && e.key.toLowerCase() === "c" && input.selectionStart === input.selectionEnd) { e.preventDefault(); this.interrumpir(); }
       return;
@@ -222,20 +223,30 @@ class Terminal {
 
   async #correr(linea) {
     this.ocupado = true;
+    this.panel.alOcupado();
     this.control = new AbortController();
     this.sesion.senal = this.control.signal;
     this.raiz.focus({ preventScroll: true });
     try { await this.panel.shell.ejecutar(linea, this.sesion); }
     catch (error) { this.escribir(`Error inesperado: ${error?.message || error}\n`); }
     this.ocupado = false;
+    this.panel.alOcupado();
     if (this.cerrada) return;
     if (this.actual) this.actual = null;
     this.#prompt();
   }
 
-  /** Escribe y ejecuta un comando como si la persona lo hubiera tecleado (botón Ejecutar). */
-  lanzar(linea) {
-    if (this.ocupado) { this.escribir("\x1b[33m(espera a que termine el comando actual o pulsa Ctrl+C)\x1b[0m\n"); return false; }
+  /**
+   * Escribe y ejecuta un comando como si la persona lo hubiera tecleado (botón Ejecutar).
+   * Si hay un programa corriendo, lo detiene primero (así «Ejecutar» nunca se queda esperando).
+   */
+  async lanzar(linea) {
+    if (this.ocupado) {
+      this.interrumpir();
+      const limite = Date.now() + 4000;
+      while ((this.ocupado || !this.entrada) && Date.now() < limite) await new Promise((r) => setTimeout(r, 25));
+      if (this.ocupado || !this.entrada) { this.escribir("\x1b[31mNo se pudo detener el programa anterior. Recarga la página si no responde.\x1b[0m\n"); return false; }
+    }
     this.entrada.value = linea;
     void this.#enviar();
     return true;
@@ -257,8 +268,9 @@ export class PanelInferior {
    * @param {Storage} [o.storage] y {string} o.claveHistorial
    * @param {(abierto:boolean)=>void} [o.alCambiar]
    */
-  constructor({ raiz, shell, proyecto, claveHistorial, storage = globalThis.localStorage, alCambiar = () => {} }) {
+  constructor({ raiz, shell, proyecto, claveHistorial, storage = globalThis.localStorage, alCambiar = () => {}, alOcupado = () => {} }) {
     Object.assign(this, { raiz, shell, proyecto, claveHistorial, storage, alCambiar });
+    this.alOcupado = () => alOcupado(this.hayProgramaCorriendo);
     this.terminales = [];
     this.activa = null;
     this.contador = 0;
@@ -376,6 +388,11 @@ export class PanelInferior {
   #pintarLista() {
     this.lista.innerHTML = this.terminales.length < 2 ? "" : this.terminales.map((t) => `<span class="term-chip${t === this.activa ? " on" : ""}" role="tab" data-term="${t.numero}" tabindex="0">${ICONOS.terminal}<span>bash ${t.numero}</span><button type="button" class="chip-x" aria-label="Cerrar terminal ${t.numero}">${ICONOS.cerrar}</button></span>`).join("");
   }
+
+  get hayProgramaCorriendo() { return this.terminales.some((t) => t.ocupado); }
+
+  /** Detiene lo que esté corriendo en cualquier terminal (botón Detener). */
+  detener() { this.terminales.filter((t) => t.ocupado).forEach((t) => t.interrumpir()); }
 
   /** Escribe y ejecuta un comando en la terminal activa (crea una si hace falta). */
   correr(linea) {

@@ -7,6 +7,7 @@
 //  · SQL         -> sql.js (SQLite en el navegador), igual que en Aprende.
 import { color } from "./ansi.js";
 import * as FS from "./fs.js";
+import { dependenciasDe, restaurarPaquetes, urlDeCdn } from "./paquetes.js";
 
 const MAX_SALIDA = 200_000;
 const TIEMPO_MAXIMO = 120_000;
@@ -351,7 +352,7 @@ export function runtimeNode(CC) {
     const integrado = requerirIntegrado(nombre);
     if (integrado !== undefined) return integrado;
     if (!/^(\.{1,2}\/|\.{1,2}$|\/)/.test(nombre)) {
-      const e = new Error(`Cannot find module '${nombre}'\nEn esta terminal no hay npm: solo puedes usar tus archivos (require("./archivo")) y los módulos fs, path, util, os, events, readline y assert.`);
+      const e = new Error(`Cannot find module '${nombre}'\nrequire() solo funciona con tus archivos (./archivo) y los módulos fs, path, util, os, events, readline y assert.\nLos paquetes de npm se usan con import desde un archivo .mjs después de «npm install ${nombre}»: import x from "${nombre}".`);
       e.code = "MODULE_NOT_FOUND"; throw e;
     }
     const base = nombre.startsWith("/") ? aInterna(nombre) : aInterna(rutaNode.join(RAIZ, desdeDir, nombre));
@@ -403,7 +404,7 @@ function transformarImportIntegrado(clausula, modulo) {
 }
 
 /** Reescribe los import de un módulo ES: archivos del proyecto -> blob URL; módulos integrados -> __cc_require. */
-async function prepararModulo(ruta, codigo, py, urls, enCurso) {
+async function prepararModulo(ruta, codigo, py, urls, enCurso, deps) {
   const dir = FS.carpetaDe(ruta);
   const re = /\b(import|export)(\s*[\w*${},\s]*?\s*from\s*|\s*)(["'])([^"'\n]+)\3/g;
   let resultado = "";
@@ -422,10 +423,14 @@ async function prepararModulo(ruta, codigo, py, urls, enCurso) {
       const real = destino === null ? undefined : [destino, destino + ".js", destino + ".mjs", destino + "/index.js"].find((c) => FS.tieneArchivo(py, c));
       if (real === undefined) throw new Error(`No se encontró el módulo '${spec}' (importado desde ${ruta}).`);
       if (enCurso.includes(real)) throw new Error(`Dependencia circular entre módulos (${[...enCurso, real].join(" → ")}): no se puede ejecutar así aquí.`);
-      if (!urls.has(real)) urls.set(real, await construirModulo(real, py.files[real], py, urls, [...enCurso, ruta]));
+      if (!urls.has(real)) urls.set(real, await construirModulo(real, py.files[real], py, urls, [...enCurso, ruta], "", deps));
       reemplazo = `${palabra}${clausula}${comilla}${urls.get(real)}${comilla}`;
+    } else if (/^https:\/\//.test(spec)) {
+      reemplazo = todo; // import directo desde una URL (CDN): lo resuelve el navegador
     } else {
-      throw new Error(`No se encontró el paquete '${spec}'. En esta terminal no hay npm: importa tus archivos con rutas relativas (./archivo.js).`);
+      const url = urlDeCdn(deps, spec);
+      if (!url) throw new Error(`No se encontró el paquete '${spec}'. Instálalo primero con: npm install ${spec.split("/")[0].startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0]}`);
+      reemplazo = `${palabra}${clausula}${comilla}${url}${comilla}`;
     }
     resultado += codigo.slice(ultimo, m.index) + reemplazo;
     ultimo = m.index + todo.length;
@@ -433,8 +438,8 @@ async function prepararModulo(ruta, codigo, py, urls, enCurso) {
   return resultado + codigo.slice(ultimo);
 }
 
-async function construirModulo(ruta, codigo, py, urls, enCurso, prefijo = "") {
-  const texto = await prepararModulo(ruta, codigo, py, urls, enCurso);
+async function construirModulo(ruta, codigo, py, urls, enCurso, prefijo = "", deps = {}) {
+  const texto = await prepararModulo(ruta, codigo, py, urls, enCurso, deps);
   const fuente = `${prefijo}${texto}\n;globalThis.__cc_fin_main && globalThis.__cc_fin_main();\n//# sourceURL=/workspace/${ruta}`;
   return URL.createObjectURL(new Blob([fuente], { type: "text/javascript" }));
 }
@@ -469,7 +474,7 @@ export async function ejecutarNode(o) {
     if (esm) {
       const urlPreludio = URL.createObjectURL(new Blob([preludio], { type: "text/javascript" }));
       urls.set("::preludio", urlPreludio);
-      urlScript = await construirModulo(o.ruta, o.codigo, { ...py, files: archivos }, urls, [], `import ${JSON.stringify(urlPreludio)};`);
+      urlScript = await construirModulo(o.ruta, o.codigo, { ...py, files: archivos }, urls, [], `import ${JSON.stringify(urlPreludio)};`, dependenciasDe(py));
       worker = new Worker(urlScript, { type: "module" });
     } else {
       urlScript = URL.createObjectURL(new Blob([preludio], { type: "text/javascript" }));
@@ -482,6 +487,7 @@ export async function ejecutarNode(o) {
   const limpiarUrls = () => { [urlScript, ...urls.values()].forEach((u) => { try { URL.revokeObjectURL(u); } catch { /* nada */ } }); };
   return new Promise((resolver) => {
     let hecho = false;
+    let textoErr = "";
     const terminar = (codigo, mensaje) => {
       if (hecho) return;
       hecho = true;
@@ -489,6 +495,9 @@ export async function ejecutarNode(o) {
       worker.terminate();
       limpiarUrls();
       if (mensaje) o.err(mensaje);
+      if (codigo === 1 && /\b(document|window|alert|navigator|localStorage|sessionStorage|location) is not defined/.test(textoErr)) {
+        o.err(color.gris("Pista: ese código es de navegador (usa document/window…) y Node no lo tiene. Para verlo funcionar, abre la vista previa de tu página HTML.\n"));
+      }
       resolver(codigo);
     };
     const limite = setTimeout(() => terminar(124, `\n${color.rojo("Tiempo máximo agotado")} (2 minutos): se detuvo el programa.\n`), TIEMPO_MAXIMO);
@@ -496,7 +505,7 @@ export async function ejecutarNode(o) {
     worker.onmessage = async (ev) => {
       const m = ev.data;
       if (m.t === "out") o.out(m.s);
-      else if (m.t === "err") o.err(m.s);
+      else if (m.t === "err") { textoErr = (textoErr + m.s).slice(-2000); o.err(m.s); }
       else if (m.t === "leer") {
         const valor = await o.leerLinea(m.prompt);
         if (!hecho) worker.postMessage({ t: "linea", valor });
@@ -517,6 +526,24 @@ const cargarScript = (url) => new Promise((ok, ko) => {
   s.onerror = () => { s.remove(); ko(new Error("No se pudo descargar el motor. Revisa tu conexión.")); };
   document.head.appendChild(s);
 });
+
+/** JSX / TSX / TypeScript → módulo ES para la vista previa (JSX automático: react/jsx-runtime o preact/jsx-runtime). */
+export async function transpilarModulo(codigo, ruta, { jsxImportSource = "react" } = {}) {
+  if (!globalThis.ts) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/typescript/5.4.5/typescript.min.js");
+  const ts = globalThis.ts;
+  const nombre = /\.(m?js|cjs)$/.test(ruta) ? ruta.replace(/\.(m?js|cjs)$/, ".jsx") : ruta; // un .js con JSX se trata como .jsx
+  const r = ts.transpileModule(codigo, {
+    fileName: nombre, reportDiagnostics: true,
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, jsx: ts.JsxEmit.ReactJSX, jsxImportSource, verbatimModuleSyntax: false, isolatedModules: true },
+  });
+  const errores = (r.diagnostics || []).filter((d) => d.category === 1);
+  if (errores.length) {
+    const d = errores[0];
+    const linea = d.file && d.start !== undefined ? ` (línea ${d.file.getLineAndCharacterOfPosition(d.start).line + 1})` : "";
+    throw new Error(ts.flattenDiagnosticMessageText(d.messageText, "\n") + linea);
+  }
+  return r.outputText;
+}
 
 /** Transpila un archivo TypeScript a CommonJS con el compilador oficial (se descarga la primera vez). */
 export async function transpilarTS(codigo) {
@@ -552,7 +579,7 @@ export const cargarPyodide = () => {
 
 const RAIZ_PY = "/workspace";
 
-function escribirEnPyodide(pyo, py) {
+export function escribirEnPyodide(pyo, py) {
   const { FS: sis } = pyo;
   const asegurar = (dir) => { let acc = ""; for (const p of dir.split("/").filter(Boolean)) { acc += "/" + p; try { sis.mkdir(acc); } catch { /* ya existe */ } } };
   asegurar(RAIZ_PY);
@@ -560,9 +587,10 @@ function escribirEnPyodide(pyo, py) {
   for (const [ruta, texto] of Object.entries(py.files)) { asegurar(`${RAIZ_PY}/${FS.carpetaDe(ruta)}`); sis.writeFile(`${RAIZ_PY}/${ruta}`, texto); }
 }
 
-function leerDePyodide(pyo) {
+export function leerDePyodide(pyo) {
   const { FS: sis } = pyo;
   const salida = { files: {}, folders: [] };
+  if (!existeEnPyodide(sis, RAIZ_PY)) return salida;
   const recorrer = (dir) => {
     for (const nombre of sis.readdir(dir)) {
       if (nombre === "." || nombre === "..") continue;
@@ -578,8 +606,12 @@ function leerDePyodide(pyo) {
   return salida;
 }
 
-function borrarEnPyodide(pyo, dir = RAIZ_PY, raiz = true) {
+const existeEnPyodide = (sis, ruta) => { try { sis.stat(ruta); return true; } catch { return false; } };
+
+/** Vacía /workspace. La primera vez la carpeta aún no existe (readdir fallaría): en ese caso se crea. */
+export function borrarEnPyodide(pyo, dir = RAIZ_PY, raiz = true) {
   const { FS: sis } = pyo;
+  if (raiz && !existeEnPyodide(sis, dir)) { sis.mkdir(dir); return; }
   for (const nombre of sis.readdir(dir)) {
     if (nombre === "." || nombre === "..") continue;
     const ruta = `${dir}/${nombre}`;
@@ -607,6 +639,8 @@ export async function ejecutarPython(o) {
     pyo = await cargarPyodide();
   } catch (error) { o.err(`${error.message}\n`); return 1; }
   if (o.senal?.aborted) return 130;
+  if (o.almacenPip) await restaurarPaquetes({ pyo, lista: o.almacenPip.leer(), out: o.out, err: o.err });
+  try { await pyo.loadPackagesFromImports(o.codigo); } catch { /* si falta un paquete, Python mostrará su propio error */ }
   const py = o.proyecto;
   const antes = { files: { ...py.files }, folders: [...py.folders] };
   let codigo = 0;
@@ -651,18 +685,22 @@ export async function ejecutarSQL(o) {
 }
 
 /** Los ejecutores que usa el shell. `api` es la función de llamadas al servidor (js/auth.js). */
-export function crearEjecutores({ api }) {
+export function crearEjecutores({ api, almacenPip = null }) {
   return {
     node: ejecutarNode,
     ts: ejecutarTS,
-    python: ejecutarPython,
+    python: (o) => ejecutarPython({ ...o, almacenPip }),
     sql: ejecutarSQL,
     async servidor({ lenguaje, codigo }) {
+      let reloj;
+      const limite = new Promise((resolver) => { reloj = setTimeout(() => resolver({ salida: "El servidor tardó demasiado en responder. Inténtalo de nuevo.", error: true }), 45_000); });
       try {
-        const d = await api("/api/run", { lenguaje, codigo });
+        const d = await Promise.race([api("/api/run", { lenguaje, codigo }), limite]);
         return { salida: d.salida || "", error: Boolean(d.error) };
       } catch (error) {
         return { salida: error.message, error: true };
+      } finally {
+        clearTimeout(reloj);
       }
     },
   };

@@ -1,4 +1,4 @@
-// Git didáctico sobre el proyecto. Es una simulación: el historial vive en la cuenta de la persona y «push» no envía nada.
+// Git didáctico sobre el proyecto. El historial vive en la cuenta de la persona; «push» lo publica en GitHub con la API (ver github.js).
 // Lógica pura: recibe el proyecto { files, folders, git } y devuelve texto (con colores ANSI) y si algo cambió.
 import { color } from "./ansi.js";
 import { archivosEn, carpetaDe, dentroDe, esCarpeta, resolver, tieneArchivo } from "./fs.js";
@@ -198,7 +198,8 @@ export function ejecutarGit(py, args, { cwd = "", usuario = "estudiante", ahora 
       "  git restore [--staged] <arch>  descartar cambios / sacar de preparación",
       "  git branch | switch -c <rama>  ramas",
       "  git remote add origin <URL>    configurar GitHub (práctica)",
-      "  git push -u origin main        simulado: no envía nada",
+      "  git push -u origin main        publica en GitHub (te pide un token personal)",
+      "  git clone <url> [carpeta]      trae un repositorio de GitHub (con «.» en un proyecto vacío activa Git)",
     ].join("\n"));
   }
   if (sub === "--version" || sub === "version") return salida("git version 2.45.0 (simulado en CódigoCamp)");
@@ -399,10 +400,14 @@ export function ejecutarGit(py, args, { cwd = "", usuario = "estudiante", ahora 
     case "push": {
       if (!g.remote) return fallo("fatal: no hay un destino configurado.\nPrimero: git remote add origin https://github.com/usuario/repositorio.git");
       if (!g.commits.length) return fallo("error: no hay nada que enviar: aún no hay commits.");
-      return salida(`Simulación: no se envió nada a ${g.remote}.\nEn tu computadora real, este mismo comando publicaría ${g.commits.length} commit(s) de la rama ${g.branch}.\n` + color.gris("(CódigoCamp no se conecta a GitHub.)"));
+      const [remoto, ramaArg] = posicionales;
+      if (remoto && remoto !== "origin") return fallo(`fatal: '${remoto}' no parece un repositorio de git. Usa «origin».`);
+      if (ramaArg && ![g.branch, "HEAD", `${g.branch}:${g.branch}`].includes(ramaArg)) return fallo(`error: aquí solo se puede enviar la rama actual (${g.branch}).`);
+      if (tiene("--force", "-f", "--force-with-lease")) return fallo("error: --force no está disponible: esta práctica nunca reescribe el historial de GitHub.");
+      return salida("", { empujar: true });
     }
 
-    case "merge": case "pull": case "fetch": case "clone": case "rebase": case "stash": case "tag": case "cherry-pick": case "revert":
+    case "merge": case "pull": case "fetch": case "rebase": case "stash": case "tag": case "cherry-pick": case "revert":
       return fallo(`git ${sub} no está disponible en esta práctica. Aquí puedes ensayar: init, status, add, commit, log, diff, restore, branch, switch y remote.`);
     default:
       return fallo(`git: '${sub}' no es un comando de git en esta práctica. Escribe «git help».`);

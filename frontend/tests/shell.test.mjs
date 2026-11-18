@@ -154,7 +154,7 @@ test("errores de sintaxis y comandos desconocidos o no disponibles", async () =>
   assert.equal((await sh("echo a >")).codigo, 2);
   const r = await sh("foo");
   assert.equal(r.codigo, 127); assert.match(r.err, /orden no encontrada/);
-  const n = await sh("npm install"); assert.equal(n.codigo, 127); assert.match(n.err, /no está disponible/);
+  const n = await sh("sudo ls"); assert.equal(n.codigo, 127); assert.match(n.err, /no está disponible/);
   assert.match((await sh("help")).out, /Terminal de CódigoCamp/);
 });
 
@@ -221,4 +221,44 @@ test("enColumnas reparte por columnas según el ancho", () => {
   assert.equal(enColumnas(["a", "b", "c", "d"], 80), "a  b  c  d");
   assert.equal(enColumnas(["aaaa", "bbbb", "cccc"], 10), "aaaa  cccc\nbbbb");
   assert.equal(enColumnas([], 80), "");
+});
+
+test("git push: pide el token oculto, lo recuerda solo en memoria y lo olvida si GitHub lo rechaza", async () => {
+  const pedidos = []; const llamadas = [];
+  const github = { publicar: async ({ token, progreso }) => { llamadas.push(token); progreso("Subiendo archivos 1/1…"); if (token === "malo") { const e = new Error("GitHub rechazó el token"); e.estado = 401; throw e; } return { url: "https://github.com/a/b/commit/abc", rama: "main", archivos: 3, rama_nueva: false }; } };
+  const { py, shell, sesion, sh } = entorno(undefined, {});
+  shell.github = github;
+  const tokens = ["malo", "bueno"];
+  sesion.leerLinea = async (texto, opciones) => { pedidos.push([texto, opciones]); return tokens.shift(); };
+  await sh("git init"); await sh("git add ."); await sh('git commit -m base'); await sh("git remote add origin https://github.com/a/b.git");
+  const r1 = await sh("git push");
+  assert.equal(r1.codigo, 1); assert.match(r1.err, /rechazó el token/);
+  assert.equal(pedidos[0][1].secreto, true, "la entrada es secreta");
+  assert.equal(shell.tokenGitHub, null, "un token rechazado se olvida");
+  const r2 = await sh("git push -u origin main");
+  assert.equal(r2.codigo, 0); assert.match(r2.out, /Publicado.*rama main/s); assert.match(r2.out, /github\.com\/a\/b\/commit\/abc/);
+  assert.equal(shell.tokenGitHub, "bueno");
+  const r3 = await sh("git push");
+  assert.equal(pedidos.length, 2, "no vuelve a pedir el token en la misma pestaña");
+  assert.deepEqual(llamadas, ["malo", "bueno", "bueno"]);
+  assert.ok(!JSON.stringify(py).includes("bueno"), "el token no se escribe en el proyecto");
+  sesion.leerLinea = async () => "  "; shell.tokenGitHub = null;
+  assert.match((await sh("git push")).err, /no se escribió ningún token/);
+});
+
+test("CANCELAR: un programa colgado devuelve el control al instante y su salida tardía se descarta", async () => {
+  let liberar; const colgado = new Promise((r) => { liberar = r; });
+  const { shell, sesion, sh } = entorno(undefined, { node: async (c) => { c.out("empieza\n"); await colgado; c.out("SALIDA TARDÍA\n"); return 0; } });
+  const control = new AbortController(); sesion.senal = control.signal;
+  const ejecucion = shell.ejecutar("node script.js", sesion);
+  await new Promise((r) => setTimeout(r, 20));
+  control.abort();
+  assert.equal(await ejecucion, 130);
+  assert.equal(sesion.vars["?"], 130);
+  // el siguiente comando funciona con normalidad aunque el anterior siga colgado en segundo plano
+  const nuevo = new AbortController(); sesion.senal = nuevo.signal;
+  const r = await sh("echo sigo vivo");
+  assert.equal(r.out, "sigo vivo\n");
+  liberar(); await new Promise((r2) => setTimeout(r2, 10));
+  assert.ok(!r.out.includes("TARDÍA"));
 });

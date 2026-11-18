@@ -1,11 +1,11 @@
 """Genera, a partir de CONCEPTOS, el camino de retos (Inicio) y las lecciones de Aprende.
 
 Cada concepto se escribe una sola vez con la función K(...). De él salen:
-  · una SECCIÓN del camino con 4 lecciones de retos (concepto, uso, código y errores/práctica)
+  · una SECCIÓN del camino con hasta 3 lecciones de retos, sin preguntas repetidas ni parecidas en todo el curso
   · una lección de Aprende (explicación, para qué sirve, puntos clave, código comentado, error común)
 
-Las preguntas de cada lección deben variar en objetivo y respuesta; las lecciones posteriores también
-recuperan conceptos ya vistos. Las opciones falsas salen de otros conceptos de la misma etapa.
+Ninguna pregunta del curso se repite ni se parece a otra (ver construir_etapas). Las opciones falsas salen de otros
+conceptos de la misma etapa.
 
     flask --app app check-retos                    -> revisa los retos
     python herramientas/generar_aprende.py         -> vuelve a crear frontend/js/lecciones/<lenguaje>.js
@@ -155,94 +155,180 @@ def q_orden(c):
                explicacion=f"En este orden, el código {c['h']}.") if ls else None
 
 
-def _limpia(lista):
-    return [q for q in lista if q is not None]
+# ---- armado del camino: cada dato se pregunta UNA vez en todo el curso ----
+#
+# Un concepto aporta unos 9 a 12 «datos» distintos (definición, uso, 3 ideas clave, situación, código, completar,
+# segundo completar, error común y, a veces, «encuentra el error»). Cada dato produce una sola pregunta en todo el
+# curso. Además se descarta cualquier pregunta cuyo dato o respuesta ya apareció en el curso, aunque sea con otras
+# palabras (se comparan las palabras importantes): así no hay preguntas repetidas ni parecidas.
+# Con esas preguntas se arman hasta 3 lecciones por concepto, y cada etapa se parte para no pasar de 45 lecciones.
+
+MAX_LECCIONES_ETAPA = 45
+LECCIONES_POR_CONCEPTO = 3
+_VACIAS = set("""a al algo ante antes asi aun cada como con contra cual cuando de del desde donde dos el ella ellas ellos en
+entre era es esa ese eso esta este esto estos estas fue ha hace hay la las le lo los mas me mi muy no nos o otra otro para
+pero poco por que se sea ser si sin sobre solo su sus tambien te tiene todo tu un una uno unos unas usa usar y ya cosa
+forma manera sirve sirven permite permiten puede pueden""".split())
 
 
-def _respuesta_claves(pregunta):
-    if pregunta["tipo"] not in {"opcion", "completar"}:
-        return set()
-    return {" ".join(respuesta.casefold().split()) for respuesta in pregunta["respuesta"].split("|") if respuesta.strip()}
+def _sin_tildes(texto):
+    import unicodedata
+    return "".join(ch for ch in unicodedata.normalize("NFD", texto) if unicodedata.category(ch) != "Mn")
 
 
-def _distintas(preguntas, minimo=4, maximo=5):
-    """Evita volver a preguntar lo mismo con otra redacción dentro de una lección."""
-    elegidas, enunciados, respuestas = [], set(), set()
-    for pregunta in preguntas:
-        if pregunta is None:
-            continue
-        enunciado = " ".join(pregunta["enunciado"].casefold().split())
-        claves = _respuesta_claves(pregunta)
-        if enunciado in enunciados or (claves and claves.intersection(respuestas)):
-            continue
-        elegidas.append(pregunta)
-        enunciados.add(enunciado)
-        respuestas.update(claves)
-        if len(elegidas) == maximo:
-            break
-    if len(elegidas) < minimo:
-        raise ValueError(f"Una lección generada necesita al menos {minimo} preguntas distintas; solo hay {len(elegidas)}.")
-    return elegidas
+def _palabras(texto):
+    """Palabras importantes de un texto (sin tildes, sin palabras vacías)."""
+    import re
+    t = _sin_tildes(str(texto).casefold())
+    return frozenset(w for w in re.findall(r"[a-z0-9_#+.<>/-]+", t) if w.strip(".-/") and w not in _VACIAS and len(w) > 1)
 
 
-def _pregunta_anterior(previos, indice):
-    if indice >= len(previos):
-        return None
-    lista, i = previos[indice]
-    concepto = lista[i]
-    funcion = (q_cuando, q_nombre, q_que)[indice]
-    return funcion(concepto, [lista[j] for j in _vecinos(i, len(lista), A)])
+def _clave(texto):
+    return " ".join(_sin_tildes(str(texto).casefold()).replace("¿", "").replace("?", "").split()).strip(" .")
 
 
-def _lecciones(i, lista, previos, repaso=False):
-    """Las cuatro lecciones de un concepto mezclan comprensión, uso, código y errores."""
+class _Registro:
+    """Lo ya preguntado en un curso: enunciados, respuestas y «datos» (para detectar preguntas parecidas)."""
+
+    def __init__(self):
+        self.enunciados, self.respuestas, self.datos, self.indice = set(), set(), [], {}
+
+    def parecido(self, palabras):
+        if len(palabras) < 2:
+            return False
+        candidatos = set()
+        for w in palabras:
+            candidatos.update(self.indice.get(w, ()))
+        for i in candidatos:
+            otro = self.datos[i]
+            comunes = len(palabras & otro)
+            if comunes / len(palabras | otro) >= 0.5 or (min(len(palabras), len(otro)) >= 3 and comunes / min(len(palabras), len(otro)) >= 0.8):
+                return True
+        return False
+
+    def admite(self, pregunta, dato):
+        enunciado = _clave(pregunta["enunciado"]) + "|" + pregunta["codigo"] + "|" + "\n".join(pregunta["datos"].get("piezas", []))
+        respuestas = {_clave(r) for r in pregunta["respuesta"].split("|") if r.strip()} if pregunta["tipo"] in {"opcion", "completar"} else set()
+        if enunciado in self.enunciados or respuestas & self.respuestas:
+            return False
+        palabras = _palabras(dato)
+        if self.parecido(palabras):
+            return False
+        self.enunciados.add(enunciado)
+        self.respuestas |= respuestas
+        i = len(self.datos)
+        self.datos.append(palabras)
+        for w in palabras:
+            self.indice.setdefault(w, []).append(i)
+        return True
+
+
+def _completo(p):
+    """El dato de una pregunta para completar: la frase con la respuesta puesta."""
+    import re
+    frase = re.sub(r"\([^)]*\)\s*$", "", p[0]).strip()
+    return frase.replace("___", p[1])
+
+
+def _candidatas(i, lista):
+    """(pregunta, dato) de un concepto, una por dato y en orden de prioridad (variando el tipo de pregunta)."""
     c, n = lista[i], len(lista)
     va, vb, vc = ([lista[j] for j in _vecinos(i, n, d)] for d in (A, B, Cc))
-    t = c["t"]
-    l1 = leccion(f"{t}: qué es", *_distintas([
-        q_completar(c), q_que(c, va), q_cierta(c, va, 0), q_cierta(c, vb, 1),
-        q_uso(c, vc), q_cuando(c, vb), q_falsa(c, vc),
-    ]))
-    l2 = leccion(f"{t}: para qué sirve", *_distintas([
-        q_uso(c, va), q_situacion_completar(c), q_codigo_hace(c, vc), _pregunta_anterior(previos, 0),
-        q_cierta(c, vc, 2), q_falsa(c, vb),
-    ]))
-    l3 = leccion(f"{t}: en código", *_distintas([
-        q_orden(c), q_codigo_hace(c, va), q_codigo_concepto_escribir(c), _pregunta_anterior(previos, 1),
-        q_cierta(c, va, 2), q_uso(c, vc), q_cuando(c, vb), q_que(c, va),
-    ]))
-    l4 = leccion(f"{t}: errores y práctica", *_distintas([
-        q_completar(c, True), q_error(c) if c["err"] else None, q_falsa(c, vb), _pregunta_anterior(previos, 2),
-        q_ec(c, va), q_uso(c, vc), q_codigo_lee(c, vb), q_cierta(c, vc, 1),
-    ]))
-    if not repaso:                      # cursos sin repaso: solo las 4 lecciones del concepto
-        return [l1, l2, l3, l4]
-    # Repaso: tres preguntas sobre conceptos anteriores y tres sobre el actual.
-    rep = []
-    for p, mk in zip(previos[:3], (q_que, q_cuando, q_nombre)):
-        pl, pi = p
-        rep.append(mk(pl[pi], [pl[j] for j in _vecinos(pi, len(pl), A)]))
-    extras = [q_cierta(c, va, 0), q_ec(c, vb), q_codigo_concepto(c, vb)]
-    while len(rep) < 3:                 # los primeros conceptos aún no tienen nada que repasar
-        rep.append(extras.pop(0))
-    l5 = leccion(f"Repaso de {t}",
-                 *rep, q_uso_nombre(c, vc), q_situacion(c, va), q_codigo_concepto(c, vc))
-    return [l1, l2, l3, l4, l5]
+    ordenable = _lineas_orden(c) is not None
+    codigo = q_orden(c) if ordenable and i % 2 else q_codigo_hace(c, vb)
+    pr2_real = not c["pr2"][0].startswith("Completa: un error común")
+    sale = [
+        (q_completar(c), _completo(c["pr"])),
+        (q_que(c, va), c["d"]),
+        ({**q_cuando(c, vb), "_situacion": q_situacion_completar(c)}, _sin_pregunta(c["sit"])),
+        (codigo, c["h"]),
+        (q_uso(c, vc), c["u"]),
+        (q_cierta(c, vb, 0), c["k"][0]),
+        (q_error(c) if c["err"] else None, c["err"][2] if c["err"] else ""),
+        (q_ec(c, va), c["ec"]),
+        (q_completar(c, True) if pr2_real else None, _completo(c["pr2"]) if pr2_real else ""),
+        (q_cierta(c, vc, 1), c["k"][1]),
+        (q_cierta(c, va, 2), c["k"][2]),
+    ]
+    return [(q, dato) for q, dato in sale if q is not None]
+
+
+def _repartir(preguntas, maximo=LECCIONES_POR_CONCEPTO):
+    """Reparte las preguntas en lecciones de 3 o más (hasta `maximo`). Primero se reparten las de escribir, ordenar o
+    encontrar el error, para que cada lección mezcle tipos; si una queda solo con opción múltiple, su pregunta de
+    «situación» pasa a escribirse (mismo dato, otra forma de responder)."""
+    n_lecciones = max(1, min(maximo, len(preguntas) // 3))
+    lecciones = [[] for _ in range(n_lecciones)]
+    activas = [q for q in preguntas if q["tipo"] != "opcion"]
+    resto = [q for q in preguntas if q["tipo"] == "opcion"]
+    for k, q in enumerate(activas):
+        lecciones[k % n_lecciones].append(q)
+    for q in resto:
+        min(lecciones, key=len).append(q)
+    for lec in lecciones:
+        if all(q["tipo"] == "opcion" for q in lec):
+            for k, q in enumerate(lec):
+                if q.get("_situacion"):
+                    lec[k] = q["_situacion"]
+                    break
+    for lec in lecciones:
+        for k, q in enumerate(lec):
+            lec[k] = {clave: v for clave, v in q.items() if clave != "_situacion"}
+    return lecciones
 
 
 def construir_etapas(etapas_conceptos, repaso=False):
     """etapas_conceptos = [(titulo, descripcion, [K, K, ...]), ...]  ->  lista de etapas para ETAPAS.
-    repaso=False quita la lección «Repaso de …» de cada sección (y __init__.CON_REPASO decide si hay «Práctica de repaso»; ningún curso lo lleva)."""
-    etapas, historial = [], []   # historial: conceptos anteriores como (lista_de_su_etapa, índice)
+    Cada concepto es una sección con hasta 3 lecciones; ninguna pregunta del curso se repite ni se parece a otra.
+    Las etapas largas se parten en partes de 45 lecciones como máximo. (`repaso` ya no se usa: repasar era repetir.)"""
+    registro = _Registro()
+    etapas = []
     for titulo, desc, lista in etapas_conceptos:
         secciones = []
         for i, c in enumerate(lista):
-            previos = [historial[-k] for k in (1, 3, 5) if len(historial) >= k]
-            sec = {"titulo": c["t"], "lecciones": _lecciones(i, lista, previos, repaso), "agrupada": True}
-            secciones.append(sec)
-            historial.append((lista, i))
-        e = etapa(titulo, desc, *secciones)
-        etapas.append(e)
+            elegidas = [q for q, dato in _candidatas(i, lista) if registro.admite(q, dato)]
+            if len(elegidas) < 3:
+                # Casi todo lo de este concepto ya se preguntó en otro: se completa con lo menos parecido que quede.
+                for q, _dato in _candidatas(i, lista):
+                    if len(elegidas) >= 3:
+                        break
+                    if q not in elegidas and registro.admite(q, ""):
+                        elegidas.append(q)
+            if not elegidas:
+                continue
+            if all(q["tipo"] == "opcion" for q in elegidas):
+                # Sección solo de opción múltiple: una pregunta pasa a escribirse.
+                con_sit = next((k for k, q in enumerate(elegidas) if q.get("_situacion")), None)
+                if con_sit is not None:
+                    elegidas[con_sit] = elegidas[con_sit]["_situacion"]
+                else:
+                    for extra in (q_orden(c), q_codigo_concepto_escribir(c), q_situacion_completar(c)):
+                        if extra is not None and registro.admite(extra, ""):
+                            elegidas.append(extra)
+                            break
+            partes = _repartir(elegidas)
+            n = len(partes)
+            lecciones = [leccion((f"{c['t']} · práctica {k + 1} de {n}" if n > 1 else f"{c['t']} · práctica")[:80], *qs) for k, qs in enumerate(partes)]
+            # Si no se pudo variar el tipo sin repetir una respuesta, se prefiere no repetir (y se marca para el validador).
+            un_tipo = len({q["tipo"] for qs in partes for q in qs}) < 2
+            secciones.append({"titulo": c["t"], "lecciones": lecciones, "agrupada": True, **({"un_tipo": True} if un_tipo else {})})
+        # Partir la etapa para que ninguna tenga más de MAX_LECCIONES_ETAPA lecciones.
+        grupos, actual, cuenta = [], [], 0
+        for sec in secciones:
+            if actual and cuenta + len(sec["lecciones"]) > MAX_LECCIONES_ETAPA:
+                grupos.append(actual)
+                actual, cuenta = [], 0
+            actual.append(sec)
+            cuenta += len(sec["lecciones"])
+        if actual:
+            grupos.append(actual)
+        if len(grupos) > 1:  # partes parejas en vez de una grande y una pequeña
+            import math
+            por_parte = math.ceil(len(secciones) / len(grupos))
+            grupos = [secciones[k:k + por_parte] for k in range(0, len(secciones), por_parte)]
+        for k, grupo in enumerate(grupos, 1):
+            nombre = titulo if len(grupos) == 1 else f"{titulo} · parte {k} de {len(grupos)}"
+            etapas.append(etapa(nombre[:80], desc, *grupo))
     return etapas
 
 

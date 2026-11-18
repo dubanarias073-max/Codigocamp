@@ -22,8 +22,8 @@ Cómo se escribe (ejemplo mínimo):
     ]
 """
 
-XP_ETAPA = [15, 20, 25, 30, 35]   # cada etapa da más XP que la anterior
-PREGUNTAS_POR_LECCION = 4          # mínimo validado; los cursos generados crean 5 por lección
+XP_ETAPA = [15, 18, 20, 23, 25, 28, 30, 33, 35, 38, 40]   # cada etapa da más XP que la anterior
+PREGUNTAS_POR_LECCION = 3          # mínimo validado; ninguna pregunta se repite en el curso, así que las lecciones son cortas
 
 
 def _reto(tipo, enunciado, opciones, respuesta, codigo="", explicacion="", datos=None):

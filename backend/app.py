@@ -36,6 +36,10 @@ def create_app(test_config=None):
         GOOGLE_CLIENT_ID=os.getenv("GOOGLE_CLIENT_ID", ""),
         GOOGLE_CLIENT_SECRET=os.getenv("GOOGLE_CLIENT_SECRET", ""),
         GOOGLE_REDIRECT_URI=os.getenv("GOOGLE_REDIRECT_URI", ""),
+        # Archivos del espacio de Trabajo (imágenes, videos, PDF…): se guardan en disco, no en MySQL.
+        ALMACEN_ARCHIVOS=os.getenv("ALMACEN_ARCHIVOS") or str(BACKEND / "almacen_archivos"),
+        CUOTA_ARCHIVOS=int(float(os.getenv("CUOTA_ARCHIVOS_GB", "10")) * 1024 ** 3),
+        MAX_ARCHIVO=int(float(os.getenv("MAX_ARCHIVO_MB", "1024")) * 1024 ** 2),
     )
     db_url = os.getenv("DATABASE_URL")
     if not db_url:

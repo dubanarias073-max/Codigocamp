@@ -8,6 +8,7 @@
 //     separado se le pregunta a la persona cuál conservar.
 //  4. Un proyecto vacío es un proyecto vacío: borrar todos los archivos no devuelve las plantillas.
 import { normalizar, usoCaracteres } from "./fs.js";
+import { gzip } from "./almacenamiento.js";
 
 const VERSION = 2;
 const RAMA = /^[A-Za-z0-9._/-]{1,80}$/;
@@ -106,9 +107,20 @@ export class Almacen {
     return null;
   }
 
+  /** Con proyectos grandes, convertir a JSON en cada tecla se nota: se agrupan las escrituras locales (400 ms). */
+  #persistirPronto() {
+    if ((this.ultimoLargo || 0) < 300_000) { this.#persistir(); return; }
+    if (this.persistencia) return;
+    this.persistencia = setTimeout(() => this.#persistir(), 400);
+  }
+
   #persistir() {
+    clearTimeout(this.persistencia);
+    this.persistencia = null;
     try {
-      this.storage.setItem(this.clave, JSON.stringify({ v: VERSION, proyecto: this.proyecto, sucio: this.sucio, base: this.base, ts: Date.now() }));
+      const datos = JSON.stringify({ v: VERSION, proyecto: this.proyecto, sucio: this.sucio, base: this.base, ts: Date.now() });
+      this.ultimoLargo = datos.length;
+      this.storage.setItem(this.clave, datos);
       this.errorLocalAvisado = false;
       return true;
     } catch {
@@ -119,10 +131,16 @@ export class Almacen {
   }
 
   async #pedir(metodo, cuerpo, extra = {}) {
+    const cabeceras = { "Content-Type": "application/json", "X-CSRFToken": this.csrf() };
+    // Los proyectos grandes viajan comprimidos (el código se reduce unas 5 a 10 veces).
+    if (cuerpo && cuerpo.length > 32_000 && !extra.keepalive) {
+      const z = await gzip(cuerpo).catch(() => null);
+      if (z) { cuerpo = z; cabeceras["Content-Encoding"] = "gzip"; }
+    }
     const r = await this.fetchFn("/api/trabajo/", {
       method: metodo,
       credentials: "same-origin",
-      headers: { "Content-Type": "application/json", "X-CSRFToken": this.csrf() },
+      headers: cabeceras,
       body: cuerpo,
       ...extra,
     });
@@ -200,7 +218,7 @@ export class Almacen {
   cambiar() {
     this.version += 1;
     this.sucio = true;
-    this.#persistir();
+    this.#persistirPronto();
     this.#estado("guardando");
     clearTimeout(this.temporizador);
     this.temporizador = setTimeout(() => { void this.#subir(); }, this.retardo);
@@ -265,6 +283,7 @@ export class Almacen {
 
   /** Para pagehide / visibilitychange: intenta mandar lo pendiente aunque la página se esté cerrando. */
   volcarAlSalir() {
+    if (this.persistencia) this.#persistir();
     if (!this.sucio) return;
     clearTimeout(this.temporizador);
     const cuerpo = JSON.stringify(this.proyecto);

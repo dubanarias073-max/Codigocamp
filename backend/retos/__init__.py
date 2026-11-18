@@ -48,6 +48,15 @@ def errores_catalogo(cursos=None):
     """Devuelve la lista de problemas que impedirían cargar o jugar los retos."""
     errores = []
     for slug, etapas in (cursos or cargar_cursos()).items():
+        vistos = {}
+        for etapa in etapas:
+            for seccion in etapa["secciones"]:
+                for lec in seccion["lecciones"]:
+                    for r in lec["retos"]:
+                        clave = (" ".join(r["enunciado"].casefold().split()), r["codigo"], tuple(r["datos"].get("piezas", [])))
+                        if clave in vistos:
+                            errores.append(f"{slug} · {seccion['titulo']} › {lec['titulo']}: repite una pregunta de «{vistos[clave]}» (ninguna pregunta se repite en el curso)")
+                        vistos.setdefault(clave, seccion["titulo"])
         if not etapas:
             errores.append(f"{slug}: no tiene etapas")
         for e, etapa in enumerate(etapas, 1):
@@ -58,6 +67,8 @@ def errores_catalogo(cursos=None):
             for s, seccion in enumerate(etapa["secciones"], 1):
                 if len(seccion["titulo"]) > 80 or not seccion["lecciones"]:
                     errores.append(f"{slug} etapa {e} sección {s}: título largo o sin lecciones")
+                if not seccion.get("un_tipo") and len({r["tipo"] for lec in seccion["lecciones"] for r in lec["retos"]}) < 2:
+                    errores.append(f"{slug} etapa {e} sección {s}: necesita más de un tipo de pregunta")
                 for l, lec in enumerate(seccion["lecciones"], 1):
                     donde = f"{slug} · {etapa['titulo']} › {seccion['titulo']} › {lec['titulo']}"
                     if len(lec["titulo"]) > 80 or not lec["retos"]:
@@ -65,9 +76,7 @@ def errores_catalogo(cursos=None):
                     if len(lec["retos"]) < PREGUNTAS_POR_LECCION:
                         errores.append(f"{donde}: tiene menos de {PREGUNTAS_POR_LECCION} preguntas")
                     enunciados, respuestas = {}, {}
-                    tipos = {reto["tipo"] for reto in lec["retos"]}
-                    if len(tipos) < 2:
-                        errores.append(f"{donde}: necesita más de un tipo de pregunta")
+
                     for n, r in enumerate(lec["retos"], 1):
                         prefijo = f"{donde} #{n}"
                         errores += [f"{prefijo}: {m}" for m in _problemas_reto(r)]
@@ -169,12 +178,12 @@ def sincronizar_catalogo(session):
     for slug, etapas in cursos.items():
         db_etapas = list(en_bd[slug].etapas)
         if len(db_etapas) != len(etapas):
-            raise RuntimeError(f"{slug}: cambió la cantidad de etapas; no se sincronizó para proteger el progreso.")
+            raise RuntimeError(f"{slug}: cambió la cantidad de etapas; no se sincronizó para proteger el progreso. Si el camino cambió de estructura, usa `flask --app app migrar-camino` (traslada el progreso).")
         for i, (etapa, db_etapa) in enumerate(zip(etapas, db_etapas)):
             planas = secciones_del_camino(etapa)
             db_secciones = list(db_etapa.secciones)
             if db_etapa.orden != i + 1 or len(db_secciones) > len(planas):
-                raise RuntimeError(f"{slug} etapa {i + 1}: cambió la estructura; no se sincronizó para proteger el progreso.")
+                raise RuntimeError(f"{slug} etapa {i + 1}: cambió la estructura; no se sincronizó para proteger el progreso. Si el camino cambió de estructura, usa `flask --app app migrar-camino` (traslada el progreso).")
             expandiendo_secciones = len(db_secciones) < len(planas)
             plan_etapa = {"slug": slug, "etapa": etapa, "db_etapa": db_etapa, "secciones": []}
             for j, seccion in enumerate(planas, 1):
@@ -182,7 +191,7 @@ def sincronizar_catalogo(session):
                 db_seccion = db_secciones[j - 1] if j <= len(db_secciones) else None
                 if db_seccion and (db_seccion.orden != j or
                                    (expandiendo_secciones and db_seccion.titulo != seccion["titulo"])):
-                    raise RuntimeError(f"{slug} sección {j}: no coincide con la ruta actual; no se sincronizó para proteger el progreso.")
+                    raise RuntimeError(f"{slug} sección {j}: no coincide con la ruta actual; no se sincronizó para proteger el progreso. Si el camino cambió de estructura, usa `flask --app app migrar-camino` (traslada el progreso).")
 
                 niveles = [None] * len(specs)
                 if db_seccion:
@@ -195,7 +204,7 @@ def sincronizar_catalogo(session):
                         if spec["tipo"] != "trofeo":
                             esperados[spec["tipo"]] = esperados.get(spec["tipo"], 0) + 1
                     if any(len(niveles_tipo) > esperados.get(tipo, 0) for tipo, niveles_tipo in por_tipo.items()):
-                        raise RuntimeError(f"{slug} sección {j}: se quitarían niveles existentes; no se sincronizó para proteger el progreso.")
+                        raise RuntimeError(f"{slug} sección {j}: se quitarían niveles existentes; no se sincronizó para proteger el progreso. Si el camino cambió de estructura, usa `flask --app app migrar-camino` (traslada el progreso).")
                     if len(db_seccion.niveles) < len(specs) and db_seccion.titulo != seccion["titulo"]:
                         raise RuntimeError(f"{slug} sección {j}: el título debe coincidir para agregar niveles sin reasignar el progreso.")
                     usados = {}
@@ -220,7 +229,7 @@ def sincronizar_catalogo(session):
                 for k, spec in enumerate(plan_seccion["specs"]) if spec["tipo"] == "trofeo"
             ]
             if len(trofeos_actuales) > len(trofeos_objetivo):
-                raise RuntimeError(f"{slug} etapa {i + 1}: se quitarían trofeos; no se sincronizó para proteger el progreso.")
+                raise RuntimeError(f"{slug} etapa {i + 1}: se quitarían trofeos; no se sincronizó para proteger el progreso. Si el camino cambió de estructura, usa `flask --app app migrar-camino` (traslada el progreso).")
             for nivel, (plan_seccion, k) in zip(trofeos_actuales, trofeos_objetivo):
                 plan_seccion["niveles"][k] = nivel
             planes.append(plan_etapa)

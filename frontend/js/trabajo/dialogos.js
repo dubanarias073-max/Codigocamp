@@ -3,13 +3,15 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 /**
  * Cuadro modal accesible (<dialog>). botones: [{ texto, valor, peligro?, cancelar? }].
+ * lista: puntos (texto) que se muestran bajo el mensaje; avisos: lo mismo pero resaltado; nota: texto pequeño al final.
  * Resuelve con el valor del botón pulsado; Esc devuelve el del botón marcado como cancelar.
  */
-export function dialogo({ titulo, mensaje = "", botones }) {
+export function dialogo({ titulo, mensaje = "", lista = [], avisos = [], nota = "", ancho = false, botones }) {
   return new Promise((resolver) => {
     const d = document.createElement("dialog");
-    d.className = "ide-dialogo";
-    d.innerHTML = `<form method="dialog"><h3>${esc(titulo)}</h3>${mensaje ? `<p>${esc(mensaje).replace(/\n/g, "<br>")}</p>` : ""}<div class="ide-dialogo-botones"></div></form>`;
+    d.className = `ide-dialogo${ancho ? " ancho" : ""}`;
+    const ul = (items, clase) => (items.length ? `<ul class="${clase}">${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "");
+    d.innerHTML = `<form method="dialog"><h3>${esc(titulo)}</h3>${mensaje ? `<p>${esc(mensaje).replace(/\n/g, "<br>")}</p>` : ""}${ul(avisos, "ide-dialogo-avisos")}${ul(lista, "ide-dialogo-lista")}${nota ? `<p class="ide-dialogo-nota">${esc(nota).replace(/\n/g, "<br>")}</p>` : ""}<div class="ide-dialogo-botones"></div></form>`;
     const caja = d.querySelector(".ide-dialogo-botones");
     const cancelar = botones.find((b) => b.cancelar);
     let valor = cancelar ? cancelar.valor : undefined;
@@ -60,6 +62,7 @@ export function aviso(texto, { accion, ms = 6000, tipo = "info" } = {}) {
   contenedorAvisos.appendChild(el);
   while (contenedorAvisos.childElementCount > 4) contenedorAvisos.firstElementChild.remove();
   setTimeout(quitar, ms);
+  quitar.actualizar = (t) => { el.querySelector("span").textContent = t; };
   return quitar;
 }
 

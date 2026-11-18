@@ -1,4 +1,9 @@
+import gzip
+import json
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from app import create_app
@@ -8,7 +13,9 @@ from rutas.auth import oauth
 
 class TrabajoAPITest(unittest.TestCase):
     def setUp(self):
+        self.dir = tempfile.mkdtemp()
         self.app = create_app({
+            "ALMACEN_ARCHIVOS": self.dir,
             "TESTING": True,
             "SECRET_KEY": "test-secret",
             "SQLALCHEMY_DATABASE_URI": "sqlite://",
@@ -28,6 +35,31 @@ class TrabajoAPITest(unittest.TestCase):
         db.drop_all()
         db.engine.dispose()
         self.context.pop()
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_proyecto_grande_comprimido_se_guarda_en_disco(self):
+        self._registrar(self.client, "grande@example.com")
+        files = {f"src/m{i}.py": "x = 1\n" * 2000 for i in range(150)}  # 1,8 millones de caracteres
+        files["backend/application/__init__.py"] = ""
+        cuerpo = gzip.compress(json.dumps({"files": files, "folders": [], "git": {}}).encode())
+        r = self.client.put("/api/trabajo/", data=cuerpo, headers={**self.csrf, "Content-Type": "application/json", "Content-Encoding": "gzip"})
+        self.assertEqual(r.status_code, 200, r.get_json())
+        guardado = json.loads((Path(self.dir) / "1" / "proyecto.json").read_text())
+        self.assertEqual(guardado["files"], files)
+        self.assertEqual(UserWorkspace.query.one().archivos, {}, "el contenido no va en MySQL")
+        self.assertEqual(self.client.get("/api/trabajo/").get_json()["proyecto"]["files"], files)
+        from rutas.archivos import limpiar_disco
+        self.assertEqual(limpiar_disco(self.app), 0)
+        self.assertTrue((Path(self.dir) / "1" / "proyecto.json").exists())
+        demasiado = {"a.txt": "x" * 5_000_001}
+        self.assertEqual(self.client.put("/api/trabajo/", json={"files": demasiado, "folders": [], "git": {}}, headers=self.csrf).status_code, 400)
+        self.assertEqual(self.client.put("/api/trabajo/", data=b"no-gzip", headers={**self.csrf, "Content-Type": "application/json", "Content-Encoding": "gzip"}).status_code, 400)
+
+    def test_proyectos_viejos_en_la_tabla_se_siguen_leyendo(self):
+        self._registrar(self.client, "viejo@example.com")
+        db.session.add(UserWorkspace(usuario_id=1, archivos={"a.txt": "de antes"}, carpetas=[], git={}))
+        db.session.commit()
+        self.assertEqual(self.client.get("/api/trabajo/").get_json()["proyecto"]["files"], {"a.txt": "de antes"})
 
     def _registrar(self, client, email):
         client.get("/api/auth/me/")

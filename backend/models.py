@@ -34,6 +34,21 @@ class UserWorkspace(db.Model):
     actualizado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
 
+class WorkspaceFile(db.Model):
+    """Archivo binario del espacio de trabajo (imagen, video, PDF…). Los bytes viven en disco
+    (ALMACEN_ARCHIVOS/<usuario>/<hash[:2]>/<hash>); aquí solo sus datos. El proyecto lo referencia con un
+    «marcador» de texto (ccbin:v1:<hash>:<tipo>:<bytes>), así mover, copiar o versionar con Git no duplica datos."""
+    __tablename__ = "archivos_trabajo"
+    __table_args__ = (db.UniqueConstraint("usuario_id", "hash", name="uq_archivos_trabajo_usuario_hash"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    hash = db.Column(db.String(64), nullable=False)
+    tipo = db.Column(db.String(100), nullable=False)
+    tamano = db.Column(db.BigInteger, nullable=False)
+    creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
 class Course(db.Model):
     __tablename__ = "cursos"
 

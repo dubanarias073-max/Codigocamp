@@ -15,9 +15,12 @@ export class Explorador {
    * @param {(info:object)=>void} o.alCambiar   { origen, borrado?, movido?: [de, a], creado? }
    * @param {(ruta:string, eliminado:object)=>void} o.alBorrar   para ofrecer «Deshacer»
    * @param {(ruta:string)=>void} o.alAbrirTerminalEn
+   * @param {(o:{ entradas: any[], archivos: File[], destino: string })=>void} [o.alSoltarArchivos]   archivos soltados desde el computador
+   * @param {(carpeta:string)=>void} [o.alSubirEn]   «Subir archivos aquí…»
+   * @param {(ruta:string)=>void} [o.alDescargar]   «Descargar»
    */
-  constructor({ raiz, proyecto, expandidas, alAbrir, alCambiar, alBorrar, alAbrirTerminalEn }) {
-    Object.assign(this, { raiz, proyecto, expandidas, alAbrir, alCambiar, alBorrar, alAbrirTerminalEn });
+  constructor({ raiz, proyecto, expandidas, alAbrir, alCambiar, alBorrar, alAbrirTerminalEn, alSoltarArchivos = null, alSubirEn = null, alDescargar = null }) {
+    Object.assign(this, { raiz, proyecto, expandidas, alAbrir, alCambiar, alBorrar, alAbrirTerminalEn, alSoltarArchivos, alSubirEn, alDescargar });
     this.seleccion = null;
     this.activo = null;
     this.edicion = null;
@@ -162,11 +165,13 @@ export class Explorador {
     const items = [
       { texto: "Nuevo archivo", fn: () => this.nuevo("archivo", carpeta) },
       { texto: "Nueva carpeta", fn: () => this.nuevo("carpeta", carpeta) },
+      ...(this.alSubirEn ? [{ texto: "Subir archivos aquí…", fn: () => this.alSubirEn(carpeta) }] : []),
     ];
     if (ruta) {
       items.push("-",
         { texto: "Abrir en la terminal", fn: () => this.alAbrirTerminalEn(carpeta) },
         { texto: "Copiar ruta relativa", fn: () => navigator.clipboard?.writeText(ruta).catch(() => {}) },
+        ...(this.alDescargar && FS.tieneArchivo(py, ruta) ? [{ texto: "Descargar", fn: () => this.alDescargar(ruta) }] : []),
         "-",
         { texto: "Renombrar", atajo: "F2", fn: () => this.renombrar(ruta) },
         { texto: "Eliminar", atajo: "Supr", peligro: true, fn: () => this.eliminar(ruta) });
@@ -273,12 +278,15 @@ export class Explorador {
     return f.dataset.tipo === "dir" ? f.dataset.ruta : FS.carpetaDe(f.dataset.ruta);
   }
 
-  #limpiarDestino() { this.raiz.querySelectorAll(".destino").forEach((x) => x.classList.remove("destino")); this.raiz.classList.remove("destino-raiz"); }
+  #limpiarDestino() { this.raiz.querySelectorAll(".destino").forEach((x) => x.classList.remove("destino")); this.raiz.classList.remove("destino-raiz", "soltar-archivos"); }
 
   #arrastrarSobre(e) {
-    if (!e.dataTransfer.types.includes("text/plain")) return;
+    const externos = e.dataTransfer.types.includes("Files") && !e.dataTransfer.types.includes("text/plain");
+    if (externos && !this.alSoltarArchivos) return;
+    if (!externos && !e.dataTransfer.types.includes("text/plain")) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    e.dataTransfer.dropEffect = externos ? "copy" : "move";
+    if (externos) this.raiz.classList.add("soltar-archivos");
     this.#limpiarDestino();
     const f = e.target.closest(".fila[data-ruta]");
     const dir = this.#destinoDe(e);
@@ -290,6 +298,12 @@ export class Explorador {
     e.preventDefault();
     this.#limpiarDestino();
     const origen = e.dataTransfer.getData("text/plain");
+    if (!origen && e.dataTransfer.files?.length && this.alSoltarArchivos) {
+      // Las entradas hay que pedirlas YA (dentro del evento): después el navegador las invalida.
+      const entradas = [...(e.dataTransfer.items || [])].map((it) => (it.kind === "file" && it.webkitGetAsEntry ? it.webkitGetAsEntry() : null)).filter(Boolean);
+      this.alSoltarArchivos({ entradas, archivos: [...e.dataTransfer.files], destino: this.#destinoDe(e) });
+      return;
+    }
     const py = this.proyecto();
     if (!origen || !FS.existe(py, origen)) return;
     const dir = this.#destinoDe(e);

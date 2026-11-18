@@ -2,16 +2,24 @@
 // Este archivo solo conecta las piezas (js/trabajo/*): guardado, explorador, editor, terminal, vista previa y asistente.
 import { api, aviso as avisoSimple, iniciar } from "/js/app.js";
 import { Almacen } from "/js/trabajo/almacen.js";
+import { crearAlmacenamiento } from "/js/trabajo/almacenamiento.js";
 import { dialogo, aviso } from "/js/trabajo/dialogos.js";
 import { Editor, unidadDeIndentacion } from "/js/trabajo/editor.js";
-import { crearEjecutores } from "/js/trabajo/ejecucion.js";
+import { cargarPyodide, crearEjecutores, transpilarModulo } from "/js/trabajo/ejecucion.js";
+import { modulosDePagina, usaModulos } from "/js/trabajo/modulos.js";
 import { Explorador } from "/js/trabajo/explorador.js";
 import * as FS from "/js/trabajo/fs.js";
+import { clonar, publicar } from "/js/trabajo/github.js";
+import { ClienteArchivos, esMarcador } from "/js/trabajo/archivos.js";
+import { importarEn } from "/js/trabajo/importar.js";
+import { Entradas } from "/js/trabajo/entradas.js";
+import { VisorArchivo } from "/js/trabajo/visor.js";
 import { iconoArchivo } from "/js/trabajo/iconos.js";
 import { infoLenguaje } from "/js/trabajo/resaltado.js";
+import { ejecutarNpm, ejecutarPip } from "/js/trabajo/paquetes.js";
 import { Shell, comandoParaArchivo } from "/js/trabajo/shell.js";
 import { PanelInferior, iconoPanel } from "/js/trabajo/terminal.js";
-import { construirVistaPrevia, paginaPrincipal, resolverEnlace } from "/js/trabajo/vista.js";
+import { construirVistaPrevia, paginaPrincipal, paginaQueUsa, resolverEnlace } from "/js/trabajo/vista.js";
 
 const { user, prog } = await iniciar("trabajo");
 const $ = (id) => document.getElementById(id);
@@ -20,6 +28,7 @@ const STORAGE = `cc_trabajo_${user.id}`;
 const UI_STORAGE = `cc_trabajo_ui_${user.id}`;
 const CHAT_STORAGE = `cc_trabajo_chat_${user.id}`;
 const HIST_STORAGE = `cc_trabajo_hist_${user.id}`;
+const PIP_STORAGE = `cc_trabajo_pip_${user.id}`;
 
 // Los elementos del menú lateral no tienen texto visible aquí (es una barra de iconos): se pone como ayuda.
 document.querySelectorAll(".trabajo-app .lado .nav-i").forEach((a) => { const t = a.querySelector(".t")?.textContent.trim(); if (t) { a.title = t; a.setAttribute("aria-label", t); } });
@@ -27,7 +36,7 @@ document.querySelectorAll(".trabajo-app .lado .nav-i").forEach((a) => { const t 
 // ------------------------------------------------------------------ estado de la interfaz ----
 const uiGuardada = (() => { try { return JSON.parse(localStorage.getItem(UI_STORAGE)) || null; } catch { return null; } })();
 const ui = {
-  abiertos: [], activo: null, expandidas: [], panel: false, altoPanel: 260, anchoExp: 260, explorador: true, asistente: null,
+  abiertos: [], activo: null, expandidas: [], panel: false, altoPanel: 260, anchoExp: 260, explorador: true, asistente: null, autoguardado: true,
   ...(uiGuardada || {}),
 };
 const primeraVisita = !uiGuardada;
@@ -47,25 +56,45 @@ const textoEstado = {
   error: ["⚠ No se pudo guardar", "problema", "El servidor rechazó el guardado."],
   errorLocal: ["⚠ Sin espacio local", "problema", "No hay espacio para guardar en este navegador."],
 };
+// Con el guardado automático apagado, el texto escrito en los editores NO pasa al proyecto hasta que se guarda (Ctrl+S).
+// Aquí se anotan los archivos con texto sin guardar.
+const sucios = new Set();
+let ultimoEstado = ["iniciando", ""];
 const avisosEstado = new Set();
 function pintarEstado(estado, mensaje) {
-  const [texto, clase, ayuda] = textoEstado[estado] ?? textoEstado.guardado;
+  ultimoEstado = [estado, mensaje];
+  mostrarEstado();
+}
+function mostrarEstado() {
+  const [estado, mensaje] = ultimoEstado;
   const el = $("estadoGuardado");
+  if (sucios.size) {
+    el.textContent = sucios.size === 1 ? "Sin guardar · Ctrl+S" : `${sucios.size} sin guardar · Ctrl+S`;
+    el.className = "estado-item guardando";
+    el.title = "Hay cambios sin guardar (el guardado automático está desactivado). Clic o Ctrl+S para guardar.";
+    return;
+  }
+  const [texto, clase, ayuda] = textoEstado[estado] ?? textoEstado.guardado;
   el.textContent = texto;
   el.className = `estado-item ${clase}`.trim();
   el.title = mensaje || ayuda;
+  if (estado !== "guardado") avisarProblema(estado, mensaje, ayuda);
   $("expNube").textContent = estado === "guardado" ? "CUENTA" : estado === "guardando" || estado === "iniciando" ? "…" : "LOCAL";
+  if (estado === "guardado") avisosEstado.clear();
+}
+function avisarProblema(estado, mensaje, ayuda) {
   if (["sinconexion", "sesion", "error", "errorLocal"].includes(estado) && !avisosEstado.has(estado)) {
     avisosEstado.add(estado);
     aviso(mensaje || ayuda, { tipo: "error", ms: 9000 });
   }
-  if (estado === "guardado") avisosEstado.clear();
 }
 
+// La copia local vive en IndexedDB: cabe un proyecto grande (localStorage solo admite unos 5 MB).
+const copiaLocal = await crearAlmacenamiento(STORAGE, { alCambiarFuera: () => almacen.recargarDesdeLocal() });
 const almacen = new Almacen({
-  clave: STORAGE,
+  clave: STORAGE, storage: copiaLocal,
   alEstado: pintarEstado,
-  alRemoto: () => proyectoCambio({ origen: "remoto" }),
+  alRemoto: () => { proyectoCambio({ origen: "remoto" }); entradas?.alCambiarProyecto({ origen: "remoto" }); },
   resolverConflicto: ({ local, nube }) => dialogo({
     titulo: "Hay dos versiones de tu proyecto",
     mensaje: `En este navegador hay cambios que no se llegaron a sincronizar (${local.archivos} archivos), y tu cuenta tiene otra versión distinta (${nube.archivos} archivos).\n\n¿Cuál quieres conservar? La otra se descartará.`,
@@ -74,16 +103,36 @@ const almacen = new Almacen({
 });
 await almacen.iniciar();
 const proyecto = () => almacen.proyecto;
+const archivos = new ClienteArchivos();
+// Se declara antes de usarse: proyectoCambio puede llamarse durante el arranque, antes de crear Entradas.
+let entradas = null;
+let turnoVista = 0; // cada vista previa nueva invalida a las que aún esperaban sus imágenes
 
 // --------------------------------------------------------------------- terminal y shell ----
-const ejecutores = crearEjecutores({ api });
+// Paquetes de Python que la persona instaló con pip: se recuerdan en este navegador y se reinstalan al ejecutar Python.
+const almacenPip = {
+  leer: () => { try { const l = JSON.parse(localStorage.getItem(PIP_STORAGE)); return Array.isArray(l) ? l.filter((x) => typeof x === "string").slice(0, 40) : []; } catch { return []; } },
+  guardar: (lista) => { try { localStorage.setItem(PIP_STORAGE, JSON.stringify(lista.slice(0, 40))); } catch { /* sin espacio: se pierde solo el recordatorio */ } },
+};
+const ejecutores = crearEjecutores({ api, almacenPip });
+const paquetes = {
+  pip: (o) => ejecutarPip({ ...o, cargarPy: cargarPyodide, almacen: almacenPip }),
+  npm: (o) => ejecutarNpm({ ...o, nombreProyecto: "mi-proyecto" }),
+};
 const shell = new Shell({
-  proyecto, usuario: user.nombre || "estudiante", ejecutores,
+  proyecto, usuario: user.nombre || "estudiante", ejecutores, github: { publicar, clonar }, paquetes,
+  leerArchivo: (m) => archivos.bytes(m),
+  importar: (origen, o) => importarEn(proyecto(), origen, {
+    ...o, subir: (d, op) => archivos.subir(d, op),
+    espacio: async () => { const u = await archivos.consultarUso(); return { libre: Math.max(0, u.limite - u.uso), maxArchivo: u.max_archivo }; },
+  }),
   cambio: (info) => proyectoCambio(info),
   abrir: (ruta) => abrir(ruta, { enfocar: false }),
+  abrirVista: (ruta) => abrirVista(ruta),
 });
 const panel = new PanelInferior({
   raiz: $("terminalPanel"), shell, proyecto, claveHistorial: HIST_STORAGE,
+  alOcupado: (corriendo) => pintarEjecutar(corriendo),
   alCambiar: (abierto) => {
     ui.panel = abierto;
     $("terminalPanel").hidden = !abierto;
@@ -103,9 +152,20 @@ const editores = new Map();
 function editorPara(ruta) {
   let ed = editores.get(ruta);
   if (ed) return ed;
+  const texto = proyecto().files[ruta] ?? "";
+  if (esMarcador(texto)) {
+    ed = new VisorArchivo({ ruta, texto, url: (m, o) => archivos.url(m, o) });
+    editores.set(ruta, ed);
+    $("editores").appendChild(ed.raiz);
+    return ed;
+  }
   ed = new Editor({
     ruta, texto: proyecto().files[ruta] ?? "",
-    alCambiar: (texto) => { proyecto().files[ruta] = texto; proyectoCambio({ origen: "editor", ruta }); },
+    alCambiar: (texto) => {
+      if (ui.autoguardado) { proyecto().files[ruta] = texto; proyectoCambio({ origen: "editor", ruta }); return; }
+      if (!sucios.has(ruta)) { sucios.add(ruta); pintarPestanas(); }
+      mostrarEstado();
+    },
     alCursor: (pos) => { if (ui.activo === ruta) pintarCursor(pos); },
     alAtajo: (accion) => { if (accion === "guardar") guardarAhora(); else ejecutarActual(); },
   });
@@ -117,6 +177,7 @@ function editorPara(ruta) {
 function pintarCursor(pos) {
   const ed = editores.get(ui.activo);
   if (!ed) return;
+  if (ed.esImagen) { $("posicionCursor").textContent = ""; $("estIndent").textContent = ""; $("lenguajeArchivo").textContent = ed.lenguaje; return; }
   $("posicionCursor").textContent = `Ln ${pos.linea}, Col ${pos.col}${pos.seleccion ? ` (${pos.seleccion} sel.)` : ""}`;
   const u = unidadDeIndentacion(ed.ext);
   $("estIndent").textContent = u === "\t" ? "Tabulaciones: 4" : `Espacios: ${u.length}`;
@@ -132,7 +193,7 @@ function pintarPestanas() {
     const on = r === ui.activo;
     const nombre = r === VISTA ? "Vista previa" : FS.nombreBase(r);
     const icono = r === VISTA ? '<svg class="ico-vista" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.1"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>' : iconoArchivo(r);
-    return `<div class="pestana${on ? " on" : ""}" role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-ruta="${r.replace(/"/g, "&quot;")}" title="${r === VISTA ? "Vista previa de la página" : r}">${icono}<span class="nom">${nombre}</span><button type="button" class="cerrar" tabindex="-1" aria-label="Cerrar ${nombre}">${x}</button></div>`;
+    return `<div class="pestana${on ? " on" : ""}${sucios.has(r) ? " sucio" : ""}" role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-ruta="${r.replace(/"/g, "&quot;")}" title="${r === VISTA ? "Vista previa de la página" : r}">${icono}<span class="nom">${nombre}</span><button type="button" class="cerrar" tabindex="-1" aria-label="Cerrar ${nombre}">${x}</button></div>`;
   }).join("");
   $("pestanas").querySelector(".pestana.on")?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
@@ -182,17 +243,29 @@ function abrir(ruta, { enfocar = true } = {}) {
   activar(ruta, { enfocar });
 }
 
-function cerrarPestana(ruta) {
+async function cerrarPestana(ruta) {
   const i = ui.abiertos.indexOf(ruta);
   if (i < 0) return;
-  ui.abiertos.splice(i, 1);
+  if (sucios.has(ruta)) {
+    const eleccion = await dialogo({
+      titulo: `¿Guardar los cambios de «${FS.nombreBase(ruta)}»?`,
+      mensaje: "Si no los guardas, se perderán.",
+      botones: [{ texto: "Guardar", valor: "guardar" }, { texto: "No guardar", valor: "descartar", peligro: true }, { texto: "Cancelar", valor: "cancelar", cancelar: true }],
+    });
+    if (eleccion === "cancelar") return;
+    if (eleccion === "guardar") guardarArchivos([ruta]); else { sucios.delete(ruta); mostrarEstado(); }
+  }
+  const j = ui.abiertos.indexOf(ruta);
+  if (j < 0) return;
+  ui.abiertos.splice(j, 1);
   const ed = editores.get(ruta);
   if (ed) { ed.destruir(); editores.delete(ruta); }
-  if (ui.activo === ruta) activar(ui.abiertos[Math.min(i, ui.abiertos.length - 1)] ?? null);
+  if (ui.activo === ruta) activar(ui.abiertos[Math.min(j, ui.abiertos.length - 1)] ?? null);
   else { pintarPestanas(); guardarUI(); }
 }
 
 function renderVista() {
+  guardarArchivos();
   const py = proyecto();
   paginaVista = paginaPrincipal(py, paginaVista);
   if (!paginaVista) {
@@ -202,8 +275,36 @@ function renderVista() {
   }
   panel.limpiarConsola();
   $("vistaRuta").textContent = `Vista previa · ${paginaVista}`;
-  $("vista").srcdoc = construirVistaPrevia(py, paginaVista);
+  const turno = ++turnoVista;
+  const pagina = paginaVista;
+  const hayImagenes = Object.values(py.files).some(esMarcador);
+  (async () => {
+    const mapa = hayImagenes ? await archivos.enlaces(py) : new Map();
+    let modulos = null;
+    if (usaModulos(py, pagina)) {
+      if (turno === turnoVista) $("vista").srcdoc = '<p style="font:14px system-ui;padding:24px;color:#555">Preparando los módulos (JSX, TypeScript y paquetes)…</p>';
+      try {
+        modulos = await modulosDePagina(py, pagina, { transpilar: transpilarModulo, enlaces: mapa });
+        for (const e of modulos.errores) panel.escribirConsola("error", e);
+      } catch (error) {
+        panel.escribirConsola("error", `No se pudieron preparar los módulos: ${error.message}`);
+      }
+    }
+    if (turno !== turnoVista) return; // llegó otra vista previa más nueva
+    pintarVista(py, pagina, mapa, modulos);
+  })();
   pintarMigas();
+}
+
+function pintarVista(py, pagina, mapa, modulos = null) {
+  try {
+    $("vista").srcdoc = construirVistaPrevia(py, pagina, { imagenes: mapa, modulos });
+  } catch (error) {
+    // Nunca una página en blanco sin explicación.
+    const msg = String(error?.message || error).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    $("vista").srcdoc = `<p style="font:14px system-ui;padding:24px;color:#b91c1c">No se pudo construir la vista previa: ${msg}</p>`;
+    panel.escribirConsola("error", `No se pudo construir la vista previa: ${error?.message || error}`);
+  }
 }
 
 function abrirVista(preferida = null) {
@@ -226,10 +327,15 @@ window.addEventListener("message", (e) => {
 });
 
 function ejecutarActual() {
+  guardarArchivos(); // ejecutar siempre usa lo último que escribiste
   const ruta = ui.activo;
   if (ruta === VISTA) { renderVista(); return; }
   if (!ruta) { aviso("Abre un archivo para ejecutarlo.", { tipo: "info" }); return; }
+  if (esMarcador(proyecto().files[ruta])) { aviso("Es un archivo (imagen, video, PDF…): no se ejecuta. Úsalo desde tu HTML o CSS y abre la vista previa.", { tipo: "info" }); return; }
   if (/\.(html?|css)$/i.test(ruta)) { abrirVista(/\.html?$/i.test(ruta) ? ruta : null); return; }
+  // Un .js que usa una página del proyecto se «ejecuta» abriendo esa página (corre en el navegador, no en Node).
+  const pagina = /\.m?js$/i.test(ruta) ? paginaQueUsa(proyecto(), ruta) : null;
+  if (pagina) { abrirVista(pagina); return; }
   const comando = comandoParaArchivo(ruta, panel.activa?.sesion.cwd ?? "");
   if (!comando) { aviso(`No sé ejecutar archivos .${FS.extension(ruta) || "sin extensión"}. Los de texto solo se editan.`); return; }
   panel.correr(comando);
@@ -240,6 +346,7 @@ function renombrarRutas(de, a) {
   const cambiar = (r) => (r === de ? a : FS.dentroDe(r, de) && r !== VISTA ? a + r.slice(de.length) : r);
   ui.abiertos = ui.abiertos.map(cambiar);
   if (ui.activo) ui.activo = cambiar(ui.activo);
+  for (const r of [...sucios]) { const n = cambiar(r); if (n !== r) { sucios.delete(r); sucios.add(n); } }
   for (const [ruta, ed] of [...editores]) {
     const nueva = cambiar(ruta);
     if (nueva !== ruta) { editores.delete(ruta); editores.set(nueva, ed); ed.renombrar(nueva); }
@@ -252,7 +359,7 @@ function reconciliarPestanas() {
   const py = proyecto();
   const antes = ui.activo;
   ui.abiertos = ui.abiertos.filter((r) => r === VISTA || FS.tieneArchivo(py, r));
-  for (const [ruta, ed] of [...editores]) if (!FS.tieneArchivo(py, ruta)) { ed.destruir(); editores.delete(ruta); }
+  for (const [ruta, ed] of [...editores]) if (!FS.tieneArchivo(py, ruta)) { ed.destruir(); editores.delete(ruta); sucios.delete(ruta); }
   for (const c of [...expandidas]) if (!FS.esCarpeta(py, c)) expandidas.delete(c);
   if (ui.activo !== null && !ui.abiertos.includes(ui.activo)) ui.activo = ui.abiertos[ui.abiertos.length - 1] ?? null;
   return antes !== ui.activo;
@@ -282,18 +389,62 @@ function proyectoCambio(info = {}) {
   if (origen !== "remoto") almacen.cambiar();
   if (info.movido) renombrarRutas(info.movido[0], info.movido[1]);
   if (info.eliminado && origen === "terminal") ofrecerDeshacer(info.borrado, info.eliminado);
-  const cambioActivo = reconciliarPestanas();
-  if (origen !== "editor") for (const [ruta, ed] of editores) ed.establecer(proyecto().files[ruta] ?? "");
+  let cambioActivo = reconciliarPestanas();
+  // Si un archivo pasó de imagen a texto (o al revés), su editor se vuelve a crear del tipo correcto.
+  for (const [ruta, ed] of [...editores]) {
+    if (Boolean(ed.esImagen) !== esMarcador(proyecto().files[ruta])) { ed.destruir(); editores.delete(ruta); sucios.delete(ruta); if (ruta === ui.activo) cambioActivo = true; }
+  }
+  // El texto sin guardar de un editor nunca se pisa con lo que haya en el proyecto.
+  if (origen !== "editor") for (const [ruta, ed] of editores) if (!sucios.has(ruta)) ed.establecer(proyecto().files[ruta] ?? "");
   if (cambioActivo || info.movido || origen === "remoto") activar(ui.activo, { enfocar: false });
   else if (origen !== "editor") { explorador.render(); pintarPestanas(); pintarMigas(); }
   if (origen !== "editor") pintarGit();
+  if (info.origen === "importar" && info.rutas?.length === 1 && FS.tieneArchivo(proyecto(), info.rutas[0])) abrir(info.rutas[0], { enfocar: false });
+  entradas?.alCambiarProyecto(info);
   guardarUI();
 }
 
+/** Pasa el texto de los editores (con cambios sin guardar) al proyecto. */
+function guardarArchivos(rutas = [...sucios]) {
+  let hubo = false;
+  for (const ruta of rutas) {
+    const ed = editores.get(ruta);
+    if (ed && FS.tieneArchivo(proyecto(), ruta)) { proyecto().files[ruta] = ed.leer(); hubo = true; }
+    sucios.delete(ruta);
+  }
+  if (hubo) proyectoCambio({ origen: "editor" });
+  pintarPestanas();
+  mostrarEstado();
+  return hubo;
+}
+
 async function guardarAhora() {
+  guardarArchivos();
   const ok = await almacen.guardarAhora();
   if (ok) aviso("Proyecto guardado en tu cuenta.", { ms: 2200 });
 }
+
+function pintarAutoguardado() {
+  const b = $("autoGuardado");
+  b.textContent = `Autoguardado: ${ui.autoguardado ? "Sí" : "No"}`;
+  b.setAttribute("aria-pressed", String(ui.autoguardado));
+  b.classList.toggle("apagado", !ui.autoguardado);
+}
+
+function alternarAutoguardado() {
+  ui.autoguardado = !ui.autoguardado;
+  if (ui.autoguardado) {
+    void guardarAhora(); // al volver a activarlo se guarda lo pendiente
+    aviso("Autoguardado activado: tus cambios se guardan solos.", { ms: 3500 });
+  } else {
+    aviso("Autoguardado desactivado. Guarda con Ctrl+S; al ejecutar o abrir la vista previa también se guarda el archivo.", { ms: 6500 });
+  }
+  pintarAutoguardado();
+  guardarUI();
+}
+
+// Aviso del navegador al salir con cambios sin guardar
+addEventListener("beforeunload", (e) => { if (sucios.size) { e.preventDefault(); e.returnValue = ""; } });
 
 // ------------------------------------------------------------------------------ explorador ----
 const explorador = new Explorador({
@@ -302,7 +453,16 @@ const explorador = new Explorador({
   alCambiar: proyectoCambio,
   alBorrar: ofrecerDeshacer,
   alAbrirTerminalEn: (carpeta) => panel.correr(`cd ${FS.rutaAbsoluta(carpeta)}`),
+  alSoltarArchivos: (o) => entradas.soltados(o),
+  alSubirEn: (carpeta) => entradas.subirArchivos(carpeta),
+  alDescargar: (ruta) => entradas.descargarArchivo(ruta),
 });
+entradas = new Entradas({
+  proyecto, archivos, usuarioId: user.id, botonCarpeta: $("estCarpeta"),
+  cambio: (info) => proyectoCambio(info),
+  antesDeLeer: () => guardarArchivos(),
+});
+$("masAcciones").onclick = (e) => { const r = e.currentTarget.getBoundingClientRect(); entradas.menu(r.left, r.bottom + 4); };
 $("nuevoArchivo").onclick = () => explorador.nuevo("archivo");
 $("nuevaCarpeta").onclick = () => explorador.nuevo("carpeta");
 $("colapsarTodo").onclick = () => { expandidas.clear(); explorador.render(); guardarUI(); };
@@ -323,11 +483,21 @@ $("pestanas").addEventListener("keydown", (e) => {
   else if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const n = ui.abiertos[(i + (e.key === "ArrowRight" ? 1 : -1) + ui.abiertos.length) % ui.abiertos.length]; activar(n, { enfocar: false }); $("pestanas").querySelector(".pestana.on")?.focus(); }
   else if (e.key === "Delete") cerrarPestana(tab.dataset.ruta);
 });
-$("ejecutar").onclick = ejecutarActual;
+function pintarEjecutar(corriendo = panel.hayProgramaCorriendo) {
+  const b = $("ejecutar");
+  b.classList.toggle("detener", corriendo);
+  b.innerHTML = corriendo
+    ? '<svg viewBox="0 0 16 16" aria-hidden="true" width="12" height="12"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg> Detener'
+    : '<svg viewBox="0 0 16 16" aria-hidden="true" width="12" height="12"><path d="M4 2.5v11L13.5 8z" fill="currentColor"/></svg> Ejecutar';
+  b.title = corriendo ? "Detener el programa que se está ejecutando" : "Ejecutar el archivo abierto (Ctrl+Enter)";
+  b.setAttribute("aria-label", corriendo ? "Detener el programa" : "Ejecutar archivo");
+}
+$("ejecutar").onclick = () => { if (panel.hayProgramaCorriendo) panel.detener(); else ejecutarActual(); };
+$("autoGuardado").onclick = alternarAutoguardado;
+$("estadoGuardado").onclick = guardarAhora;
 $("vistaPrevia").onclick = () => abrirVista(ui.activo && /\.html?$/i.test(ui.activo) ? ui.activo : paginaVista);
 $("vistaRecargar").onclick = renderVista;
 $("guardar").onclick = guardarAhora;
-$("estadoGuardado").onclick = guardarAhora;
 $("estRama").onclick = () => panel.correr("git status");
 $("terminalToggle").onclick = () => panel.alternar();
 $("bienvenida").addEventListener("click", (e) => {
@@ -335,6 +505,9 @@ $("bienvenida").addEventListener("click", (e) => {
   if (a === "nuevo-archivo") explorador.nuevo("archivo", "");
   else if (a === "terminal") panel.abrir();
   else if (a === "guardar") guardarAhora();
+  else if (a === "importar-zip") entradas.importarZip();
+  else if (a === "carpeta") entradas.vincularCarpeta();
+  else if (a === "subir") entradas.subirArchivos("");
 });
 
 function alternarAsistente(mostrar = $("ide").classList.contains("sin-asistente")) {
@@ -379,7 +552,7 @@ function arrastre(sash, mover, terminar) {
 const limitar = (v, a, b) => Math.max(a, Math.min(b, v));
 const fijarAnchoExp = (w) => { ui.anchoExp = limitar(Math.round(w), 160, 520); $("ide").style.setProperty("--w-exp", `${ui.anchoExp}px`); };
 const fijarAltoPanel = (h) => { const max = $("contenido").getBoundingClientRect().height - 120; ui.altoPanel = limitar(Math.round(h), 90, Math.max(120, max)); $("ide").style.setProperty("--alto-panel", `${ui.altoPanel}px`); };
-arrastre($("sashExp"), (e) => fijarAnchoExp(e.clientX - $("ide").getBoundingClientRect().left - 56), guardarUI);
+arrastre($("sashExp"), (e) => fijarAnchoExp(e.clientX - $("explorador").getBoundingClientRect().left), guardarUI);
 arrastre($("sashPanel"), (e) => fijarAltoPanel($("contenido").getBoundingClientRect().bottom - e.clientY), guardarUI);
 $("sashExp").addEventListener("keydown", (e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); fijarAnchoExp(ui.anchoExp + (e.key === "ArrowRight" ? 16 : -16)); guardarUI(); } });
 $("sashPanel").addEventListener("keydown", (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); fijarAltoPanel(ui.altoPanel + (e.key === "ArrowUp" ? 24 : -24)); guardarUI(); } });
@@ -425,7 +598,7 @@ $("preguntar").onsubmit = async (event) => {
   $("enviar").disabled = true;
   const archivo = ui.activo && ui.activo !== VISTA && FS.tieneArchivo(proyecto(), ui.activo) ? ui.activo : null;
   const ext = archivo ? FS.extension(archivo) : "";
-  const codigo = archivo ? proyecto().files[archivo].slice(0, 2400) : "";
+  const codigo = archivo ? (esMarcador(proyecto().files[archivo]) ? "(es un archivo binario: imagen, video, PDF…)" : proyecto().files[archivo].slice(0, 2400)) : "";
   const mensaje = `Estoy trabajando en ${archivo || "un proyecto nuevo"}${ext ? ` (${infoLenguaje(ext).nombre})` : ""}.\nSolicitud: ${pregunta}\n\nCódigo actual:\n\`\`\`${ext}\n${codigo}\n\`\`\``;
   try {
     const r = await api("/api/tutor/", { mensaje, historial: historial.slice(-10) });
@@ -445,6 +618,7 @@ $("preguntar").onsubmit = async (event) => {
 
 // ------------------------------------------------------------------------------- arranque ----
 fijarAnchoExp(ui.anchoExp);
+pintarAutoguardado();
 alternarExplorador(ui.explorador !== false);
 alternarAsistente(ui.asistente === null ? innerWidth >= 1280 : Boolean(ui.asistente));
 pintarChat();
@@ -461,3 +635,4 @@ if (primeraVisita && !ui.abiertos.length) {
 if (ui.abiertos.includes(VISTA)) paginaVista = paginaPrincipal(py0);
 activar(ui.activo, { enfocar: false });
 if (ui.panel) panel.abrir({ enfocar: false });
+void entradas.iniciar();

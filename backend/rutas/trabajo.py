@@ -1,26 +1,46 @@
-"""Espacio de archivos personal y estado didáctico de Git."""
+"""Espacio de archivos personal y estado didáctico de Git.
+
+El proyecto (texto de los archivos, carpetas y Git) se guarda como JSON en disco:
+ALMACEN_ARCHIVOS/<usuario>/proyecto.json. La tabla espacios_trabajo solo lleva la fecha de la última escritura.
+Así un proyecto grande (hasta 5 millones de caracteres de texto) no choca con max_allowed_packet de MySQL.
+Los proyectos guardados antes en las columnas JSON se siguen leyendo y pasan a disco al guardar.
+"""
+import gzip
+import json
+import os
 import re
+import secrets
+from pathlib import Path
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 
 from models import UserWorkspace, db
-from utilidades import api_error, json_body
+from rutas.archivos import limpiar_huerfanas
+from utilidades import api_error
 
 bp = Blueprint("trabajo", __name__)
 
-_COMPONENTE = re.compile(r"^[A-Za-z0-9_.-]{1,60}$")
+_COMPONENTE = re.compile(r"^[A-Za-z0-9_.-]{1,120}$")
 _RAMA = re.compile(r"^[A-Za-z0-9._/-]{1,80}$")
 _HASH = re.compile(r"^[a-f0-9]{1,12}$")
-_MAX_ARCHIVOS = 250
-_MAX_CARACTERES = 500_000
+_MAX_ARCHIVOS = 5000
+_MAX_CARPETAS = 2000
+_MARCADOR = re.compile(r"^cc(?:img|bin):v1:[a-f0-9]{64}:")
+_MAX_CARACTERES = 5_000_000
+_MAX_CUERPO = 64 * 1024 * 1024  # JSON descomprimido
+
+
+def _texto(archivos):
+    """Caracteres de texto editable: los marcadores de archivos guardados en la cuenta no cuentan."""
+    return sum(len(t) for t in archivos.values() if isinstance(t, str) and not _MARCADOR.match(t))
 
 
 def _ruta_valida(path):
     return (
         isinstance(path, str)
-        and len(path) <= 180
+        and len(path) <= 400
         and all(
             _COMPONENTE.fullmatch(parte)
             and parte not in {".", ".."}
@@ -36,13 +56,13 @@ def _validar_proyecto(data):
     git = data.get("git", {})
     if not isinstance(files, dict) or not isinstance(folders, list) or not isinstance(git, dict):
         return None
-    if len(files) > _MAX_ARCHIVOS or len(folders) > _MAX_ARCHIVOS:
+    if len(files) > _MAX_ARCHIVOS or len(folders) > _MAX_CARPETAS:
         return None
     if any(not _ruta_valida(path) or not isinstance(text, str) for path, text in files.items()):
         return None
     if any(not _ruta_valida(path) for path in folders) or len(set(folders)) != len(folders):
         return None
-    if sum(len(text) for text in files.values()) > _MAX_CARACTERES:
+    if _texto(files) > _MAX_CARACTERES:
         return None
 
     file_paths = set(files)
@@ -78,7 +98,7 @@ def _validar_proyecto(data):
         or not isinstance(committed, dict)
         or len(committed) > _MAX_ARCHIVOS
         or any(not _ruta_valida(path) or not isinstance(text, str) for path, text in committed.items())
-        or sum(len(text) for text in committed.values()) > _MAX_CARACTERES
+        or _texto(committed) > _MAX_CARACTERES
         or not isinstance(commits, list) or len(commits) > 100
         or any(
             not isinstance(commit, dict)
@@ -119,23 +139,63 @@ def _marca(workspace):
     return valor.astimezone(timezone.utc).isoformat()
 
 
+def _archivo_proyecto(usuario_id):
+    return Path(current_app.config["ALMACEN_ARCHIVOS"]) / str(int(usuario_id)) / "proyecto.json"
+
+
+def leer_proyecto(workspace):
+    """El proyecto guardado de una cuenta: desde disco o, si es de antes, desde las columnas de la tabla."""
+    if workspace is None:
+        return None
+    ruta = _archivo_proyecto(workspace.usuario_id)
+    if ruta.exists():
+        with open(ruta, encoding="utf-8") as f:
+            return json.load(f)
+    return {"files": workspace.archivos or {}, "folders": workspace.carpetas or [], "git": workspace.git or {}}
+
+
+def _escribir_proyecto(usuario_id, proyecto):
+    ruta = _archivo_proyecto(usuario_id)
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    temporal = ruta.with_name(f".proyecto-{secrets.token_hex(6)}.json")
+    with open(temporal, "w", encoding="utf-8") as f:
+        json.dump(proyecto, f, ensure_ascii=False, separators=(",", ":"))
+    os.replace(temporal, ruta)  # atómico: nunca queda un proyecto a medio escribir
+
+
+def _cuerpo_json():
+    """JSON del cuerpo, aceptando que venga comprimido (Content-Encoding: gzip), como lo envía el navegador."""
+    crudo = request.get_data(cache=False)
+    if request.headers.get("Content-Encoding", "").lower() == "gzip":
+        try:
+            with gzip.GzipFile(fileobj=__import__("io").BytesIO(crudo)) as g:
+                crudo = g.read(_MAX_CUERPO + 1)
+        except (OSError, EOFError):
+            return api_error("El cuerpo comprimido no es válido.")
+    if len(crudo) > _MAX_CUERPO:
+        return api_error("El proyecto es demasiado grande.", 413)
+    try:
+        data = json.loads(crudo.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return api_error("El cuerpo de la solicitud debe ser JSON válido.")
+    if not isinstance(data, dict):
+        return api_error("El cuerpo de la solicitud debe ser un objeto JSON.")
+    return data
+
+
 @bp.get("/api/trabajo/")
 @login_required
 def obtener_proyecto():
     workspace = UserWorkspace.query.filter_by(usuario_id=current_user.id).first()
     if workspace is None:
         return jsonify(proyecto=None, actualizado=None)
-    return jsonify(proyecto={
-        "files": workspace.archivos,
-        "folders": workspace.carpetas,
-        "git": workspace.git,
-    }, actualizado=_marca(workspace))
+    return jsonify(proyecto=leer_proyecto(workspace), actualizado=_marca(workspace))
 
 
 @bp.put("/api/trabajo/")
 @login_required
 def guardar_proyecto():
-    data = json_body()
+    data = _cuerpo_json()
     if isinstance(data, tuple):
         return data
     project = _validar_proyecto(data)
@@ -146,9 +206,9 @@ def guardar_proyecto():
     if workspace is None:
         workspace = UserWorkspace(usuario_id=current_user.id)
         db.session.add(workspace)
-    workspace.archivos = project["files"]
-    workspace.carpetas = project["folders"]
-    workspace.git = project["git"]
+    _escribir_proyecto(current_user.id, project)
+    workspace.archivos, workspace.carpetas, workspace.git = {}, [], {}  # el contenido vive en disco
     workspace.actualizado_en = datetime.now(timezone.utc)
+    limpiar_huerfanas(current_user.id, project["files"], project["git"])
     db.session.commit()
     return jsonify(ok=True, actualizado=_marca(workspace))

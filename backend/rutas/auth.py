@@ -44,8 +44,10 @@ def google_callback():
     try:
         oauth.google.authorize_access_token()
         identity = oauth.google.userinfo()
-    except OAuthError:
+    except OAuthError as error:
+        print("DETALLE DEL ERROR OAUTH:", error.error, error.description)
         return redirect("/pages/login.html?error=google")
+
 
     subject = identity.get("sub") if identity else None
     email = str(identity.get("email", "")).strip().lower() if identity else ""

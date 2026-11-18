@@ -110,7 +110,7 @@ test("ramas: crear, listar, cambiar entre ramas iguales y negarse si divergen", 
   assert.match(git(py, "merge main").texto, /no está disponible/);
 });
 
-test("remote y push simulado", () => {
+test("remote y validaciones de push (el envío real lo hace github.js)", () => {
   const py = nuevo(); git(py, "init");
   assert.equal(git(py, "push").error, true);
   assert.equal(git(py, "remote add origin https://example.com/x.git").error, true);
@@ -118,5 +118,9 @@ test("remote y push simulado", () => {
   assert.match(git(py, "remote -v").texto, /origin\thttps:\/\/github.com\/ana\/proy.git \(push\)/);
   assert.match(git(py, "push").texto, /aún no hay commits/);
   git(py, "add ."); git(py, "commit -m base");
-  assert.match(git(py, "push -u origin main").texto, /Simulación: no se envió nada/);
+  assert.equal(git(py, "push -u origin main").empujar, true);
+  assert.equal(git(py, "push").empujar, true);
+  assert.match(git(py, "push upstream main").texto, /origin/);
+  assert.match(git(py, "push origin otra").texto, /solo se puede enviar la rama actual/);
+  assert.match(git(py, "push --force").texto, /nunca reescribe/);
 });
