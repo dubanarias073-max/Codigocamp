@@ -1,0 +1,34 @@
+/* Widget de CódigoCamp (pages/widget.html): racha, meta y semana. Sirve como widget flotante en el escritorio
+   (Windows, macOS, Linux), dentro de apps de widgets en Android y como acceso directo en cualquier dispositivo. */
+:root{color-scheme:dark;--bg1:#0b1020;--bg2:#141c38;--txt:#e5eaff;--sub:#8b95b8;--fuego:#ff9f1c;--verde:#caff4e;--rojo:#ff6b6b;--borde:#29304b}
+@media (prefers-color-scheme:light){:root.auto{color-scheme:light;--bg1:#f6f8ff;--bg2:#e9eeff;--txt:#151a2d;--sub:#5b6482;--borde:#cfd6ee;--verde:#3a7d00}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--txt);background:linear-gradient(145deg,var(--bg1),var(--bg2));overflow:hidden}
+.wg{display:flex;flex-direction:column;gap:8px;height:100%;min-height:150px;padding:max(10px,env(safe-area-inset-top)) 12px max(10px,env(safe-area-inset-bottom))}
+.wg-cab{display:flex;align-items:center;gap:8px}
+.wg-tabs{display:flex;gap:4px;flex:1;min-width:0}
+.wg-tabs button{flex:0 1 auto;padding:3px 8px;border:1px solid var(--borde);border-radius:99px;background:none;color:var(--sub);font:600 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.wg-tabs button[aria-selected="true"]{color:var(--txt);border-color:var(--verde);background:color-mix(in srgb,var(--verde) 14%,transparent)}
+.wg-vidas{font-weight:700;font-size:12px;white-space:nowrap}
+.wg-cuerpo{flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;min-height:0}
+.wg-grande{display:flex;align-items:center;gap:10px}
+.wg-grande .ic{font-size:clamp(28px,12vmin,48px);line-height:1}
+.wg-grande b{display:block;font-size:clamp(26px,13vmin,52px);line-height:1;color:var(--fuego)}
+.wg-grande small,.wg-sub{color:var(--sub);font-size:12px;margin:0}
+.wg-semana{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.wg-semana span{display:grid;gap:1px;font-size:11px;color:var(--sub)}
+.wg-semana i{font-style:normal;font-size:clamp(14px,6vmin,22px)}
+.wg-semana .hoy{color:var(--txt);font-weight:800}
+.wg-barra{height:10px;border-radius:99px;background:color-mix(in srgb,var(--txt) 14%,transparent);overflow:hidden}
+.wg-barra i{display:block;height:100%;background:linear-gradient(90deg,#39e7ff,var(--verde));border-radius:inherit;transition:width .6s}
+.wg-estado{margin:0;font-weight:700;font-size:12px}
+.wg-estado.ok{color:var(--verde)}.wg-estado.peligro{color:var(--fuego)}
+.wg-pie{display:flex;align-items:center;gap:8px}
+.wg-btn{padding:6px 12px;border-radius:8px;background:var(--verde);color:#111508;font-weight:800;font-size:12px;text-decoration:none}
+.wg-hora{flex:1;color:var(--sub);font-size:11px;text-align:right}
+.wg-ic{width:28px;height:28px;border:1px solid var(--borde);border-radius:8px;background:none;color:var(--txt);cursor:pointer;font-size:14px}
+.wg-error{color:var(--rojo);font-size:13px}
+.wg-error a{color:var(--verde)}
+@media (max-height:170px){.wg-semana{display:none}.wg-tabs{display:none}}
+@media (max-width:260px){.wg-tabs button{padding:2px 6px;font-size:11px}.wg-hora{display:none}}

@@ -25,6 +25,7 @@ import { Shell, comandoParaArchivo } from "/js/trabajo/shell.js";
 import { ClienteBD } from "/js/trabajo/bd.js";
 import { claveCuenta } from "/js/trabajo/cuenta.js";
 import { cargarGitReal } from "/js/trabajo/cargargit.js";
+import { SesionGitHub } from "/js/trabajo/sesiongithub.js";
 import { PanelExtensiones, faltantesPython } from "/js/trabajo/extensiones.js";
 import { almacenDeVenv, listarVenvs } from "/js/trabajo/venv.js";
 import { aplicarCambio, contextoProyecto, extraerCambios, validarCambios } from "/js/trabajo/copiloto.js";
@@ -139,14 +140,17 @@ const almacenPip = {
   guardar: (lista) => { try { localStorage.setItem(PIP_STORAGE, JSON.stringify(lista.slice(0, 40))); } catch { /* sin espacio: se pierde solo el recordatorio */ } },
 };
 const bd = new ClienteBD();
+// «Iniciar sesión con GitHub» (git push / pull / clone): una sola sesión para la terminal y el panel de Git.
+const sesionGitHub = new SesionGitHub({ cuenta: claveCuenta(user), api });
+const motorGit = () => cargarGitReal({ usuario: user, archivos, credencial: sesionGitHub });
 const ejecutores = crearEjecutores({ api, almacenPip, archivos, bd });
 const paquetes = {
   pip: (o) => ejecutarPip({ cargarPy: cargarPyodide, almacen: almacenPip, ...o }),
   npm: (o) => ejecutarNpm({ ...o, nombreProyecto: "mi-proyecto" }),
 };
 const shell = new Shell({
-  proyecto, usuario: user.nombre || "estudiante", ejecutores, github: { publicar, clonar }, paquetes, bd,
-  gitReal: () => cargarGitReal({ usuario: user, archivos }),
+  proyecto, usuario: user.nombre || "estudiante", ejecutores, github: { publicar, clonar }, credencialGitHub: sesionGitHub, paquetes, bd,
+  gitReal: () => motorGit(),
   leerArchivo: (m) => archivos.bytes(m),
   subirArchivo: (d, o) => archivos.subir(d, o),
   importar: (origen, o) => importarEn(proyecto(), origen, {
@@ -1053,7 +1057,7 @@ async function decorarGit() {
   if (!dirs.length) { if (mapaGit.size) { mapaGit = new Map(); $("numGit").hidden = true; explorador.decorarGit(mapaGit); pintarPestanas(); } return; }
   decorando = true;
   try {
-    const motor = await cargarGitReal({ usuario: user, archivos });
+    const motor = await motorGit();
     const mapa = new Map();
     for (const dir of dirs) {
       try {
@@ -1081,7 +1085,7 @@ async function decorarGit() {
 
 panelGit = new PanelGit({
   raiz: $("panelGit"), proyecto, usuario: user.nombre || "estudiante", aviso,
-  motor: () => cargarGitReal({ usuario: user, archivos }),
+  motor: () => motorGit(),
   elegir: (titulo, opciones) => new Promise((ok) => abrirPaleta({ titulo, lista: opciones.map((o) => ({ etiqueta: o.texto, accion: () => ok(o.valor) })) })),
   alCambiar: (info) => proyectoCambio(info),
   correr: (c) => { panel.abrir(); panel.correr(c); },

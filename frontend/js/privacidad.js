@@ -6,7 +6,8 @@ import { claveCuenta } from "./trabajo/cuenta.js";
 
 const ULTIMA = "cc_ultima_cuenta";
 // Claves de localStorage con datos de la persona (no ajustes neutros como el tema o el sonido).
-const PREFIJOS = ["cc_trabajo_", "cc-git-global-", "cc_ia_", "cc_hechas", "cc_codigos_aprende", "cc_cosm"];
+// «cc-github-»: la sesión de GitHub de Trabajo (git push). «cc-widget-»: la última racha que mostró el widget.
+const PREFIJOS = ["cc_trabajo_", "cc-git-global-", "cc_ia_", "cc_hechas", "cc_codigos_aprende", "cc_cosm", "cc-github-", "cc-widget-"];
 // Bases de IndexedDB: copias del proyecto, carpetas vinculadas y el .git (LightningFS crea «cc-git-…» y «…_lock»).
 const BASES_FIJAS = ["codigocamp-proyectos", "codigocamp-carpetas"];
 const esBaseDeDatos = (n) => BASES_FIJAS.includes(n) || n.startsWith("cc-git-") || n === "fs" || n === "fs_lock";
@@ -30,6 +31,12 @@ export async function borrarDatosLocales() {
     }
     localStorage.removeItem(ULTIMA);
   } catch { /* sin localStorage */ }
+  try {   // la sesión de GitHub sin «Recordar» vive en sessionStorage (esta pestaña)
+    for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith("cc-github-")) sessionStorage.removeItem(k);
+    }
+  } catch { /* sin sessionStorage */ }
   if (typeof indexedDB === "undefined") return;
   let nombres = [...BASES_FIJAS];
   try { if (indexedDB.databases) nombres = (await indexedDB.databases()).map((d) => d.name).filter((n) => n && esBaseDeDatos(n)); }
@@ -54,7 +61,7 @@ export async function protegerCuenta(usuario) {
 
 // Navegadores que ya tenían datos de antes de esta protección: si hay claves de otra cuenta, se limpian.
 // Solo cuentan los datos que llevan la clave de una cuenta (Trabajo y Git); con id viejo o de otra persona, se limpia.
-const POR_CUENTA = ["cc_trabajo_", "cc-git-global-"];
+const POR_CUENTA = ["cc_trabajo_", "cc-git-global-", "cc-github-"];
 async function hayRestosDeOtros(actual) {
   try {
     for (let i = 0; i < localStorage.length; i += 1) {

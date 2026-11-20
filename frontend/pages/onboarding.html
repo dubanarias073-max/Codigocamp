@@ -16,6 +16,7 @@
   <script src="/js/tema.js"></script>
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/onboarding.css">
+  <link rel="stylesheet" href="/css/terminos.css">
   <link rel="stylesheet" href="/css/tema.css">
 </head>
 <body class="onb">
@@ -26,7 +27,7 @@
       <div class="onb-prog" id="barra" role="progressbar" aria-label="Progreso de las preguntas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div id="progreso"></div>
       </div>
-      <span class="onb-step-count" id="paso-numero">PASO 01 / 06</span>
+      <span class="onb-step-count" id="paso-numero">PASO 01 / 07</span>
     </div>
   </header>
 
@@ -114,9 +115,23 @@
         </fieldset>
       </section>
 
-      <!-- 6 · Listo -->
+      <!-- 6 · Términos y avisos importantes -->
+      <section class="paso" data-paso="terminos" data-ancho hidden>
+        <div class="tutor"><span class="avatar" aria-hidden="true">06</span><h1 class="burbuja" tabindex="-1">Antes de empezar, lee esto.</h1></div>
+        <p class="terminos-alerta"><span aria-hidden="true">⚠️</span><span><b>Tu progreso está a salvo</b> (XP, racha y diamantes quedan en la base de datos), pero <b>tus proyectos de Trabajo no</b>: se pueden perder con las actualizaciones de CódigoCamp. Descárgalos en .zip o súbelos a GitHub.</span></p>
+        <div class="terminos-caja" id="terminosCaja" tabindex="0" role="region" aria-label="Términos y condiciones"><p>Cargando los términos…</p></div>
+        <fieldset class="opciones multi terminos-checks">
+          <legend class="sr-only">Aceptar los términos</legend>
+          <label class="op"><input type="checkbox" name="acepta" value="respaldo" required><span class="caja"><span class="ico">💾</span><span class="txt">Entiendo que debo guardar copia de mis proyectos<small>Trabajo no está en la base de datos: lo descargaré en .zip o lo subiré a GitHub</small></span></span></label>
+          <label class="op"><input type="checkbox" name="acepta" value="ia" required><span class="caja"><span class="ico">🤖</span><span class="txt">Entiendo que la IA puede equivocarse<small>Y no compartiré contraseñas ni datos sensibles</small></span></span></label>
+          <label class="op"><input type="checkbox" name="acepta" value="terminos" required><span class="caja"><span class="ico">📜</span><span class="txt">Leí y acepto los Términos y condiciones<small>Incluye las reglas de respeto en chats</small></span></span></label>
+        </fieldset>
+        <p class="terminos-leer">También puedes leerlos en una página aparte: <a href="/pages/terminos.html" target="_blank" rel="noopener">Términos y condiciones</a>.</p>
+      </section>
+
+      <!-- 7 · Listo -->
       <section class="paso listo" data-paso="listo" hidden>
-        <div class="tutor"><span class="avatar" aria-hidden="true">06</span><h1 class="burbuja" tabindex="-1">Tu ruta de aprendizaje está lista.</h1></div>
+        <div class="tutor"><span class="avatar" aria-hidden="true">07</span><h1 class="burbuja" tabindex="-1">Tu ruta de aprendizaje está lista.</h1></div>
         <div class="resumen" aria-live="polite">
           <p><span>Tu primer curso</span><b id="resCurso">—</b></p>
           <p><span>Tu meta diaria</span><b id="resMeta">—</b></p>
@@ -127,7 +142,7 @@
     <aside class="onb-panel" aria-label="Tu perfil mientras respondes">
       <ol class="onb-pasos" id="pasosLista">
         <li data-p="rol">Punto de partida</li><li data-p="intereses">Lo que quieres crear</li><li data-p="nivel">Experiencia</li>
-        <li data-p="curso">Primer lenguaje</li><li data-p="meta">Ritmo</li><li data-p="listo">Tu ruta</li>
+        <li data-p="curso">Primer lenguaje</li><li data-p="meta">Ritmo</li><li data-p="terminos">Términos</li><li data-p="listo">Tu ruta</li>
       </ol>
       <div class="onb-term" aria-hidden="true">
         <div class="onb-term-cab"><i></i><i></i><i></i><span>perfil.js</span></div>

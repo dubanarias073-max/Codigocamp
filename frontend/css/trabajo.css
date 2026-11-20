@@ -533,3 +533,18 @@ button.estado-item:hover { background: var(--hover); color: var(--cy); }
   .ide-cuerpo { gap: 4px; padding-top: 4px; }
   .movil-tabs button { min-height: 30px; }
 }
+
+/* ===== Iniciar sesión en GitHub (git push / pull / clone) ===== */
+.gh-login { width: min(470px, 94vw); }
+.gh-login .gh-paso { display: grid; gap: 12px; margin-top: 14px; }
+.gh-login .gh-paso[hidden], .gh-login [hidden] { display: none !important; }
+.gh-login .gh-boton { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; font-weight: 800; background: #24292f; color: #fff; border-color: #24292f; }
+.gh-login .gh-boton:hover { filter: brightness(1.15); }
+.gh-login .gh-token summary { cursor: pointer; color: var(--sub); font-size: 14px; }
+.gh-login .gh-token[open] { display: grid; gap: 8px; }
+.gh-login .gh-in { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 10px; background: var(--bg); color: var(--txt); font: 14px ui-monospace, Consolas, monospace; }
+.gh-login .gh-recordar { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--sub); }
+.gh-login .gh-codigo { padding: 14px; border: 2px dashed var(--borde); border-radius: 12px; text-align: center; font: 800 28px/1.2 ui-monospace, Consolas, monospace; letter-spacing: .18em; user-select: all; }
+.gh-login .gh-estado { color: var(--txt); }
+.gh-login .gh-error { margin-top: 10px; color: var(--rojo, #ff6b6b); font-weight: 600; }
+.gh-login code { font-size: 12px; }

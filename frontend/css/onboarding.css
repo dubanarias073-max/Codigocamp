@@ -259,3 +259,9 @@
 @media (max-width:640px){.opciones:not(.cursos){grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.paso.entra-der,.paso.entra-izq,#codigoVivo .cursor{animation:none}}
 :root[data-tema="oscuro"] .onb-pasos{background:#0d1b1a;border-color:rgba(255,255,255,.13)}
+/* El paso actual del panel se lee bien en tema oscuro (antes quedaba gris oscuro sobre fondo oscuro) */
+:root[data-tema="oscuro"] .onb-pasos li.actual{color:#e8f5f0}
+@media (prefers-color-scheme:dark){:root:not([data-tema="claro"]):not([data-tema="oscuro"]) .onb-pasos li.actual{color:#e8f5f0}}
+/* Paso de términos: casillas más compactas para que se vean sin tanto scroll */
+.terminos-checks .op .caja{padding:10px 14px}
+.terminos-checks .txt small{display:block;font-size:12px;opacity:.8}

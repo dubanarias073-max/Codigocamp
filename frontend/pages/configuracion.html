@@ -92,11 +92,31 @@
               <details data-so="chromeos"><summary><span>💻</span> ChromeOS</summary><ol><li>Pulsa <b>Instalar</b> aquí o el ícono ⊕ de la barra de direcciones.</li><li>Queda en el selector de apps y en la biblioteca.</li></ol></details>
             </div>
             <h3>Widgets</h3>
-            <p class="nota">En <b>Windows 11</b>: widgets de racha y del calendario de racha (tecla Windows + W). En cualquier dispositivo, la app muestra tu racha en el ícono (insignia) y en <a href="/pages/perfil.html#calendario">Perfil → Calendario de racha</a>. Android e iOS no permiten widgets de pantalla de inicio para apps web.</p>
+            <p class="nota">Tu racha, la semana, la meta de hoy, vidas y diamantes en la pantalla de inicio o el escritorio, en cualquier sistema.</p>
+            <div class="wg-enlace" id="wgEnlace">
+              <p class="nota">Los widgets usan <b>tu sesión</b>: no tienes que volver a entrar. Siguen funcionando hasta que tú cierres sesión (aquí o desde otro dispositivo).</p>
+              <div class="inst-fila">
+                <button class="bj" type="button" id="wgFlotante">📌 Abrir widget flotante</button>
+                <a class="bj sec" id="wgScriptable" href="/api/widget/scriptable.js" download="CodigoCamp.js">⬇️ Widget para iPhone/iPad (Scriptable)</a>
+                <a class="bj sec" id="wgAndroid" href="#" hidden>🤖 Conectar widget de Android</a>
+                <a class="bj sec" id="wgApk" href="/descargas/CodigoCamp-Widget.apk" download hidden>⬇️ App del widget para Android (APK)</a>
+                <button class="bj sec" type="button" id="wgCopiar">🔗 Copiar enlace del widget</button>
+              </div>
+              <p class="nota" id="wgEstado"></p>
+            </div>
+            <div class="plataformas" id="plataformasWidget">
+              <details data-so="windows"><summary><span>🪟</span> Windows 11 y 10</summary><ol><li><b>Windows 11</b>: instala CódigoCamp (botón de arriba) con <b>Edge</b>. Pulsa <b>Windows + W</b> → <b>＋</b> → <b>CódigoCamp</b> y elige <i>Tu racha</i>, <i>Meta de hoy</i> o <i>Calendario de racha</i>.</li><li><b>Windows 10</b> (o si no aparecen): pulsa <b>📌 Abrir widget flotante</b>: queda una ventanita siempre encima de las demás.</li></ol></details>
+              <details data-so="macos"><summary><span>🍎</span> macOS</summary><ol><li>En <b>Chrome o Edge</b>: <b>📌 Abrir widget flotante</b> → en la ventana del widget pulsa 📌 otra vez: queda siempre encima.</li><li>En un Mac con chip Apple (M1 o más nuevo): instala <b>Scriptable</b> de la App Store y sigue los pasos de iPhone; el widget va en el escritorio o el Centro de notificaciones.</li><li>Con macOS Sonoma o más nuevo, los widgets de tu iPhone (Scriptable) también se pueden poner en el escritorio del Mac.</li></ol></details>
+              <details data-so="linux"><summary><span>🐧</span> Linux</summary><ol><li>Abre CódigoCamp en <b>Chrome, Chromium o Edge</b> y pulsa <b>📌 Abrir widget flotante</b>; en el widget pulsa 📌 otra vez para dejarlo siempre encima.</li><li>Para tenerlo al iniciar sesión: instala CódigoCamp como app y agrega al arranque el acceso directo de la ventana del widget (o usa «Copiar enlace del widget» en tu widget de escritorio favorito: KDE «Página web», Conky…).</li></ol></details>
+              <details data-so="android"><summary><span>🤖</span> Android</summary><ol><li>Instala la app <b>CódigoCamp Widget</b> (botón «App del widget para Android»; si no aparece, pídele el APK a quien administra CódigoCamp). Si Android pregunta, permite instalar apps de esta fuente.</li><li>Vuelve aquí (con tu sesión iniciada) y pulsa <b>🤖 Conectar widget de Android</b>: la app queda conectada a tu cuenta, sin escribir nada.</li><li>Mantén pulsada la pantalla de inicio → <b>Widgets</b> → <b>CódigoCamp</b> y arrástralo. Se actualiza cada 30 minutos; tócalo para practicar.</li></ol></details>
+              <details data-so="ios"><summary><span>📱</span> iPhone y iPad</summary><ol><li>Instala <b>Scriptable</b> (gratis) desde la App Store.</li><li>Aquí (con tu sesión iniciada) pulsa <b>⬇️ Widget para iPhone/iPad</b> → se descarga <i>CodigoCamp.js</i>, ya conectado a tu cuenta. Ábrelo con <b>Compartir → Scriptable</b> (o cópialo en un script nuevo de Scriptable).</li><li>Mantén pulsada la pantalla de inicio → <b>＋</b> → <b>Scriptable</b> → elige el tamaño → toca el widget → <b>Script: CodigoCamp</b>. En <b>Parameter</b> puedes escribir <i>meta</i> o <i>calendario</i>.</li><li>También funciona en la <b>pantalla de bloqueo</b> (iOS 16+): circular, rectangular o en línea.</li></ol></details>
+              <details data-so="chromeos"><summary><span>💻</span> ChromeOS</summary><ol><li>Pulsa <b>📌 Abrir widget flotante</b> y fija la ventana donde quieras; queda siempre encima.</li></ol></details>
+            </div>
           </section>
           <section role="tabpanel" class="tarjeta conf-sec" id="sesion"><header class="sec-cab"><span class="sec-ic">🚪</span><div><h2>Sesión</h2><p>Cerrar sesión</p></div></header>
             <div class="salidas">
               <div class="salida"><div><b>Cerrar sesión</b><small>Sales en este dispositivo. Los demás siguen dentro.</small></div><button class="bj" id="salir" type="button">Cerrar sesión</button></div>
+              <div class="salida"><div><b>Términos y condiciones</b><small>Lo que debes saber: copias de tus proyectos, IA, datos y reglas.</small></div><a class="bj" href="/pages/terminos.html" target="_blank" rel="noopener">Leer</a></div>
               <div class="salida"><div><b>Cerrar sesión en otro dispositivo</b><small>Elige cuál en Seguridad → Dónde tienes la sesión abierta.</small></div><a class="bj" href="#seguridad">Ver dispositivos</a></div>
               <div class="salida peligro"><div><b>Cerrar sesión en todos los dispositivos</b><small>Sales en todos lados, incluido este. Tendrás que volver a entrar.</small></div><button class="bj rojo" id="salirTodos" type="button">Cerrar en todos</button></div>
             </div>

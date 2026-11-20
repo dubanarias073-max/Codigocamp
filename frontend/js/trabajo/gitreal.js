@@ -76,8 +76,10 @@ export class MotorGit {
    *   autor()                               { name, email } por defecto
    *   ahora()                               Date (pruebas)
    */
-  constructor({ git, fs, http, raiz = "/w", corsProxy = "/api/git", cabeceras = () => ({}), archivos = null, autor = () => ({ name: "estudiante", email: "estudiante@codigocamp.local" }), ahora = () => new Date(), claveGlobal = "cc-git-global" }) {
-    Object.assign(this, { git, fs, http, corsProxy, cabeceras, archivos, autor, ahora, claveGlobal });
+  constructor({ git, fs, http, raiz = "/w", corsProxy = "/api/git", cabeceras = () => ({}), archivos = null, autor = () => ({ name: "estudiante", email: "estudiante@codigocamp.local" }), ahora = () => new Date(), claveGlobal = "cc-git-global", credencial = null }) {
+    // credencial: SesionGitHub (sesiongithub.js) → «Iniciar sesión con GitHub» en vez de pedir un token en la terminal.
+    Object.assign(this, { git, fs, http, corsProxy, cabeceras, archivos, autor, ahora, claveGlobal, credencial });
+    this.urlRed = "";
     this.raiz = raiz.replace(/\/$/, "");
     this.cache = `${this.raiz}.cc`;
     this.p = fs.promises;
@@ -254,8 +256,8 @@ export class MotorGit {
   red() {
     return {
       fs: this.fs, http: this.http, corsProxy: this.corsProxy || undefined, headers: this.cabeceras(),
-      onAuth: () => (this.token ? { username: "x-access-token", password: this.token } : { cancel: true }),
-      onAuthFailure: () => { this.token = null; return { cancel: true }; },
+      onAuth: (url) => { const t = this.tokenPara(url || this.urlRed); return t ? { username: "x-access-token", password: t } : { cancel: true }; },
+      onAuthFailure: (url) => { this.olvidarToken(url || this.urlRed); return { cancel: true }; },
     };
   }
 
@@ -395,18 +397,30 @@ export class MotorGit {
       case "PushRejectedError": return `failed to push some refs\nhint: Updates were rejected because the remote contains work that you do not have locally.\nhint: Haz primero git pull y vuelve a intentar git push.`;
       case "HttpError": {
         const s = e.data?.statusCode;
-        if (s === 401 || s === 403) return `Authentication failed (${s}). Revisa el token: necesita permiso «Contents: Read and write» sobre el repositorio.`;
+        if (s === 403 && this.credencial?.usuario) return `Permission denied (403): tu cuenta de GitHub @${this.credencial.usuario} no puede escribir en ese repositorio.\nRevisa que el repositorio sea tuyo (o que te hayan dado acceso) y, si es de una organización, que la organización haya autorizado a CódigoCamp.`;
+        if (s === 401) return "Authentication failed (401): GitHub rechazó la sesión o el token. Vuelve a intentarlo: se te pedirá iniciar sesión otra vez.";
+        if (s === 403) return "Authentication failed (403). El token no tiene permiso de escritura («Contents: Read and write») sobre ese repositorio.";
         if (s === 404) return "repository not found (¿la URL es correcta? ¿es privado? entonces necesitas un token).";
         return `HTTP ${s} ${e.data?.statusMessage || ""}`.trim();
       }
-      case "UserCanceledError": return "Authentication failed: hace falta un token de GitHub.";
+      case "UserCanceledError": return "Authentication failed: hace falta iniciar sesión en GitHub (o un token).";
       case "NotFoundError": return m.replace(/^Could not find /, "no se encontró ");
       case "AlreadyExistsError": return m;
       default: return m;
     }
   }
 
-  async pedirToken(io, motivo = "") {
+  /** Token para esa URL: la sesión de GitHub (solo github.com) o el token escrito a mano en esta pestaña. */
+  tokenPara(url) { return this.credencial?.tokenPara(url) || this.token; }
+  olvidarToken(url) { if (this.credencial?.tokenPara(url)) this.credencial.invalidar(); else this.token = null; }
+
+  async pedirToken(io, motivo = "", url = this.urlRed) {
+    if (this.credencial && /github\.com/i.test(url || "")) {
+      io.out(color.gris("Iniciando sesión en GitHub… (se abrió un cuadro en la pantalla)\n"));
+      const t = await this.credencial.obtener({ motivo: `${motivo}${url ? `Repositorio: ${url}` : ""}`.trim() || undefined });
+      if (t) io.out(`${color.verde("✔")} Sesión iniciada en GitHub como ${color.azul("@" + (this.credencial.usuario || "?"))}\n`);
+      return t;
+    }
     io.out(color.gris(`${motivo}Necesitas un token personal de GitHub (github.com/settings/tokens) con permiso «Contents: Read and write».\nSe escribe oculto, solo se usa en esta pestaña y NO se guarda.\n`));
     const t = (await io.leerLinea("Token de GitHub: ", { secreto: true }))?.trim();
     if (!t) return null;
@@ -416,18 +430,30 @@ export class MotorGit {
   }
 
   /** Ejecuta una operación de red; si pide autenticación, pide el token y la repite una vez. */
-  async conRed(io, fn, { siempreToken = false } = {}) {
-    if (siempreToken && !this.token && !(await this.pedirToken(io))) throw Object.assign(new Error("Authentication failed: hace falta un token de GitHub."), { code: "x" });
+  async conRed(io, fn, { siempreToken = false, url = "" } = {}) {
+    this.urlRed = url || "";
+    if (siempreToken && !this.tokenPara(url) && !(await this.pedirToken(io, "", url))) throw Object.assign(new Error("Authentication failed: hace falta iniciar sesión en GitHub."), { code: "x" });
     try { return await fn(); }
     catch (e) {
       const s = e.data?.statusCode;
-      if ((e.code === "UserCanceledError" || (e.code === "HttpError" && (s === 401 || s === 403 || s === 404))) && !this.token) {
-        if (!(await this.pedirToken(io, "El repositorio pidió autenticación (o es privado). "))) throw e;
+      const sinPermiso = e.code === "UserCanceledError" || (e.code === "HttpError" && (s === 401 || s === 403 || s === 404));
+      if (sinPermiso && !this.tokenPara(url)) {
+        if (!(await this.pedirToken(io, "El repositorio pidió autenticación (o es privado). ", url))) throw e;
         return fn();
       }
-      if (e.code === "HttpError" && (s === 401 || s === 403)) this.token = null;
+      // 401 = sesión o token vencido/revocado: se olvida y se pide iniciar sesión otra vez (una sola vez).
+      // 403 con la sesión de GitHub = la cuenta es válida pero no tiene permiso en ESE repositorio: no se cierra la sesión.
+      if (e.code === "HttpError" && (s === 401 || s === 403) && this.tokenPara(url)) {
+        const eraSesion = Boolean(this.credencial?.tokenPara(url));
+        if (s === 401 || !eraSesion) this.olvidarToken(url);
+        if (eraSesion && s === 401 && (await this.pedirToken(io, "GitHub rechazó la sesión guardada (venció o la revocaste). ", url))) return fn();
+      }
       throw e;
     }
+  }
+
+  async urlDeRemoto(d, remoto) {
+    try { return (await this.git.listRemotes({ fs: this.fs, dir: d })).find((r) => r.remote === remoto)?.url || ""; } catch { return ""; }
   }
 
   progreso(io) {
@@ -548,7 +574,7 @@ export class MotorGit {
     out(`Cloning into '${carpeta ?? (dir === "" ? "." : nombre)}'...\n`);
     const urlGit = url.endsWith(".git") ? url : `${url}.git`;
     try {
-      await this.conRed(io, () => this.git.clone({ ...this.red(), dir: d, url: urlGit, ref: rama, singleBranch: unaRama, depth: profundidad || undefined, onProgress: this.progreso(io), noTags: false }));
+      await this.conRed(io, () => this.git.clone({ ...this.red(), dir: d, url: urlGit, ref: rama, singleBranch: unaRama, depth: profundidad || undefined, onProgress: this.progreso(io), noTags: false }), { url: urlGit });
     } catch (e) {
       await this.borrarArbol(d === this.raiz ? `${this.raiz}/.git` : d);
       err(`fatal: ${this.mensaje(e)}\n`);
@@ -1011,7 +1037,7 @@ export class MotorGit {
       }
       case "fetch": {
         const remoto = a.find((x) => !x.startsWith("-")) || "origin";
-        await this.conRed(ctx, () => g.fetch({ ...this.red(), dir: d, remote: remoto, tags: true, prune: a.includes("--prune") || a.includes("-p"), onProgress: this.progreso(ctx) }));
+        await this.conRed(ctx, () => g.fetch({ ...this.red(), dir: d, remote: remoto, tags: true, prune: a.includes("--prune") || a.includes("-p"), onProgress: this.progreso(ctx) }), { url: await this.urlDeRemoto(d, remoto) });
         out(color.gris(`From ${(await g.listRemotes({ fs, dir: d })).find((r) => r.remote === remoto)?.url ?? remoto}\n`));
         await this.terminarCambios(ctx, { trabajo: false });
         return 0;
@@ -1022,7 +1048,7 @@ export class MotorGit {
         const actual = await g.currentBranch({ fs, dir: d });
         if (!actual) { err("fatal: You are not currently on a branch.\n"); return 128; }
         const ramaRemota = pos[1] || (await g.getConfig({ fs, dir: d, path: `branch.${actual}.merge` }).catch(() => null))?.replace(/^refs\/heads\//, "") || actual;
-        await this.conRed(ctx, () => g.fetch({ ...this.red(), dir: d, remote: remoto, ref: ramaRemota, singleBranch: true, tags: true, onProgress: this.progreso(ctx) }));
+        await this.conRed(ctx, () => g.fetch({ ...this.red(), dir: d, remote: remoto, ref: ramaRemota, singleBranch: true, tags: true, onProgress: this.progreso(ctx) }), { url: await this.urlDeRemoto(d, remoto) });
         return this.unir(ctx, actual, `${remoto}/${ramaRemota}`, { soloFF: a.includes("--ff-only"), desdePull: true });
       }
       case "push": {
@@ -1040,9 +1066,9 @@ export class MotorGit {
         }
         let r;
         try {
-          r = await this.conRed(ctx, () => g.push({ ...this.red(), dir: d, remote: remoto, ref, remoteRef: destino, force: a.includes("--force") || a.includes("-f"), onProgress: this.progreso(ctx) }), { siempreToken: true });
+          r = await this.conRed(ctx, () => g.push({ ...this.red(), dir: d, remote: remoto, ref, remoteRef: destino, force: a.includes("--force") || a.includes("-f"), onProgress: this.progreso(ctx) }), { siempreToken: true, url });
         } catch (e) {
-          if (e.code === "x") { err("error: push cancelado: no se escribió ningún token.\n"); return 1; }
+          if (e.code === "x") { err("error: push cancelado: no se inició sesión en GitHub.\n"); return 1; }
           throw e;
         }
         if (a.includes("--tags")) for (const t of await g.listTags({ fs, dir: d })) await g.push({ ...this.red(), dir: d, remote: remoto, ref: t }).catch(() => {});
@@ -1296,5 +1322,5 @@ historial      commit -m "mensaje" [-a] [--amend] · log [--oneline] [--graph] [
 ramas          branch [-a] [-d] [-m] · switch [-c] <rama> · checkout [-b] <rama> · merge <rama> [--abort] · stash [pop|list|drop]
 GitHub         remote add origin <url> · fetch · pull · push [-u] [origin rama] [--force] · tag [-a] · config user.name "Tu Nombre"
 deshacer       reset [--soft|--hard] [HEAD~1] · restore <archivo> · revert <commit>
-Para GitHub privado o para push te pide un token (github.com/settings/tokens → «Contents: Read and write»). No se guarda.
+Para push (o un repositorio privado) se abre «Iniciar sesión con GitHub». También: gh auth login · gh auth status · gh auth logout.
 `;

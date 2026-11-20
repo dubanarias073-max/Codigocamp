@@ -27,6 +27,8 @@ def perfil():
         course = Course.query.filter_by(slug=str(data.get("curso", "")), activo=True).first()
         if not course:
             return api_error("Curso no válido.")
+        if not data.get("terminos"):
+            return api_error("Para empezar debes aceptar los Términos y condiciones.")
         interests = data.get("intereses") if isinstance(data.get("intereses"), list) else []
         profile.rol = rol
         profile.nivel_previo = nivel
@@ -34,6 +36,8 @@ def perfil():
         profile.curso_actual = course
         profile.intereses = [item for item in interests if item in {"web", "movil", "juegos", "datos", "auto", "bd"}]
         profile.onboarding_completo = True
+        from servicios.terminos import registrar_aceptacion
+        registrar_aceptacion(current_user.id)
         db.session.commit()
     return jsonify(perfil={
         "rol": profile.rol, "intereses": profile.intereses, "nivel": profile.nivel_previo,
@@ -98,3 +102,24 @@ def ajustes():
 def avatares():
     propios = [c.articulo.icono for c in Purchase.query.filter_by(usuario_id=current_user.id).all() if c.articulo.clave in PERMANENTES]
     return jsonify(libres=AVATARES_LIBRES, coleccion=list(dict.fromkeys(propios)))
+
+
+@bp.get("/api/terminos/")
+def terminos():
+    from servicios.terminos import acepto_actual, version_actual
+    return jsonify(version=version_actual(), aceptado=acepto_actual(current_user.id) if current_user.is_authenticated else False)
+
+
+@bp.post("/api/terminos/aceptar/")
+@login_required
+def aceptar_terminos():
+    """Para cuentas que ya hicieron el onboarding y deben aceptar una versión nueva de los términos."""
+    from servicios.terminos import registrar_aceptacion, version_actual
+    data = json_body()
+    if isinstance(data, tuple):
+        return data
+    if not data.get("acepto"):
+        return api_error("Debes aceptar los Términos y condiciones para seguir usando CódigoCamp.")
+    registrar_aceptacion(current_user.id)
+    db.session.commit()
+    return jsonify(ok=True, version=version_actual())

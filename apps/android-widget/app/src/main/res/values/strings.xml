@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CódigoCamp Widget</string>
+    <string name="widget_racha">CódigoCamp · Tu racha</string>
+    <string name="widget_desc">Tu racha, la semana, la meta de hoy, vidas y diamantes.</string>
+</resources>

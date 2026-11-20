@@ -183,6 +183,7 @@ function mostrar() {
   const cont = $("cuerpo"); cont.replaceChildren(el("p", TIPOS[q.tipo], "r-tipo"), el("h1", q.enunciado));
   cont.classList.remove("entra"); void cont.offsetWidth; cont.classList.add("entra");   // la pregunta entra con animación
   render = RENDER[q.tipo](q, cont, () => { $("accion").disabled = render.obtener() == null; }, item);
+  window.scrollTo({ top: 0 });
 }
 
 function feedback(ok, r, extra) {
@@ -214,6 +215,7 @@ async function comprobar() {
     if (!r.correcto) fallos++;
     render.bloquear(); feedback(r.correcto, r, extra);
     $("accion").textContent = "Continuar"; $("accion").className = "bj" + (r.correcto ? "" : " rojo"); $("accion").disabled = false; fase = "feedback";
+    $("mensaje").scrollTop = 0; $("accion").focus({ preventScroll: true }); $("pie").scrollIntoView({ block: "end", behavior: "smooth" });
   } catch (e) {
     if (/vidas/i.test(e.message)) { enCurso = false; $("sinVidas").hidden = false; }
     else { $("mensaje").textContent = e.message; $("accion").textContent = "Comprobar"; $("accion").disabled = false; }
@@ -237,6 +239,7 @@ async function continuar() {
       <a class="bj" href="/pages/inicio.html?curso=${datos.curso.slug}">Continuar</a></div>`;
     // Como en Duolingo: los cofres de lo que acabas de cumplir se abren aquí mismo.
     import("/js/cofres.js").then((m) => m.abrirPremiosNuevos(r.desafios_completados || [])).catch(() => {});
+    try { navigator.serviceWorker?.controller?.postMessage("actualizar-widget"); } catch { /* sin service worker */ }
   } catch (e) { $("cuerpo").replaceChildren(el("p", e.message, "vacio")); }
 }
 

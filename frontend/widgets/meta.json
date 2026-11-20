@@ -15,7 +15,7 @@
     { "type": "TextBlock", "text": "${estado}", "wrap": true, "isSubtle": true, "size": "Small" }
   ],
   "actions": [
-    { "type": "Action.OpenUrl", "title": "Practicar", "url": "/pages/inicio.html?app=1" },
-    { "type": "Action.OpenUrl", "title": "Cofres", "url": "/pages/recompensas.html?app=1" }
+    { "type": "Action.OpenUrl", "title": "Practicar", "url": "${url_practicar}" },
+    { "type": "Action.OpenUrl", "title": "Cofres", "url": "${url_cofres}" }
   ]
 }

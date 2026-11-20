@@ -41,8 +41,10 @@ mostrarSeccion(location.hash.slice(1));
   const ua = navigator.userAgent;
   const so = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "ios"
     : /Android/.test(ua) ? "android" : /CrOS/.test(ua) ? "chromeos" : /Windows/.test(ua) ? "windows" : /Mac OS X/.test(ua) ? "macos" : /Linux/.test(ua) ? "linux" : "";
-  const d = so && document.querySelector(`#plataformas details[data-so="${so}"]`);
-  if (d) { d.open = true; d.classList.add("tuyo"); d.parentElement.prepend(d); }
+  for (const lista of ["plataformas", "plataformasWidget"]) {
+    const d = so && document.querySelector(`#${lista} details[data-so="${so}"]`);
+    if (d) { d.open = true; d.classList.add("tuyo"); d.parentElement.prepend(d); }
+  }
 }
 
 // Cuenta
@@ -161,6 +163,22 @@ function pintarInstalar() {
 pintarInstalar();
 addEventListener("cc-instalable", pintarInstalar);
 $("instalar").onclick = async () => { await instalar(); pintarInstalar(); };
+
+// Widgets en cualquier sistema: usan la sesión que ya está abierta (siguen funcionando hasta que se cierre sesión).
+{
+  const esAndroid = /Android/.test(navigator.userAgent);
+  let enlaces = null;
+  const pedir = async () => (enlaces ??= await api("/api/widget/conectar/"));
+  pedir().then((e) => {
+    if (esAndroid) { $("wgAndroid").href = e.android; $("wgAndroid").hidden = false; }
+    $("wgApk").hidden = !e.apk;   // el botón del APK solo aparece si el archivo está en frontend/descargas/
+  }).catch((x) => { $("wgEstado").textContent = x.message; });
+  $("wgCopiar").onclick = async () => {
+    try { const e = await pedir(); await navigator.clipboard.writeText(e.pagina); aviso("Enlace del widget copiado"); }
+    catch (x) { aviso(x.message || "No se pudo copiar", true); }
+  };
+  $("wgFlotante").onclick = () => window.open("/pages/widget.html?mini=1", "cc-widget", "popup=yes,width=340,height=230");
+}
 
 // Sesión
 $("salir").onclick = () => salir(api);

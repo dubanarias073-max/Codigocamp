@@ -1,0 +1,32 @@
+/* Términos y condiciones: página propia (terminos.html), paso del onboarding y aviso de la app. */
+.terminos{line-height:1.6;color:var(--txt)}
+.terminos h1{margin:0 0 4px;font-size:clamp(22px,4vw,30px);line-height:1.2}
+.terminos h2{margin:20px 0 6px;font-size:17px}
+.terminos p,.terminos li{margin:0 0 8px;color:var(--sub);font-size:15px}
+.terminos b{color:var(--txt)}
+.terminos ul{margin:0 0 8px;padding-left:20px}
+.terminos code{padding:1px 6px;border-radius:6px;background:color-mix(in srgb,currentColor 12%,transparent);font-size:13px}
+.terminos-fecha{font-size:13px!important;opacity:.8}
+.terminos-pagina .terminos-main{max-width:760px;margin:0 auto;padding:28px 20px 60px}
+.terminos-volver{display:inline-block;margin-bottom:16px;color:var(--acc,#4ade80);font-weight:700;text-decoration:none}
+
+/* Caja con scroll (onboarding y aviso) */
+.terminos-caja{max-height:min(46vh,420px);overflow:auto;overscroll-behavior:contain;padding:16px 18px;margin:0 0 14px;border:1px solid var(--borde);border-radius:14px;background:color-mix(in srgb,var(--panel,#0d1b1a) 80%,transparent)}
+.terminos-caja h1{font-size:20px}
+.terminos-caja:focus-visible{outline:3px solid var(--cy,#22d3ee);outline-offset:2px}
+.terminos-alerta{display:flex;gap:10px;align-items:flex-start;margin:0 0 12px;padding:12px 14px;border-radius:12px;border-left:4px solid var(--oro,#fbbf24);background:color-mix(in srgb,var(--oro,#fbbf24) 12%,transparent);font-size:14px}
+.terminos-alerta b{color:inherit}
+.terminos-checks .caja{min-height:0}
+.terminos-checks .txt{font-size:15px}
+.terminos-leer{font-size:13px;color:var(--sub)}
+.terminos-leer a{color:var(--acc,#4ade80);font-weight:700}
+
+/* Aviso a pantalla completa para cuentas que aún no aceptaron la versión actual */
+.terminos-capa{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:16px;background:rgba(3,6,14,.78);backdrop-filter:blur(4px)}
+.terminos-capa>div{width:min(640px,100%);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;padding:22px;border-radius:20px;border:1px solid var(--borde);background:var(--panel,#0d1b1a);color:var(--txt);box-sizing:border-box}
+.terminos-capa h2{margin:0 0 8px;font-size:20px}
+.terminos-capa .terminos-caja{flex:1;min-height:120px}
+.terminos-capa label{display:flex;gap:10px;align-items:flex-start;margin:6px 0;font-size:14px;cursor:pointer}
+.terminos-capa input{margin-top:3px;width:18px;height:18px;accent-color:var(--acc,#4ade80)}
+.terminos-capa button{margin-top:12px;width:100%;min-height:48px}
+.terminos-capa .terminos-error{color:var(--rojo,#ff6b6b);font-size:14px;margin:8px 0 0}

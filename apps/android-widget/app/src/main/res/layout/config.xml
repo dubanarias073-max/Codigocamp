@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF0B1020"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Widget de CódigoCamp"
+            android:textColor="#FFE5EAFF"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="1. Abre CódigoCamp en Chrome con tu sesión iniciada.\n2. Configuración → App y widgets → «Conectar widget de Android».\n3. Mantén pulsada la pantalla de inicio → Widgets → CódigoCamp.\n\nO pega aquí el enlace del widget (botón «Copiar enlace del widget»):"
+            android:textColor="#FF8B95B8"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/enlace"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:hint="https://…/pages/widget.html?t=…"
+            android:inputType="textUri"
+            android:textColor="#FFE5EAFF"
+            android:textColorHint="#FF5B6482"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/guardar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/boton"
+            android:text="Guardar y actualizar el widget"
+            android:textColor="#FF111508" />
+
+        <TextView
+            android:id="@+id/resultado"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:textColor="#FFE5EAFF"
+            android:textSize="14sp" />
+    </LinearLayout>
+</ScrollView>

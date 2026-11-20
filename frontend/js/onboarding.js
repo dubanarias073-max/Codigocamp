@@ -13,12 +13,30 @@
   var RECOMIENDA = { web: 'html', movil: 'kotlin', juegos: 'csharp', datos: 'python', auto: 'terminal', bd: 'bd' };
 
   function respondido(p) {
+    // Términos: hay que marcar TODAS las casillas obligatorias.
+    var obligatorias = p.querySelectorAll('input[required]');
+    if (obligatorias.length) return Array.prototype.every.call(obligatorias, function (x) { return x.checked; });
     return !p.querySelector('input') || p.querySelector('input:checked') !== null;
   }
 
+  // El texto de los términos vive en una sola página (terminos.html): se copia aquí.
+  var VERSION_TERMINOS = null;
+  fetch('/pages/terminos.html', { credentials: 'same-origin' }).then(function (r) { return r.text(); }).then(function (html) {
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var art = doc.getElementById('terminosTexto');
+    if (!art) throw new Error('sin texto');
+    VERSION_TERMINOS = art.getAttribute('data-version');
+    var caja = $('terminosCaja');
+    caja.replaceChildren(document.importNode(art, true));
+    caja.firstElementChild.removeAttribute('id');
+  }).catch(function () {
+    $('terminosCaja').innerHTML = '<p>No se pudieron cargar los términos aquí. <a href="/pages/terminos.html" target="_blank" rel="noopener">Ábrelos en otra pestaña</a>.</p>';
+  });
+
   function datos() {
     var f = new FormData(form);
-    return { rol: f.get('rol'), intereses: f.getAll('intereses'), nivel: f.get('nivel'), curso: f.get('curso'), meta: f.get('meta') };
+    return { rol: f.get('rol'), intereses: f.getAll('intereses'), nivel: f.get('nivel'), curso: f.get('curso'), meta: f.get('meta'),
+      terminos: f.getAll('acepta').length === 3 ? (VERSION_TERMINOS || 'actual') : null };
   }
 
   function marcarRecomendados() {
@@ -70,6 +88,7 @@
       '  nivel: ' + q(NOMBRES[d.nivel]) + ',\n' +
       '  curso: ' + q(CURSOS[d.curso]) + ',\n' +
       '  minutosAlDia: ' + (d.meta ? '<u>' + d.meta + '</u>' : '<em>null</em>') + ',\n' +
+      '  aceptaTerminos: ' + (d.terminos ? '<u>true</u>' : '<em>false</em>') + ',\n' +
       '};\n\n<i>// ' + (d.curso ? 'listo para empezar ' + CURSOS[d.curso] : 'completando tu perfil…') + '</i>';
   }
   function pintarPanel() {
@@ -139,7 +158,9 @@
       .then(function (r) {
         if (r.status === 401) { location.href = '/pages/login.html'; return; }
         if (r.ok) { location.href = destino; return; }
-        sig.disabled = false; sig.textContent = 'No se pudo guardar. Inténtalo de nuevo';
+        return r.json().catch(function () { return {}; }).then(function (e) {
+          sig.disabled = false; sig.textContent = e.error ? e.error : 'No se pudo guardar. Inténtalo de nuevo';
+        });
       })
       .catch(function () { sig.disabled = false; sig.textContent = 'Sin conexión. Inténtalo de nuevo'; });
   }

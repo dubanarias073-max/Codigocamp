@@ -15,5 +15,5 @@
     ] },
     { "type": "TextBlock", "text": "${estado}", "wrap": true, "isSubtle": true, "size": "Small" }
   ],
-  "actions": [{ "type": "Action.OpenUrl", "title": "Ver calendario", "url": "/pages/perfil.html?app=1#calendario" }]
+  "actions": [{ "type": "Action.OpenUrl", "title": "Ver calendario", "url": "${url_calendario}" }]
 }

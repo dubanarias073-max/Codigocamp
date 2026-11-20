@@ -25,5 +25,5 @@
     ] },
     { "type": "TextBlock", "text": "${estado}", "wrap": true, "spacing": "Medium", "weight": "Bolder", "size": "Small" }
   ],
-  "actions": [{ "type": "Action.OpenUrl", "title": "Practicar ahora", "url": "/pages/inicio.html?app=1" }]
+  "actions": [{ "type": "Action.OpenUrl", "title": "Practicar ahora", "url": "${url_practicar}" }]
 }

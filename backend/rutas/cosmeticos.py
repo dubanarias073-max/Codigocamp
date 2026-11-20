@@ -244,30 +244,29 @@ def calendario_racha():
                    salvarrachas=p.salvarrachas, practicado_hoy=p.ultima_actividad == hoy)
 
 
-@bp.get("/api/widget/")
-@login_required
-def widget():
-    """Datos del widget «Tu racha» (Windows 11) y de los accesos rápidos de la app instalada."""
-    from datetime import date, timedelta
+def _datos_widget(usuario):
+    """Racha, semana, meta de hoy y calendario para todos los widgets (Windows 11, iPhone/iPad, Android, escritorio)."""
+    from datetime import date, datetime, timedelta
     from models import DailyActivity
-    p = get_profile(current_user)
+    p = get_profile(usuario)
     db.session.commit()
     hoy = date.today()
     practicado = p.ultima_actividad == hoy
     racha_dias = _racha_info(p, hoy)
     racha = p.racha_actual if racha_dias else 0
-    # Semana (lunes a domingo) para los widgets: 🔥 practicado · ○ hoy pendiente · · no
+    # Semana (lunes a domingo) para los widgets: 🔥 practicado · ⏳ hoy pendiente · «·» no practicado · ○ por venir
     lunes = hoy - timedelta(days=hoy.weekday())
-    activos = {a.fecha for a in DailyActivity.query.filter(DailyActivity.usuario_id == current_user.id, DailyActivity.fecha >= lunes,
+    activos = {a.fecha for a in DailyActivity.query.filter(DailyActivity.usuario_id == usuario.id, DailyActivity.fecha >= lunes,
                                                            DailyActivity.fecha <= hoy) if a.xp > 0 or a.niveles > 0} | racha_dias
     semana = []
-    for i, letra in enumerate("LMXJVSD"):
+    for i, letra in enumerate("LMMJVSD"):
         d = lunes + timedelta(days=i)
-        semana.append({"letra": letra, "icono": "🔥" if d in activos else ("⏳" if d == hoy else ("·" if d < hoy else "○")), "hoy": d == hoy})
-    act = DailyActivity.query.filter_by(usuario_id=current_user.id, fecha=hoy).first()
+        estado_dia = "hecho" if d in activos else ("hoy" if d == hoy else ("perdido" if d < hoy else "futuro"))
+        semana.append({"letra": letra, "icono": {"hecho": "🔥", "hoy": "⏳", "perdido": "·", "futuro": "○"}[estado_dia], "hoy": d == hoy,
+                       "estado": estado_dia, "fecha": d.isoformat()})
+    act = DailyActivity.query.filter_by(usuario_id=usuario.id, fecha=hoy).first()
     xp_hoy = act.xp if act else 0
     meta_xp = max(10, p.meta_minutos * 3)
-    from datetime import datetime
     hora = datetime.now().hour
     if practicado:
         estado = "¡Ya practicaste hoy! 💪"
@@ -275,10 +274,108 @@ def widget():
         estado = f"⚠️ Practica antes de medianoche o pierdes tu racha de {racha}" if hora >= 18 else "Practica hoy para no perder tu racha"
     else:
         estado = "Empieza tu racha hoy"
-    return jsonify(
+    base = request.host_url.rstrip("/")
+    return dict(
         racha=racha, racha_maxima=p.racha_maxima, xp=p.xp_total, diamantes=p.diamante, meta=p.meta_minutos,
-        nombre=current_user.nombre.split(" ")[0], practicado_hoy=practicado, estado=estado, salvarrachas=p.salvarrachas,
+        nombre=(usuario.nombre or "").split(" ")[0], practicado_hoy=practicado, estado=estado, salvarrachas=p.salvarrachas,
         semana=semana, semana_texto=" ".join(x["icono"] for x in semana), xp_hoy=xp_hoy, meta_xp=meta_xp,
         progreso_hoy=min(100, round(xp_hoy * 100 / meta_xp)), vidas=p.vidas,
         mes=hoy.strftime("%m/%Y"), titulo=f"🔥 {racha} día{'s' if racha != 1 else ''}",
+        # Direcciones absolutas: el panel de widgets de Windows y las apps de widgets no conocen la página de origen.
+        url_practicar=f"{base}/pages/inicio.html?app=1", url_cofres=f"{base}/pages/recompensas.html?app=1",
+        url_calendario=f"{base}/pages/perfil.html?app=1#calendario", actualizado=datetime.now().strftime("%H:%M"),
     )
+
+
+def _firma_widget(fila):
+    import hmac
+    import base64
+    clave = str(current_app.config["SECRET_KEY"]).encode()
+    firma = hmac.new(clave, f"cc-widget|{fila.usuario_id}|{fila.token_hash}".encode(), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(firma).decode().rstrip("=")
+
+
+def token_widget(fila):
+    """Token del widget para ESTE inicio de sesión: «<id de sesión>.<firma>». No se guarda en ningún lado: se calcula.
+    Sirve mientras esa sesión siga abierta; al cerrar sesión (aquí o desde otro dispositivo) deja de funcionar."""
+    return f"{fila.id}.{_firma_widget(fila)}"
+
+
+def _usuario_de_enlace(token):
+    import hmac
+    from models import UserSession
+    sid, _, firma = str(token or "").partition(".")
+    if not sid.isdigit() or not (20 <= len(firma) <= 60):
+        return None
+    fila = db.session.get(UserSession, int(sid))
+    if fila is None or fila.revocada or not hmac.compare_digest(firma, _firma_widget(fila)):
+        return None
+    usuario = db.session.get(User, fila.usuario_id)
+    return usuario if usuario and usuario.activo else None
+
+
+def _enlaces(token):
+    from urllib.parse import quote
+    base = request.host_url.rstrip("/")
+    t = quote(token, safe="")
+    return dict(token=token, base=base, datos=f"{base}/api/widget/?t={t}", pagina=f"{base}/pages/widget.html?t={t}",
+                scriptable=f"{base}/api/widget/scriptable.js?t={t}",
+                android=f"intent://conectar?base={quote(base, safe='')}&t={t}#Intent;scheme=codigocamp-widget;package=com.codigocamp.widget;end",
+                android_directo=f"codigocamp-widget://conectar?base={quote(base, safe='')}&t={t}")
+
+
+@bp.get("/api/widget/")
+def widget():
+    """Datos de los widgets. Con la sesión de CódigoCamp (la app, Windows 11, el widget flotante) o con el token de
+    la sesión ?t=… (widgets de iPhone/iPad con Scriptable y de Android, que no comparten las cookies del navegador)."""
+    token = request.args.get("t") or request.headers.get("X-Widget-Token", "")
+    if current_user.is_authenticated and not token:
+        usuario = current_user
+    elif token:
+        if too_many(f"widget:{request.remote_addr}", 120, 60):
+            return api_error("Demasiadas consultas. Espera un momento.", 429)
+        usuario = _usuario_de_enlace(token)
+        if not usuario:
+            return api_error("Tu sesión de CódigoCamp se cerró. Inicia sesión otra vez y vuelve a conectar el widget.", 401)
+    else:
+        return api_error("Inicia sesión para continuar.", 401)
+    r = jsonify(_datos_widget(usuario))
+    r.headers["Cache-Control"] = "no-store"
+    if token:
+        r.headers["Access-Control-Allow-Origin"] = "*"   # solo lectura y sin cookies: lo pueden pedir apps de widgets
+    return r
+
+
+@bp.get("/api/widget/conectar/")
+@login_required
+def conectar_widget():
+    """Enlaces del widget para la sesión actual (no hay que crear nada: se usa la sesión que ya está abierta)."""
+    from models import UserSession
+    sesion_id = getattr(current_user, "_sesion_id", None)
+    fila = db.session.get(UserSession, sesion_id) if sesion_id else None
+    if fila is None or fila.revocada:
+        return api_error("Vuelve a iniciar sesión para conectar los widgets.", 401)
+    from constantes import FRONTEND
+    r = jsonify(**_enlaces(token_widget(fila)), apk=(FRONTEND / "descargas" / "CodigoCamp-Widget.apk").is_file())
+    r.headers["Cache-Control"] = "no-store"
+    return r
+
+
+@bp.get("/api/widget/scriptable.js")
+def widget_scriptable():
+    """Script para la app gratuita Scriptable (iPhone, iPad y Mac con Apple Silicon): widget de pantalla de inicio de verdad."""
+    token = request.args.get("t", "")
+    if not token and current_user.is_authenticated:
+        from models import UserSession
+        fila = db.session.get(UserSession, getattr(current_user, "_sesion_id", 0) or 0)
+        token = token_widget(fila) if fila and not fila.revocada else ""
+    if not _usuario_de_enlace(token):
+        return api_error("Inicia sesión en CódigoCamp para descargar el widget.", 401)
+    from constantes import FRONTEND
+    plantilla = (FRONTEND / "widgets" / "scriptable.js").read_text(encoding="utf-8")
+    base = request.host_url.rstrip("/")
+    codigo = plantilla.replace("__CC_BASE__", base).replace("__CC_TOKEN__", token)
+    r = current_app.response_class(codigo, mimetype="text/javascript")
+    r.headers["Content-Disposition"] = 'attachment; filename="CodigoCamp.js"'
+    r.headers["Cache-Control"] = "no-store"
+    return r

@@ -95,6 +95,18 @@
           "sizes": "192x192"
         }
       ]
+    },
+    {
+      "name": "Widget de racha",
+      "short_name": "Widget",
+      "description": "Tu racha en una ventanita (widget flotante)",
+      "url": "/pages/widget.html?mini=1",
+      "icons": [
+        {
+          "src": "/img/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
   "widgets": [

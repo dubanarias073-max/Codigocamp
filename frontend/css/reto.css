@@ -60,3 +60,28 @@
 @keyframes r-entra{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
 @keyframes r-titulo{from{opacity:0;transform:translateY(8px);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
 @keyframes r-destello{0%{opacity:0;transform:scale(.88)}35%{opacity:1}100%{opacity:0;transform:scale(1.12)}}
+
+/* ===== Distribución de la lección: el botón Comprobar/Continuar SIEMPRE visible =====
+   Antes «.pantalla-reto>.r-pie{position:relative}» anulaba el position:fixed del pie y el botón quedaba
+   debajo de 190 px de relleno. Ahora la página es una columna de alto de pantalla: cabecera · pregunta · pie pegado abajo. */
+.pantalla-reto{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;margin:0}
+.pantalla-reto>.r-top{flex:none;width:100%;box-sizing:border-box;padding:max(14px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left))}
+.pantalla-reto>.r-cuerpo{flex:1 0 auto;width:100%;box-sizing:border-box;padding:6px 20px 24px}
+.pantalla-reto>.r-pie{position:sticky;bottom:0;z-index:5;flex:none;padding:12px max(16px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.pantalla-reto>.r-pie[hidden]{display:none}
+.r-pie>div{gap:10px}
+.r-pie #mensaje:empty{display:none}
+.r-pie #mensaje{max-height:min(34vh,34dvh);overflow:auto;overscroll-behavior:contain}
+.r-pie #mensaje h2{margin:0 0 4px;font-size:18px}
+.r-pie #mensaje p{margin:4px 0}
+.r-pie .bj{min-height:50px}
+.r-cuerpo .opc{margin-bottom:10px}
+.r-cuerpo pre.cod{max-height:40vh;overflow:auto}
+@media (max-width:600px){
+  .r-top{gap:10px}
+  .r-cuerpo h1{font-size:20px;margin:6px 0 12px}
+  .r-cuerpo .opc{padding:12px 14px}
+  .r-pie #mensaje{max-height:28vh}
+  .r-pie #mensaje h2{font-size:16px}
+}
+@media (max-height:560px){ .r-pie #mensaje{max-height:22vh} .r-cuerpo h1{margin:4px 0 10px} }

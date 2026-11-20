@@ -514,6 +514,16 @@ CREATE TABLE IF NOT EXISTS sesiones (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Sesiones abiertas por dispositivo';
 
+-- Términos y condiciones aceptados (versión vigente: atributo data-version de frontend/pages/terminos.html).
+CREATE TABLE IF NOT EXISTS terminos_aceptados (
+  usuario_id INT NOT NULL,
+  version VARCHAR(20) NOT NULL,
+  aceptado DATETIME NOT NULL,
+  ip VARCHAR(45) NOT NULL DEFAULT '',
+  PRIMARY KEY (usuario_id),
+  CONSTRAINT fk_terminos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Conversaciones guardadas con la IA (historial como el de Claude o ChatGPT).
 CREATE TABLE IF NOT EXISTS conversaciones_ia (
   id INT NOT NULL AUTO_INCREMENT,

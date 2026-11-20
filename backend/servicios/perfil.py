@@ -43,7 +43,8 @@ def serialize_user(user, profile):
 
 def _extras(usuario_id):
     from rutas.cosmeticos import equipados_de, foto_url
-    return {"foto": foto_url(usuario_id), "cosmeticos": equipados_de(usuario_id)}
+    from servicios.terminos import acepto_actual
+    return {"foto": foto_url(usuario_id), "cosmeticos": equipados_de(usuario_id), "terminos": acepto_actual(usuario_id)}
 
 
 def _user(user):

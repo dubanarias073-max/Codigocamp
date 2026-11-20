@@ -449,3 +449,14 @@ class AIMessage(db.Model):
     archivos = db.Column(TextoJSON, nullable=False, default=list)   # nombres de los archivos adjuntos
     creado = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
     conversacion = db.relationship("AIConversation", back_populates="mensajes")
+
+
+
+class TermsAcceptance(db.Model):
+    """Qué versión de los Términos y condiciones aceptó cada persona (onboarding o aviso de la app), cuándo y desde qué IP."""
+    __tablename__ = "terminos_aceptados"
+
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE", name="fk_terminos_usuario"), primary_key=True)
+    version = db.Column(db.String(20), nullable=False)
+    aceptado = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    ip = db.Column(db.String(45), nullable=False, default="")

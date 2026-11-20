@@ -195,6 +195,7 @@ const AYUDA = [
   color.azul("Archivos") + "   ls  cd  pwd  cat  touch  mkdir  rm  rmdir  mv  cp  tree  find  head  tail  wc  grep  echo  code <archivo>",
   color.azul("Shell") + "      comillas, $VARIABLES, comodines (*.js), pipes ( | ), encadenar ( && ; || ) y redirigir ( > >> )",
   color.azul("Git") + "        git init | status | add | commit -m | log | diff | restore | branch | switch -c | remote | push · git clone <url> [carpeta|.]",
+  color.azul("GitHub") + "     gh auth login | status | logout  (git push abre «Iniciar sesión con GitHub» si hace falta)",
   color.azul("Ejecutar") + "   node archivo.js      python archivo.py      ts-node archivo.ts",
   color.azul("Bases") + "      sqlite3 tienda.db (consola; .help) · sqlite3 tienda.db < esquema.sql · mysql -u root mi_base (MySQL/XAMPP) · psql -U postgres · mongosh · redis-cli · bd-puente (si CódigoCamp está en internet)",
   color.azul("Paquetes") + "   pip install numpy      npm install dayjs react bootstrap… (se usan con import)      npm run <script>      npm init -y",
@@ -218,8 +219,8 @@ export class Shell {
    * @param {object} o.ejecutores   { node, python, ts, servidor, sql } (ver ejecucion.js)
    */
   constructor({ proyecto, cambio = () => {}, usuario = "estudiante", abrir = () => {}, ejecutores = {}, ahora = () => new Date(), github = null, paquetes = null,
-    importar = (origen, opciones) => importarEn(this.proyecto(), origen, opciones), leerArchivo = null, subirArchivo = null, abrirVista = null, bd = null, gitReal = null, abrirUrl = null }) {
-    Object.assign(this, { proyecto, cambio, usuario, abrir, ejecutores, ahora, github, paquetes, importar, leerArchivo, subirArchivo, abrirVista, abrirUrl });
+    importar = (origen, opciones) => importarEn(this.proyecto(), origen, opciones), leerArchivo = null, subirArchivo = null, abrirVista = null, bd = null, gitReal = null, abrirUrl = null, credencialGitHub = null }) {
+    Object.assign(this, { proyecto, cambio, usuario, abrir, ejecutores, ahora, github, paquetes, importar, leerArchivo, subirArchivo, abrirVista, abrirUrl, credencialGitHub });
     this.bd = bd ?? new ClienteBD();
     this.gitReal = gitReal; // () => Promise<MotorGit>: Git de verdad (isomorphic-git)
     this.tokenGitHub = null; // solo en memoria: se pierde al recargar la página y no se guarda en ningún sitio
@@ -716,7 +717,37 @@ const COMANDOS = {
       }
     }
   },
-  gh(a, io) { io.err("GitHub CLI (gh) no está conectado en esta terminal. Para practicar el flujo usa git; para publicar de verdad usa Git y gh en tu computadora (cli.github.com/manual).\n"); return 1; },
+  async gh(a, io) {
+    const s = this.credencialGitHub;
+    const [grupo, orden] = a;
+    if (grupo === "auth" && s) {
+      if (orden === "login") {
+        if (s.token && !a.includes("--force")) { io.out(`Ya iniciaste sesión en github.com como ${color.azul("@" + s.usuario)}. (gh auth login --force para cambiar de cuenta)\n`); return 0; }
+        if (a.includes("--force")) s.cerrarSesion();
+        io.out(color.gris("Abriendo «Iniciar sesión con GitHub»…\n"));
+        const t = await s.obtener({ motivo: "Inicia sesión para usar git push, pull y clone con tus repositorios de GitHub." });
+        if (!t) { io.err("Inicio de sesión cancelado.\n"); return 1; }
+        io.out(`${color.verde("✔")} Sesión iniciada en github.com como ${color.azul("@" + s.usuario)}\n`);
+        return 0;
+      }
+      if (orden === "logout") {
+        if (!s.token) { io.err("No hay ninguna sesión de GitHub iniciada.\n"); return 1; }
+        const quien = s.usuario; s.cerrarSesion(); this.tokenGitHub = null;
+        io.out(`${color.verde("✔")} Sesión de github.com cerrada (@${quien}).\n`);
+        return 0;
+      }
+      if (orden === "status" || orden === undefined) {
+        if (!s.token) { io.out("No has iniciado sesión en GitHub. Usa: gh auth login  (o haz git push y se abrirá solo)\n"); return 1; }
+        const d = s.datos;
+        io.out(`github.com\n  ${color.verde("✓")} Sesión iniciada como ${color.azul("@" + d.login)}${d.nombre && d.nombre !== d.login ? ` (${d.nombre})` : ""}\n  - Método: ${{ web: "ventana de GitHub", dispositivo: "código de dispositivo", token: "token personal" }[d.metodo] || d.metodo}\n${d.alcance ? `  - Permisos: ${d.alcance}\n` : ""}`);
+        return 0;
+      }
+      if (orden === "token") { if (!s.token) { io.err("No has iniciado sesión.\n"); return 1; } io.out(color.gris("(Por seguridad, CódigoCamp no muestra el token.)\n")); return 0; }
+    }
+    if (grupo === "auth") { io.err("gh auth no está disponible aquí.\n"); return 1; }
+    io.err(`gh ${a.join(" ")}: en CódigoCamp solo está «gh auth login | status | logout». Para el resto usa git (push, pull, clone) o gh en tu computadora.\n`);
+    return 1;
+  },
   async git(a, io) {
     if (this.gitReal) {
       let motor;
@@ -758,7 +789,12 @@ function cabezaCola(a, io, cabeza) {
 async function empujarAGitHub(io) {
   if (!this.github) { io.err("git push no está disponible en este entorno.\n"); return 1; }
   const { sesion } = io;
-  let token = this.tokenGitHub;
+  let token = this.tokenGitHub || this.credencialGitHub?.token;
+  if (!token && this.credencialGitHub) {
+    io.out(color.gris("Iniciando sesión en GitHub… (se abrió un cuadro en la pantalla)\n"));
+    token = await this.credencialGitHub.obtener({ motivo: `Para publicar en ${io.py().git.remote || "GitHub"} necesitas iniciar sesión.` });
+    if (!token) { io.err("push cancelado: no se inició sesión en GitHub.\n"); return 1; }
+  }
   if (!token) {
     io.out(color.gris("Para publicar en GitHub necesitas un token personal con permiso «Contents: Read and write» sobre este repositorio.\nSe escribe oculto, solo se usa en esta pestaña y NO se guarda en ningún sitio.\n"));
     token = (await sesion.leerLinea("Token de GitHub: ", { secreto: true }))?.trim();
@@ -776,7 +812,7 @@ async function empujarAGitHub(io) {
     for (const o of r.omitidos || []) io.out(color.amarillo(`No se publicó ${o.ruta}: ${o.motivo}.\n`));
     return 0;
   } catch (error) {
-    if (error.estado === 401 || error.estado === 403) this.tokenGitHub = null;
+    if (error.estado === 401) { this.tokenGitHub = null; this.credencialGitHub?.invalidar(); }
     io.err(`${error.message}\n`);
     return 1;
   }
@@ -822,7 +858,7 @@ async function clonarDeGitHub(args, io) {
   io.out(`Clonando en '${enRaiz ? "." : relativa(sesion.cwd, destino)}'...\n`);
   const progreso = (t) => io.out(color.gris(t + "\n"));
   let r;
-  let token = this.tokenGitHub;
+  let token = this.tokenGitHub || this.credencialGitHub?.token;
   for (let intento = 0; intento < 2; intento += 1) {
     try { r = await this.github.clonar({ url, token, rama, progreso }); break; }
     catch (error) {

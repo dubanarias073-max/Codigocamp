@@ -25,14 +25,14 @@ from seguridad import configurar_seguridad  # noqa: E402
 def _crear_tablas_nuevas(app):
     """Crea las tablas que agregan las versiones nuevas si la base aún no las tiene (no toca las que ya existen).
     Así no hace falta ejecutar a mano migracion_archivos.sql. Si MySQL no está encendido, se intentará al reiniciar."""
-    from models import AIConversation, AIMessage, AppliedMigration, Attachment, UserSession, EmailSettings, EquippedCosmetics, KnownDevice, OpenedChest, OwnedCosmetic, ProfilePhoto, WorkspaceFile
+    from models import AIConversation, AIMessage, AppliedMigration, Attachment, UserSession, EmailSettings, EquippedCosmetics, KnownDevice, OpenedChest, OwnedCosmetic, ProfilePhoto, TermsAcceptance, WorkspaceFile
     try:
         with app.app_context():
             from servicios.workbench import reparar
             cambios = reparar(db.engine)
             if cambios:
                 app.logger.info("Base ajustada para el diagrama de MySQL Workbench: %s", "; ".join(cambios))
-            nuevos = (WorkspaceFile, KnownDevice, EmailSettings, OwnedCosmetic, EquippedCosmetics, OpenedChest, ProfilePhoto, Attachment, AppliedMigration, UserSession, AIConversation, AIMessage)
+            nuevos = (WorkspaceFile, KnownDevice, EmailSettings, OwnedCosmetic, EquippedCosmetics, OpenedChest, ProfilePhoto, Attachment, AppliedMigration, UserSession, AIConversation, AIMessage, TermsAcceptance)
             for modelo in nuevos:
                 modelo.__table__.create(bind=db.engine, checkfirst=True)
             from servicios.workbench import agregar_columnas
@@ -49,6 +49,7 @@ def _crear_tablas_nuevas(app):
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("application/wasm", ".wasm")
+mimetypes.add_type("application/vnd.android.package-archive", ".apk")
 
 
 def create_app(test_config=None):
@@ -66,7 +67,14 @@ def create_app(test_config=None):
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.getenv("DEBUG", "1") != "1",
-        PERMANENT_SESSION_LIFETIME=timedelta(days=7),
+        PERMANENT_SESSION_LIFETIME=timedelta(days=400),
+        # La sesión dura hasta que la persona la cierre (Cerrar sesión, o desde otro dispositivo): la cookie
+        # «recordarme» se renueva en cada visita, así nunca vence mientras la uses (ni la app ni los widgets).
+        REMEMBER_COOKIE_DURATION=timedelta(days=400),
+        REMEMBER_COOKIE_REFRESH_EACH_REQUEST=True,
+        REMEMBER_COOKIE_HTTPONLY=True,
+        REMEMBER_COOKIE_SAMESITE="Lax",
+        REMEMBER_COOKIE_SECURE=os.getenv("DEBUG", "1") != "1",
         GEMINI_API_KEY=os.getenv("GEMINI_API_KEY", "").strip().strip('"'),
         GEMINI_MODEL=(os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip(),
         GOOGLE_CLIENT_ID=os.getenv("GOOGLE_CLIENT_ID", ""),

@@ -66,6 +66,8 @@ export async function iniciar(activa) {
   await protegerCuenta(user);   // si antes estuvo otra cuenta en este navegador, se borran sus copias locales
   if (!user.onboarding) { location.replace(url("onboarding")); await parar(); }
   aplicarTema(user.tema);
+  // Cuentas antiguas o términos actualizados: hay que aceptarlos antes de seguir.
+  if (user.terminos === false) await (await import("/js/terminos.js")).pedirTerminos();
   aplicarCosmeticos(user.cosmeticos || {});
   const [prog, mis] = await Promise.all([api("/api/progreso/"), api("/api/desafios/").catch(() => ({ hoy: [] }))]);
   const p = prog.perfil;

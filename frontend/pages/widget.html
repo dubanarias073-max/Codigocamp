@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Widget · CódigoCamp</title>
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <meta name="theme-color" content="#0b1020">
+  <link rel="stylesheet" href="/css/widget.css">
+</head>
+<body>
+  <main class="wg" id="wg" data-vista="racha" aria-live="polite">
+    <header class="wg-cab">
+      <nav class="wg-tabs" role="tablist" aria-label="Vista del widget">
+        <button type="button" role="tab" data-v="racha">🔥 Racha</button>
+        <button type="button" role="tab" data-v="meta">🎯 Meta</button>
+        <button type="button" role="tab" data-v="calendario">📅 Semana</button>
+      </nav>
+      <span class="wg-vidas" id="vidas"></span>
+    </header>
+    <section class="wg-cuerpo" id="cuerpo"><p class="wg-sub">Cargando…</p></section>
+    <footer class="wg-pie">
+      <a id="practicar" class="wg-btn" href="/pages/inicio.html?app=1" target="_blank" rel="noopener">Practicar</a>
+      <span class="wg-hora" id="hora"></span>
+      <button type="button" class="wg-ic" id="flotar" title="Widget flotante (siempre encima)" aria-label="Widget flotante" hidden>📌</button>
+      <button type="button" class="wg-ic" id="recargar" title="Actualizar" aria-label="Actualizar">⟳</button>
+    </footer>
+  </main>
+  <script type="module" src="/js/widget.js"></script>
+</body>
+</html>
