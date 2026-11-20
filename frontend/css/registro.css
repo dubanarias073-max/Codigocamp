@@ -1,2 +1,8 @@
 /* Estilos de registro.html: parte del formulario de acceso de login.css */
 @import url("/css/login.css");
+
+.google-acceso{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:11px 14px;border:1px solid var(--borde);border-radius:9px;background:var(--panel);color:inherit;font-weight:700;text-decoration:none}
+.google-acceso:hover{border-color:var(--cy);background:var(--panel2)}
+.google-acceso span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#fff;color:#4285f4;font-weight:900;box-shadow:0 0 0 1px var(--borde)}
+.separador-acceso{display:flex;align-items:center;gap:12px;margin:14px 0;color:var(--sub);font-size:12px}
+.separador-acceso::before,.separador-acceso::after{content:"";height:1px;flex:1;background:var(--borde)}

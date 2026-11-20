@@ -2,7 +2,8 @@
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from models import Message, db
+from models import Attachment, Message, db
+from rutas.adjuntos import publico, tomar
 from servicios.amistades import my_friendships
 from utilidades import api_error, json_body, local_time, parse_integer, too_many
 
@@ -20,11 +21,19 @@ def chat(friendship_id):
         if isinstance(data, tuple):
             return data
         text = " ".join(str(data.get("texto", "")).split())
-        if not text or len(text) > 300:
-            return api_error("Escribe un mensaje de hasta 300 caracteres.")
+        ids = data.get("adjuntos") or []
+        if (not text and not ids) or len(text) > 300:
+            return api_error("Escribe un mensaje de hasta 300 caracteres o adjunta un archivo.")
         if too_many(f"chat:{current_user.id}", 20, 60):
             return api_error("Estás escribiendo muy rápido. Espera un momento.", 429)
-        db.session.add(Message(amistad_id=friendship.id, autor_id=current_user.id, texto=text))
+        mensaje = Message(amistad_id=friendship.id, autor_id=current_user.id, texto=text)
+        db.session.add(mensaje)
+        db.session.flush()
+        try:
+            tomar(ids, "chat", mensaje.id)
+        except ValueError as e:
+            db.session.rollback()
+            return api_error(str(e))
         db.session.commit()
     after = parse_integer(request.args.get("despues"), 0)
     query = Message.query.filter_by(amistad_id=friendship.id)
@@ -33,7 +42,11 @@ def chat(friendship_id):
         {Message.leido: True}, synchronize_session=False,
     )
     db.session.commit()
+    adj = {}
+    if messages:
+        for a in Attachment.query.filter(Attachment.mensaje_id.in_([m.id for m in messages])).order_by(Attachment.id).all():
+            adj.setdefault(a.mensaje_id, []).append(publico(a))
     return jsonify(mensajes=[{
         "id": message.id, "texto": message.texto, "yo": message.autor_id == current_user.id,
-        "hora": local_time(message.creado_en),
+        "hora": local_time(message.creado_en), "adjuntos": adj.get(message.id, []),
     } for message in messages])

@@ -10,6 +10,31 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
+
+import json as _json
+from sqlalchemy.dialects.mysql import LONGTEXT as _LONGTEXT
+from sqlalchemy.types import Text as _Text, TypeDecorator as _TypeDecorator
+
+
+class TextoJSON(_TypeDecorator):
+    """JSON guardado como LONGTEXT. Evita el tipo JSON (que en MariaDB/XAMPP agrega un CHECK json_valid)
+    porque MySQL Workbench se cierra al hacer el diagrama de tablas con esos CHECK."""
+    impl = _Text
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(_LONGTEXT() if dialect.name in ("mysql", "mariadb") else _Text())
+
+    def process_bind_param(self, value, dialect):
+        return None if value is None else _json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+    def process_result_value(self, value, dialect):
+        if value is None or value == "":
+            return value if value is None else None
+        if isinstance(value, (dict, list)):
+            return value
+        return _json.loads(value)
+
 class User(UserMixin, db.Model):
     __tablename__ = "usuarios"
 
@@ -22,15 +47,20 @@ class User(UserMixin, db.Model):
     creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
     profile = db.relationship("Profile", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
+    def get_id(self):
+        # «usuario:sesión»: así cada inicio de sesión se puede cerrar desde otro dispositivo (seguridad.py).
+        sid = getattr(self, "_sid", None)
+        return f"{self.id}:{sid}" if sid else str(self.id)
+
 
 class UserWorkspace(db.Model):
     __tablename__ = "espacios_trabajo"
 
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), unique=True, nullable=False)
-    archivos = db.Column(db.JSON, nullable=False, default=dict)
-    carpetas = db.Column(db.JSON, nullable=False, default=list)
-    git = db.Column(db.JSON, nullable=False, default=dict)
+    archivos = db.Column(TextoJSON, nullable=False, default=dict)
+    carpetas = db.Column(TextoJSON, nullable=False, default=list)
+    git = db.Column(TextoJSON, nullable=False, default=dict)
     actualizado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
 
@@ -73,7 +103,7 @@ class Profile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE", onupdate="CASCADE", name="fk_perfiles_usuario"), unique=True, nullable=False)
     rol = db.Column(db.String(12), nullable=False, default="")
-    intereses = db.Column(db.JSON, nullable=False, default=list)
+    intereses = db.Column(TextoJSON, nullable=False, default=list)
     nivel_previo = db.Column(db.String(10), nullable=False, default="")
     curso_actual_id = db.Column(db.Integer, db.ForeignKey("cursos.id", ondelete="SET NULL", onupdate="CASCADE", name="fk_perfiles_curso_actual"), nullable=True)
     meta_minutos = db.Column(db.SmallInteger, nullable=False, default=10)
@@ -153,10 +183,10 @@ class Challenge(db.Model):
     tipo = db.Column(db.String(10), nullable=False, default="opcion")
     enunciado = db.Column(db.Text, nullable=False)
     codigo = db.Column(db.Text, nullable=False, default="")
-    opciones = db.Column(db.JSON, nullable=False, default=list)
+    opciones = db.Column(TextoJSON, nullable=False, default=list)
     respuesta = db.Column(db.Text, nullable=False, default="")
     explicacion = db.Column(db.Text, nullable=False, default="")
-    datos = db.Column(db.JSON, nullable=False, default=dict)
+    datos = db.Column(TextoJSON, nullable=False, default=dict)
     nivel = db.relationship("Level", back_populates="retos")
 
 
@@ -282,3 +312,140 @@ class TutorUsage(db.Model):
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
     ip = db.Column(db.String(45), nullable=False, index=True)
     creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, index=True)
+
+
+class KnownDevice(db.Model):
+    """Navegadores/dispositivos desde los que la persona ya inició sesión (para avisar por correo de uno nuevo)."""
+    __tablename__ = "dispositivos_conocidos"
+    __table_args__ = (db.UniqueConstraint("usuario_id", "huella", name="uq_dispositivos_usuario_huella"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    huella = db.Column(db.String(64), nullable=False)
+    nombre = db.Column(db.String(120), nullable=False, default="")
+    ip = db.Column(db.String(45), nullable=False, default="")
+    primero = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    ultimo = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class EmailSettings(db.Model):
+    """Qué correos quiere recibir cada persona."""
+    __tablename__ = "ajustes_correo"
+
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True)
+    seguridad = db.Column(db.Boolean, nullable=False, default=True)   # nuevo dispositivo, cambio de contraseña
+    racha = db.Column(db.Boolean, nullable=False, default=True)       # recordatorio para no perder la racha
+    novedades = db.Column(db.Boolean, nullable=False, default=False)
+    ultimo_recordatorio = db.Column(db.Date, nullable=True)
+    nivel_recordatorio = db.Column(db.SmallInteger, nullable=False, default=0)  # 1 = aviso de la tarde, 2 = última oportunidad
+
+
+class OwnedCosmetic(db.Model):
+    """Cosméticos de cada persona (comprados en la tienda o ganados en un cofre)."""
+    __tablename__ = "cosmeticos_propios"
+    __table_args__ = (db.UniqueConstraint("usuario_id", "clave", name="uq_cosmetico_usuario"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    clave = db.Column(db.String(30), nullable=False)
+    origen = db.Column(db.String(12), nullable=False, default="tienda")  # tienda | cofre
+    creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class EquippedCosmetics(db.Model):
+    """Lo que cada persona tiene puesto: un cosmético por tipo (o ninguno)."""
+    __tablename__ = "cosmeticos_equipados"
+
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True)
+    fondo = db.Column(db.String(30), nullable=True)
+    cursor = db.Column("puntero", db.String(30), nullable=True)  # «cursor» es palabra reservada de MySQL
+    tema = db.Column(db.String(30), nullable=True)
+    marco = db.Column(db.String(30), nullable=True)
+    efecto = db.Column(db.String(30), nullable=True)
+
+
+class OpenedChest(db.Model):
+    """Cofres de recompensas ya abiertos."""
+    __tablename__ = "cofres_abiertos"
+    __table_args__ = (db.UniqueConstraint("usuario_id", "clave", name="uq_cofre_usuario"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    clave = db.Column(db.String(30), nullable=False)
+    abierto_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class ProfilePhoto(db.Model):
+    """Foto de perfil subida por la persona (los bytes, en disco: ALMACEN_ARCHIVOS/<usuario>/foto-<hash>.<ext>)."""
+    __tablename__ = "fotos_perfil"
+
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True)
+    hash = db.Column(db.String(64), nullable=False)
+    tipo = db.Column(db.String(30), nullable=False)
+    actualizada_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class Attachment(db.Model):
+    """Archivo adjunto a un mensaje de chat o a una pregunta a la IA. Los bytes son los del almacén de la cuenta
+    (archivos_trabajo): adjuntar no duplica nada y lo adjuntado no se borra al limpiar el proyecto."""
+    __tablename__ = "adjuntos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    mensaje_id = db.Column(db.Integer, db.ForeignKey("mensajes.id", ondelete="CASCADE"), nullable=True, index=True)
+    destino = db.Column(db.String(8), nullable=False, default="chat")  # chat | ia
+    hash = db.Column(db.String(64), nullable=False)
+    nombre = db.Column(db.String(160), nullable=False)
+    tipo = db.Column(db.String(100), nullable=False)
+    tamano = db.Column(db.BigInteger, nullable=False)
+    gemini_uri = db.Column(db.String(300), nullable=True)      # archivo subido a la IA (caduca a las 48 h)
+    gemini_expira = db.Column(db.DateTime(timezone=True), nullable=True)
+    creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class AppliedMigration(db.Model):
+    """Cambios de datos que se aplican una sola vez al actualizar CódigoCamp (p. ej. la nueva economía de diamantes)."""
+    __tablename__ = "migraciones"
+
+    clave = db.Column(db.String(40), primary_key=True)
+    hecha_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class UserSession(db.Model):
+    """Cada inicio de sesión (un navegador o la app en un dispositivo). Si se revoca, ese dispositivo queda fuera."""
+    __tablename__ = "sesiones"
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False)   # SHA-256 del identificador (el original solo está en la cookie)
+    dispositivo = db.Column(db.String(120), nullable=False, default="")
+    ip = db.Column(db.String(45), nullable=False, default="")
+    metodo = db.Column(db.String(20), nullable=False, default="contraseña")
+    creada = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    ultima = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    revocada = db.Column(db.Boolean, nullable=False, default=False)
+
+
+class AIConversation(db.Model):
+    """Conversación guardada con la IA (como el historial de chats de Claude o ChatGPT)."""
+    __tablename__ = "conversaciones_ia"
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    titulo = db.Column(db.String(120), nullable=False, default="Conversación nueva")
+    fijada = db.Column(db.Boolean, nullable=False, default=False)
+    creada = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    actualizada = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, index=True)
+    mensajes = db.relationship("AIMessage", back_populates="conversacion", cascade="all, delete-orphan", order_by="AIMessage.id")
+
+
+class AIMessage(db.Model):
+    __tablename__ = "mensajes_ia"
+
+    id = db.Column(db.Integer, primary_key=True)
+    conversacion_id = db.Column(db.Integer, db.ForeignKey("conversaciones_ia.id", ondelete="CASCADE"), nullable=False, index=True)
+    rol = db.Column(db.String(6), nullable=False)   # yo | tutor
+    texto = db.Column(db.Text().with_variant(_LONGTEXT(), "mysql"), nullable=False)
+    archivos = db.Column(TextoJSON, nullable=False, default=list)   # nombres de los archivos adjuntos
+    creado = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    conversacion = db.relationship("AIConversation", back_populates="mensajes")

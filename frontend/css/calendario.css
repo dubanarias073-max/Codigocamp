@@ -1,0 +1,29 @@
+/* Calendario de racha */
+.calendario-sec .misiones-kicker{margin:0;font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--sub)}
+.calendario-sec .d-cab{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.calendario-sec h2{margin:2px 0 0}
+.cal-leyenda{margin:10px 0 0;color:var(--sub);font-size:13px;display:flex;align-items:center;gap:6px}
+.cal-muestra{display:inline-block;width:18px;height:12px;border-radius:999px;background:color-mix(in srgb,#f97316 22%,transparent)}
+.cal-muestra.hoy{background:none;border:2px solid var(--acc);width:12px}
+.calendario-sec{margin:18px 0 26px;padding:22px;border:1px solid var(--borde);border-radius:22px;background:var(--panel)}
+.cal-nav{display:flex;align-items:center;gap:10px}.cal-nav b{min-width:150px;text-align:center}
+.mini-btn{width:32px;height:32px;border-radius:10px;border:1px solid var(--borde);background:var(--panel2);color:var(--txt);font-size:18px;cursor:pointer}
+.mini-btn:disabled{opacity:.35;cursor:default}
+.cal-resumen{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+.cal-dato{display:grid;justify-items:center;padding:12px;border-radius:16px;background:var(--panel2);border:1px solid var(--borde)}
+.cal-dato b{font-size:24px}.cal-dato small{color:var(--sub)}
+.cal-dato.fuego b{color:#f97316}.cal-dato.hielo b{color:#38bdf8}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px 0}
+.cal-cab{text-align:center;font-size:12px;font-weight:800;color:var(--sub);padding-bottom:4px}
+.cal-dia{position:relative;display:grid;place-items:center;height:46px;font-size:14px}
+.cal-dia b{position:relative;z-index:1;font-weight:700}
+.cal-dia.hecho::before{content:"";position:absolute;inset:4px 2px;border-radius:999px;background:color-mix(in srgb,#f97316 22%,transparent)}
+.cal-dia.hecho.une-izq::before{border-top-left-radius:0;border-bottom-left-radius:0;left:0}
+.cal-dia.hecho.une-der::before{border-top-right-radius:0;border-bottom-right-radius:0;right:0}
+.cal-dia.hecho i{position:absolute;top:-2px;right:6px;font-size:13px;font-style:normal;z-index:2}
+.cal-dia.hecho b{color:#c2410c}
+:root[data-tema=oscuro] .cal-dia.hecho b{color:#fdba74}
+.cal-dia.hoy b{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;border:2px solid var(--acc)}
+.cal-dia.futuro{opacity:.4}
+@media (max-width:600px){.cal-resumen{grid-template-columns:repeat(2,1fr)}.cal-dia{height:40px}}
+

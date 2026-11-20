@@ -10,12 +10,10 @@ import { LIMITES_ARCHIVO, TEXTO_EDITABLE, esMarcador, formatoBytes, tipoDe } fro
 export const CARPETAS_IGNORADAS = new Set([".git", "node_modules", "__MACOSX", "__pycache__", ".venv", "venv", ".idea", ".vs", ".next", ".cache"]);
 const ARCHIVOS_IGNORADOS = new Set([".DS_Store", "Thumbs.db", "desktop.ini"]);
 
-/** Convierte un nombre cualquiera en uno válido para el proyecto: «Mi Foto (1).PNG» → «Mi-Foto-_1.PNG». */
+/** Convierte un nombre en uno válido: solo cambia lo que Windows no admite («a:b?.txt» → «a_b_.txt»). */
 export function limpiarNombre(nombre) {
-  if (FS.nombreValido(String(nombre))) return String(nombre); // __init__.py, .env, mi_archivo-2.js… se quedan tal cual
-  let n = String(nombre).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ñ/g, "n").replace(/Ñ/g, "N");
-  n = n.replace(/\s+/g, "-").replace(/[^A-Za-z0-9_.-]+/g, "_").replace(/-+/g, "-");
-  n = n.replace(/^-+(?=.)/, "").replace(/(?<=[^_])_+(?=\.[^.]+$)/, "");
+  if (FS.nombreValido(String(nombre))) return String(nombre); // espacios, tildes, paréntesis, __init__.py… se quedan tal cual
+  let n = String(nombre).replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").trim().replace(/\.+$/, "");
   if (n.length > FS.LIMITES.nombre) {
     const i = n.lastIndexOf(".");
     const ext = i > 0 && n.length - i <= 10 ? n.slice(i) : "";
@@ -206,7 +204,8 @@ export async function importarEn(py, origen, { destino = "", reemplazar = false,
   let libre = 0;
   let maxArchivo = LIMITES_ARCHIVO.porArchivo;
   if (subir) {
-    try { const e = espacio ? await espacio() : { libre: Infinity }; libre = e.libre; maxArchivo = e.maxArchivo ?? maxArchivo; } catch { libre = 0; }
+    // Si no se pudo consultar el espacio, no se asume «0 libres»: el servidor decide al subir cada archivo y dice el motivo real.
+    try { const e = espacio ? await espacio() : { libre: Infinity }; libre = e.libre; maxArchivo = e.maxArchivo ?? maxArchivo; } catch { libre = Infinity; }
   }
   const plan = planificar(py, origen, { destino, reemplazar, quitarRaiz, espacioArchivos: subir ? libre : Infinity, maxArchivo, ignorar, textoComoArchivo: Boolean(subir) });
   if (plan.error) throw new Error(plan.error);

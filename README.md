@@ -1,126 +1,251 @@
 # CódigoCamp
 
-Plataforma en español para aprender programación con una ruta de retos, lecciones, práctica diaria, amistades, tutor y tienda de recompensas.
+**CódigoCamp** es una plataforma web interactiva en español para aprender a programar. Combina lecciones teóricas, retos prácticos al estilo Duolingo, un editor tipo VS Code integrado en el navegador (**Trabajo**), un tutor con IA (Gemini), chat en tiempo real entre amigos, cofres y una tienda de recompensas.
 
-## Estructura
+- **Backend:** Python (Flask + SQLAlchemy) con MySQL o MariaDB.
+- **Frontend:** HTML, CSS y JavaScript puro (servido directamente por Flask desde `frontend/`).
 
-- `frontend/`: páginas, estilos, imágenes y lecciones estáticas.
-- `backend/app.py`: aplicación Flask, API JSON y servicio de archivos del frontend.
-- `backend/models.py`: modelos y relaciones SQLAlchemy.
-- `backend/retos/<lenguaje>.py` (`html.py`, `css.py`, `javascript.py`, `python.py`…): los retos de cada lenguaje, organizados en etapas → secciones → lecciones → preguntas. `base.py` tiene los helpers para escribirlos.
-- `backend/retos/__init__.py`: revisa (`flask --app app check-retos`) y carga (`seed-retos`) el catálogo en MySQL.
-- `base de datos/`: script SQL para crear el esquema y el catálogo base desde Workbench.
+---
 
-El backend activo es Flask. `backend/db.sqlite3` se conserva sin cambios como respaldo; la aplicación usa MySQL.
+## Contenido
 
-## Base de datos en XAMPP + MySQL Workbench
+1. [Requisitos](#1-requisitos)
+2. [Instalación en local (Windows + XAMPP)](#2-instalación-en-local-windows--xampp)
+3. [Variables de entorno (`backend/.env`)](#3-variables-de-entorno-backendenv)
+4. [Comandos útiles de administración](#4-comandos-útiles-de-administración)
+5. [Funcionalidades principales](#5-funcionalidades-principales)
+6. [Trabajo: el editor tipo VS Code](#6-trabajo-el-editor-tipo-vs-code)
+7. [Diagrama de base de datos en MySQL Workbench](#7-diagrama-de-base-de-datos-en-mysql-workbench)
+8. [Instalar como aplicación (PWA) y widgets](#8-instalar-como-aplicación-pwa-y-widgets)
+9. [Estructura del proyecto](#9-estructura-del-proyecto)
+10. [Ejecución de pruebas](#10-ejecución-de-pruebas)
+11. [Solución de problemas](#11-solución-de-problemas)
 
-1. Inicia **MySQL** en el panel de XAMPP y conéctate desde Workbench a `127.0.0.1`.
-2. Para una instalación nueva, abre `base de datos/codigocamp.sql` en Workbench y pulsa **Execute**. **No lo ejecutes sobre una base existente: elimina esa base.**
-3. Si ya tienes la base y quieres conservar sus datos, ejecuta una sola vez `base de datos/migracion_trabajo_google.sql`.
-   Para los archivos del espacio de Trabajo (imágenes, videos, PDF…) ejecuta también, una sola vez, `base de datos/migracion_archivos.sql`. Los bytes no van en MySQL sino en `backend/almacen_archivos/` (cópiala junto con la base cuando hagas respaldos).
-4. Configura `backend/.env`, activa el entorno virtual y ejecuta `flask --app app seed-retos` desde `backend`.
-5. **Si tu base ya tenía el camino anterior** (4 lecciones por sección y preguntas repetidas), ejecuta una vez `flask --app app migrar-camino` desde `backend`: recrea el camino nuevo y traslada lo que cada estudiante había completado. `sync-retos` no sirve para este cambio porque quita lecciones.
+> 🚀 **¿Vas a desplegar en el servidor del SENA con Tailscale?** Sigue la guía en [Readme2.md](Readme2.md).
 
-El SQL crea la base `codigocamp`, sus tablas y los 17 cursos. El catálogo de retos (etapas, secciones, lecciones y preguntas) se carga con `flask --app app seed-retos`. Tras editar o ampliar contenido, usa `flask --app app sync-retos`: actualiza y agrega niveles compatibles conservando los IDs y el progreso existentes. Si el cambio reordena o elimina niveles, la sincronización se detiene para proteger el avance. **Atención:** `seed-retos --reset` borra el catálogo y el progreso de niveles guardado en esa base; úsalo solo tras hacer una copia de seguridad.
+---
 
-## Arrancar Flask en Windows
+## 1. Requisitos
 
-Instala los requisitos en `backend`, configura `backend/.env` con las credenciales de MySQL y una `SECRET_KEY` segura, y arranca Flask:
-```.env
-SECRET_KEY="codigocamp_super_secret_key_2026_production_ready"
-JWT_SECRET_KEY="codigocamp_jwt_token_secret_generation_2026"
+| Herramienta | Propósito |
+|---|---|
+| **Python 3.11+** | Ejecutar el servidor backend en Flask. |
+| **XAMPP (MySQL/MariaDB) o MySQL 8.4** | Almacenar la base de datos `codigocamp`. |
+| **MySQL Workbench** *(opcional)* | Visualizar tablas y generar el diagrama entidad-relación. |
+| **Navegador moderno** | Chrome, Edge, Firefox o Safari. |
+| **API Key de Gemini** *(opcional)* | Habilitar el tutor y el asistente de código ([Google AI Studio](https://aistudio.google.com/apikey)). |
 
-# URL activa para XAMPP (sin contraseña)
-DATABASE_URL="mysql+pymysql://root:@127.0.0.1:3306/codigocamp?charset=utf8mb4"
+---
 
-# Codigocamp IA 
-GEMINI_API_KEY="PEGA_AQUI_TU_CLAVE"
+## 2. Instalación en local (Windows + XAMPP)
 
-SMTP_PORT="587"
-SMTP_USERNAME="finanbot.sena@gmail.com"
-SMTP_APP_PASSWORD="contraseña de aplicacion(se ve en la cuenta finanbot)"
-SMTP_FROM="finanbot.sena@gmail.com"
+### 2.1 Crear la base de datos
 
-GOOGLE_CLIENT_ID="315416890012-2odq73aekf5ha1plh684a8adcr3u6ct3.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET="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"
-GOOGLE_REDIRECT_URI="http://localhost:5000/auth/google/callback/"
+1. Abre el panel de control de **XAMPP** e inicia el módulo **MySQL**.
+2. Abre **MySQL Workbench** y conéctate a `127.0.0.1` en el puerto `3306` con el usuario `root`.
+3. Abre el archivo `base de datos/codigocamp.sql` (**File → Open SQL Script**) y ejecútalo con el ícono del rayo ⚡ (**Execute**).
 
-```
+*(Este paso solo se hace la primera vez. Al iniciar Flask posteriormente, el sistema actualiza columnas nuevas automáticamente sin borrar datos).*
+
+### 2.2 Preparar el entorno virtual
+
+Abre una terminal dentro de la carpeta del proyecto:
+
 ```powershell
 cd backend
 python -m venv venv
-venv\Scripts\Activate
+venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+*(En Linux o macOS, activa el entorno con `source venv/bin/activate`).*
+
+### 2.3 Configurar `backend/.env`
+
+Crea un archivo llamado `.env` dentro de `backend/` (puedes usar `backend/.env.example` como base):
+
+```env
+# --- Base de datos (XAMPP por defecto) ---
+DATABASE_URL="mysql+pymysql://root:@127.0.0.1:3306/codigocamp?charset=utf8mb4"
+
+# --- Inteligencia Artificial (opcional) ---
+GEMINI_API_KEY="<TU_API_KEY_DE_GEMINI>"
+GEMINI_MODEL="gemini-3.5-flash-lite"
+
+# --- Correo electrónico con Gmail (opcional, requiere contraseña de aplicación) ---
+SMTP_PORT="587"
+SMTP_USERNAME="<tu_correo@gmail.com>"
+SMTP_APP_PASSWORD="<tu_contraseña_de_aplicación>"
+SMTP_FROM="<tu_correo@gmail.com>"
+
+# --- Inicio de sesión con Google (opcional) ---
+GOOGLE_CLIENT_ID="<TU_GOOGLE_CLIENT_ID>"
+GOOGLE_CLIENT_SECRET="<TU_GOOGLE_CLIENT_SECRET>"
+
+# --- URLs permitidas (separadas por coma si usas túnel) ---
+APP_URL="http://localhost:5000"
+GOOGLE_REDIRECT_URI="http://localhost:5000/auth/google/callback/"
+```
+
+#### Configuración en Google Cloud Console (si usas login con Google)
+
+En [Google Cloud Console → Credenciales](https://console.cloud.google.com/apis/credentials), dentro de tu **ID de cliente OAuth 2.0**:
+
+| Campo | URL exacta a registrar |
+|---|---|
+| **Orígenes de JavaScript autorizados** | `http://localhost:5000` |
+| **URI de redireccionamiento autorizados** | `http://localhost:5000/auth/google/callback/` |
+
+> ⚠️ **Importante:** La URI de redireccionamiento debe terminar exactamente con la barra `/`. Además, nunca subas el archivo `.env` ni tus claves reales a GitHub.
+
+### 2.4 Poblar los cursos y retos
+
+```powershell
 flask --app app check-retos
 flask --app app seed-retos
-flask --app app sync-retos
+```
 
+- `check-retos`: Valida la integridad de los ejercicios.
+- `seed-retos`: Carga las etapas, lecciones y retos de los 23 cursos (tarda ~1 minuto).
+
+### 2.5 Arrancar el servidor
+
+```powershell
 flask --app app run
 ```
 
-Abre <http://127.0.0.1:5000/>. Las credenciales de MySQL solo van en `backend/.env`; no las guardes en el repositorio.
+Abre **<http://localhost:5000/>** en tu navegador. *(Usa `localhost` y no `127.0.0.1` para que la sesión de Google OAuth coincida con la URL autorizada).*
 
-## Progreso, retos y monedas
+---
 
-- Los retos se desbloquean en orden. Cada respuesta incorrecta resta una vida y las vidas se regeneran cada 30 minutos hasta cinco.
-- XP es experiencia: aumenta el nivel del alumno y **no se usa para comprar**.
-- Cada cinco niveles nuevos se entrega un diamante. Los seis desafíos diarios y el desafío mensual también entregan diamantes.
-- Los diamantes son la moneda de la tienda; el XP solo sirve para progresar de nivel.
-- Tema visual: en **Configuración** puedes elegir *Predeterminado* (sigue el modo claro/oscuro de tu dispositivo), *Claro* u *Oscuro*. Se guarda en `perfiles.tema`.
-- El esquema de base de datos está en `base de datos/codigocamp.sql`.
+## 3. Variables de entorno (`backend/.env`)
 
-## Arquitectura y edición del contenido
-
-- **Presentación:** `frontend/pages/` contiene las páginas HTML; `frontend/css/` sus estilos; `frontend/js/` la interfaz, las llamadas a la API y los editores. Los ejemplos de Aprende viven en `frontend/js/lecciones/`; `frontend/js/iconos.js` reúne iconos SVG originales para navegación, estadísticas, tienda, misiones y Trabajo.
-- **Aplicación y datos:** `backend/app.py` ensambla Flask; `backend/rutas/` contiene endpoints por función; `backend/servicios/` concentra las reglas de negocio; `backend/seguridad.py` configura sesión y protección CSRF; `backend/constantes.py` define monedas, misiones y artículos; `backend/models.py` define las entidades y relaciones SQLAlchemy. `backend/retos/` es el catálogo editable de retos: un archivo por curso, con etapas → secciones → lecciones → preguntas. `backend/retos/base.py` documenta los constructores `O`, `C`, `E`, `ORD` y `reto`.
-- **Lecciones generadas:** los cursos se escriben por conceptos en `backend/retos/conceptos/` y se generan a `frontend/js/lecciones/`. La estructura objetivo es 20 conceptos por etapa (100 por curso, 400 niveles de Retos); JavaScript conserva un concepto adicional (101 conceptos, 404 niveles). Desde `backend`, ejecuta `python herramientas/generar_aprende.py` para regenerarlos todos o añade slugs para regenerar solo algunos. No edites a mano un archivo marcado como generado.
-- **Lecciones editables al aprender:** el editor permite cambiar cada ejemplo; las modificaciones se guardan automáticamente en el navegador por curso y lección. **Restablecer** recupera el ejemplo original.
-- **Trabajo** (`frontend/pages/trabajo.html`, lógica en `frontend/js/trabajo.js` y `frontend/js/trabajo/`): espacio con aspecto y atajos de VS Code (Dark+/Light+ según el tema): explorador con crear/renombrar/eliminar/arrastrar y «Deshacer», pestañas, editor con resaltado de sintaxis, auto-indentado y cierre de pares, vista previa aislada con pestaña CONSOLA, panel de terminal con varias instancias, barra de estado y tutor contextual. **Guardado:** cada cambio se guarda al instante en el navegador y se sube a la cuenta; al abrir nunca gana «la nube» a ciegas (si hay cambios locales pendientes se conservan y se suben; si ambas versiones cambiaron por separado se pregunta). Borrar archivos los borra de verdad (también en la cuenta) y un proyecto vacío sigue vacío. La terminal es una shell real sobre los archivos del proyecto (comillas, variables, comodines, pipes, `&&`/`;`/`||`, redirecciones, historial, Tab, Ctrl+C) con `node`, `ts-node`, `python` (Pyodide) y `sqlite3` en el navegador; Java, C, C++, C#, PHP, Go, Rust, Swift, Kotlin y Ruby usan el ejecutor del servidor (`POST /api/run`). **`pip`** usa micropip dentro de Pyodide (paquetes de Python puro y los que trae Pyodide: numpy, pandas…); lo instalado se recuerda en el navegador. **`npm`** mantiene el `package.json` (init, install, uninstall, run, start, test, ls); los paquetes se cargan desde el CDN esm.sh al hacer `import`, no hay `node_modules`. **`git push` es real**: publica el último commit en GitHub con la API REST usando un token personal que cada persona escribe (entrada oculta, solo en memoria de la pestaña, nunca se guarda ni pasa por el servidor); añade/actualiza archivos sin borrar los que ya existan en GitHub. Guardado automático desactivable (botón «Autoguardado» en la barra de estado): sin él, los cambios de texto quedan «sin guardar» hasta Ctrl+S, y ejecutar guarda antes. No hay sistema operativo: `sudo`, `curl`, `ssh`, etc. no existen. El tutor requiere `GEMINI_API_KEY`.
-- **Acceso Google**: crea un cliente OAuth de tipo *Aplicación web* en Google Cloud Console, registra el callback indicado arriba y coloca `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` en `backend/.env`. Reinicia Flask. Si no se configuran, el inicio de sesión normal sigue disponible.
-- **Validación y carga de retos:** desde `backend`, ejecuta `flask --app app check-retos` antes de cargar el catálogo. Usa `flask --app app seed-retos` para la primera carga y `flask --app app sync-retos` para actualizar o agregar contenido compatible sin borrar el avance. `seed-retos --reset` es destructivo y solo se necesita para reestructuraciones incompatibles.
-
-## Mejoras de interfaz y juego
-
-- La tienda usa iconos SVG propios, tarjetas con realce visual y una animación de compra sin emojis.
-- Recompensas muestra seis encargos diarios; cada uno acredita diamantes automáticamente y suma al desafío mensual.
-- Los iconos de navegación, estadísticas, tienda y misiones son SVG originales, sin depender de imágenes externas.
-- Las respuestas de los retos producen una animación de acierto/error y tonos breves generados localmente con Web Audio (estilo conexión/desconexión USB). El interruptor de sonido está en **Configuración** y guarda la preferencia en este navegador; no se descargan efectos de sonido.
-- El reto toma el color de su curso y respeta la preferencia de movimiento reducido del sistema.
-
-El catálogo tiene 17 cursos y `check-retos` valida opciones, explicaciones, variedad de tipos y que no se repitan las respuestas correctas dentro de una lección. Aprende carga dinámicamente los cursos activos desde la API; Go, Kotlin, PHP, Ruby, Rust y Swift ahora tienen 100 lecciones de Aprende y 400 niveles de Retos cada uno.
-
-## Configuración opcional
-
-- `GEMINI_API_KEY`: activa el tutor de IA.
-- `GEMINI_MODEL`: cambia el modelo, por defecto `gemini-2.5-flash`.
-- `DATABASE_URL`: permite reemplazar las variables `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` y `DB_PASSWORD`.
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y, opcionalmente, `GOOGLE_REDIRECT_URI`: habilitan el inicio de sesión con Google. No guardes estas credenciales en Git.
-
-En **Trabajo**, los archivos web (HTML/CSS y los .js que usa una página) se ejecutan en la vista previa y el resto de lenguajes desde la terminal (botón Ejecutar o Ctrl+Enter; mientras corre un programa el botón pasa a «Detener»). Python, TypeScript y SQL descargan su motor (Pyodide, TypeScript, sql.js) desde un CDN la primera vez que se usan, igual que Aprende. Las pruebas del módulo: `node --test frontend/tests/*.test.mjs` (lógica del IDE, sin dependencias) y `python -m unittest tests.test_trabajo` desde `backend/`.
-
-- **Aprende** (`frontend/js/lecciones/<lenguaje>.js`): cada lección tiene explicación, puntos clave, código que se ejecuta, y opcionalmente `r` (“Ahora tú”) y `e` (“Error común”).
-- **Repaso**: ningún curso lleva lecciones «Repaso de …» ni nodos «Práctica de repaso» (`CON_REPASO` vacío en `backend/retos/__init__.py`; `construir_etapas(..., repaso=False)` por defecto). Tras cambiarlo ejecuta `flask --app app seed-retos --reset`.
-- **Cursos con conceptos (5 etapas × 20 conceptos)**: los 17 lenguajes y temas del catálogo. `generar_aprende.py` crea Aprende desde esos mismos conceptos y guarda las salidas deterministas en `salidas.js`; para C y C++ compila y ejecuta cada ejemplo (si uno no compila, se detiene).
-
-
-## Trabajo: archivos, ZIP, carpeta del computador y git clone
-
-| Función | Navegadores | Notas |
+| Variable | Por defecto | Descripción |
 |---|---|---|
-| Subir archivos (botón ⋯ o soltar sobre la lista de archivos) | Todos | Cualquier tipo. **1 GB por archivo y 10 GB por cuenta** (configurable en `backend/.env`). Se suben en streaming y con progreso. |
-| Subir una carpeta (una sola vez) | Todos los de computador | No sincroniza. Ignora `.git`, `node_modules`, `__pycache__`… |
-| Importar / descargar `.zip` | Chrome/Edge 80+, Firefox 113+, Safari 16.4+ | Hasta 1 GB (el .zip se arma en la memoria del navegador). Lo que no cabe se descarga con clic derecho → Descargar. |
-| Abrir carpeta del computador (sincroniza en los dos sentidos) | Solo Chrome, Edge y Opera de computador | Pide permiso en cada visita; la carpeta queda en ese computador. En conflicto gana el computador y la otra versión queda como `nombre.conflicto.ext`. |
-| `git clone <url> [carpeta]` / `git clone <url> .` | Todos | Solo GitHub por HTTPS. Trae **todos** los archivos de la última versión (no el historial), reintenta descargas que fallen y completa la lista en repos enormes. Con `.` en un proyecto vacío activa Git con los últimos 20 commits y el remoto. |
-| React, Vite y librerías | Todos | `npm create vite@latest mi-app -- --template react` (también `react-ts`, `vanilla`, `vanilla-ts`, `preact`), `cd mi-app`, `npm run dev`. JSX/TSX se transpilan en el navegador y `import` de paquetes usa la versión de `package.json` desde esm.sh (una sola copia de React). `npm install bootstrap` y `import "bootstrap/dist/css/bootstrap.min.css"` o `<link href="node_modules/...">` también funcionan. |
+| `DEBUG` | `1` | `1` en local, `0` en producción (activa cookies seguras HTTPS). |
+| `SECRET_KEY` | — | Clave secreta para firmar sesiones (obligatoria en producción). |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | `127.0.0.1`, `3306`, `codigocamp`, `root`, `""` | Credenciales individuales de MySQL (alternativa a `DATABASE_URL`). |
+| `DATABASE_URL` | — | Cadena de conexión completa SQLAlchemy (`mysql+pymysql://...`). |
+| `GEMINI_API_KEY` | — | Clave de API de Google AI Studio para el tutor y editor IA. |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Modelo de Gemini a utilizar. |
+| `GOOGLE_CLIENT_ID` / `SECRET` | — | Credenciales OAuth 2.0 para «Iniciar sesión con Google». |
+| `GOOGLE_REDIRECT_URI` | automático | URIs de callback registradas en Google Cloud, separadas por coma. |
+| `SMTP_USERNAME`, `SMTP_APP_PASSWORD`, `SMTP_FROM` | — | Configuración de correo saliente (si se omite, los correos se guardan como `.eml` en `almacen_archivos/correos/`). |
+| `APP_URL` | `http://127.0.0.1:5000` | URLs base para enlaces en correos (recuperar clave, avisos de racha). |
+| `PROXY_CONFIABLE` | `0` | Cambiar a `1` cuando se usa detrás de Tailscale o Nginx para detectar HTTPS e IP real. |
+| `RECORDATORIOS_AUTO` | `1` | Activa (`1`) o desactiva (`0`) los correos automáticos de racha a las 18:00 y 21:00. |
+| `ALMACEN_ARCHIVOS` | `backend/almacen_archivos` | Directorio de fotos de perfil, adjuntos de chat y proyectos de Trabajo. |
+| `CUOTA_ARCHIVOS_GB` / `MAX_ARCHIVO_MB` | `10` / `1024` | Límites de almacenamiento por usuario y tamaño por archivo. |
+| `BD_EXTERNAS` | igual a `DEBUG` | Permite conectar proyectos de **Trabajo** a bases de datos reales del servidor. |
+| `PISTON_URL` / `PISTON_KEY` | — | Endpoint opcional para compilar lenguajes externos (Java, C, C++, Go, Rust). |
 
-- **Texto editable vs. archivos:** el código y los textos de hasta 1 MB por archivo se editan; entre todos admiten 5 millones de caracteres. El proyecto se guarda comprimido en `ALMACEN_ARCHIVOS/<usuario>/proyecto.json` (no en MySQL) y su copia local en IndexedDB. Si un texto ya no cabe, se guarda completo como archivo de la cuenta (se ve y se descarga). Lo demás —imágenes, videos, audio, PDF, fuentes— se guarda en la cuenta. Un proyecto admite 5000 archivos, 2000 carpetas, nombres de 120 caracteres y rutas de 400.
-- **Cómo se guarda:** en el proyecto queda un «marcador» (`ccbin:v1:<sha256>:<tipo>:<bytes>`) y los bytes van a `ALMACEN_ARCHIVOS/<usuario>/<hash>`, con su lista en la tabla `archivos_trabajo`. Mover, copiar, deshacer y Git funcionan igual que con cualquier archivo, y `git push` publica el archivo real (GitHub no acepta más de 100 MB por archivo: esos se avisan y no se envían).
-- **Seguridad:** solo imágenes, video, audio, PDF, fuentes y texto plano se muestran en el navegador; HTML, SVG, ejecutables y el resto se sirven como descarga. La vista previa usa enlaces firmados que caducan a las 6 horas.
-- **Limpieza:** lo que el proyecto ya no usa se borra solo una hora después de guardar. `flask --app app limpiar-archivos` quita del disco lo que quedó de cuentas eliminadas o subidas interrumpidas.
-- **Capacidad del servidor:** 10 GB por cuenta es el tope, no lo que se reserva; aun así, con muchas cuentas llenas el disco se acaba. El servidor rechaza subidas si quedaría menos de 1 GB libre.
+---
 
-## Retos sin preguntas repetidas
+## 4. Comandos útiles de administración
 
-Cada concepto de `backend/retos/conceptos/` aporta 9 a 12 datos distintos (definición, uso, 3 ideas clave, situación, código, completar, error común…). El generador (`backend/retos/generador.py`) pregunta cada dato **una sola vez en todo el curso** y descarta cualquier pregunta cuyo dato o respuesta ya apareció, aunque esté con otras palabras. Con eso arma 2 o 3 lecciones por concepto, y las etapas se parten en partes de **45 lecciones como máximo**. `flask --app app check-retos` rechaza un catálogo que repita una pregunta.
+Ejecutar dentro de `backend/` con el entorno virtual activado:
+
+| Comando | Acción |
+|---|---|
+| `flask --app app run` | Inicia el servidor web en modo desarrollo. |
+| `flask --app app check-retos` | Verifica que no haya errores de sintaxis en los cursos. |
+| `flask --app app seed-retos` | Carga el catálogo inicial de cursos en una base vacía. |
+| `flask --app app sync-retos` | Agrega cursos o lecciones nuevas sin borrar el progreso de los usuarios. |
+| `flask --app app seed-retos --reset` | ⚠️ Reinicia por completo el catálogo y borra el progreso de niveles. |
+| `flask --app app migrar-camino` | Adapta el progreso de los usuarios tras reestructurar etapas de un curso. |
+| `flask --app app reparar-workbench` | Ajusta restricciones para generar el diagrama en MySQL Workbench. |
+| `flask --app app recordar-rachas [--nivel 2]` | Fuerza el envío manual de notificaciones de racha. |
+| `flask --app app probar-correo correo@ejemplo.com` | Envía un correo de prueba para validar SMTP. |
+| `flask --app app probar-ia` | Valida la conexión y cuota de `GEMINI_API_KEY`. |
+| `flask --app app limpiar-archivos` | Elimina archivos huérfanos del disco. |
+| `python herramientas/generar_aprende.py <curso>` | Regenera las lecciones teóricas de un curso específico. |
+| `python herramientas/puente_bd.py` | Conecta una instancia remota de CódigoCamp con bases de datos locales. |
+
+---
+
+## 5. Funcionalidades principales
+
+- **23 Cursos completos:** HTML, CSS, JavaScript, TypeScript, Python, Java, C#, Kotlin, Swift, PHP, Ruby, Go, Rust, C, C++, SQL, Bases de Datos, NoSQL (MongoDB, Redis, etc.), Terminales, Git, GitHub, Docker y Node.js.
+- **Seguridad y sesiones:** Registro tradicional o con Google OAuth, recuperación de contraseña con tokens de 30 minutos, gestión activa de dispositivos conectados y limpieza automática de datos locales al cerrar sesión.
+- **Gamificación:** Sistema de rachas diarias, escudos salvarrachas (máx. 2), encargos diarios, cofres de recompensa, tienda de cosméticos (temas, marcos, cursores, fondos animados) y perfil personalizable.
+- **Social e IA:** Chat entre amigos con envío de archivos (hasta 1 GB) y tutor virtual impulsado por Gemini con historial de conversaciones.
+
+---
+
+## 6. Trabajo: el editor tipo VS Code
+
+El módulo **Trabajo** ofrece un entorno de desarrollo completo en el navegador:
+
+- **Editor Monaco:** Resaltado de sintaxis, múltiples pestañas, búsqueda global (`Ctrl+Shift+F`) y paleta de comandos (`Ctrl+Shift+P`).
+- **Terminal y Git:** Comandos Bash simulados, control de versiones (`clone`, `commit`, `branch`, `merge`, `pull`, `push`) e indicadores visuales de estado (`M`, `U`, `!`).
+- **Ejecución:** Soporte para Python en navegador (Pyodide), Vite/React, vistas previas de FastAPI/Flask y respaldo automático en SQLite (`.codigocamp/bd/`) si no hay conexión a MySQL.
+
+---
+
+## 7. Diagrama de base de datos en MySQL Workbench
+
+1. En MySQL Workbench, selecciona **Database → Reverse Engineer…** (`Ctrl+R`).
+2. Elige tu conexión local, selecciona el esquema `codigocamp` y avanza hasta **Finish**.
+3. Si Workbench presenta cierres inesperados, ejecuta `flask --app app reparar-workbench` y repite el proceso.
+
+---
+
+## 8. Instalar como aplicación (PWA) y widgets
+
+CódigoCamp puede instalarse como aplicación de escritorio o móvil (requiere HTTPS en producción o `localhost` en desarrollo):
+
+- **Windows / Linux (Chrome o Edge):** Haz clic en el ícono de instalar (`⊕`) en la barra de direcciones.
+- **macOS (Safari 17+):** **Archivo → Agregar al Dock**.
+- **Android / iOS:** Menú del navegador → **Instalar aplicación** o **Agregar a pantalla de inicio**.
+- **Widgets en Windows 11:** Presiona `Win + W` y añade los widgets de *Tu racha*, *Meta de hoy* y *Calendario*.
+
+---
+
+## 9. Estructura del proyecto
+
+```text
+Codigocamp/
+├── base de datos/
+│   └── codigocamp.sql          # Esquema SQL inicial
+├── backend/
+│   ├── app.py                  # Punto de entrada Flask
+│   ├── models.py               # Modelos ORM (SQLAlchemy)
+│   ├── comandos.py             # Comandos CLI de Flask
+│   ├── seguridad.py            # Autenticación, CSRF y sesiones
+│   ├── rutas/                  # Endpoints de la API REST
+│   ├── servicios/              # Lógica de negocio (correo, IA, tienda, etc.)
+│   ├── retos/                  # Definición de cursos y ejercicios
+│   ├── herramientas/           # Scripts auxiliares
+│   ├── .env.example            # Plantilla segura de variables de entorno
+│   └── tests/                  # Pruebas unitarias del backend
+└── frontend/
+    ├── pages/                  # Vistas HTML
+    ├── js/                     # Lógica cliente y editor Trabajo
+    ├── css/, img/, widgets/    # Recursos estáticos
+    ├── manifest.webmanifest    # Configuración PWA
+    └── tests/                  # Pruebas del frontend
+```
+
+---
+
+## 10. Ejecución de pruebas
+
+```powershell
+# Pruebas del backend (desde backend/)
+python -m unittest discover -s tests
+
+# Pruebas del frontend (desde frontend/)
+node --test tests/*.test.mjs
+```
+
+---
+
+## 11. Solución de problemas
+
+| Síntoma / Error | Causa | Solución |
+|---|---|---|
+| `Can't connect to MySQL server` | Servicio apagado o puerto incorrecto | Inicia MySQL y verifica `DB_HOST` y `DB_PORT` en `.env`. |
+| `Access denied for user 'codigocamp'@'172.17.0.1'` | Usuario sin permisos desde red Docker | Otorga permisos a `'codigocamp'@'%'` en MySQL (ver [Readme2.md](Readme2.md#33-asegurar-permisos-del-usuario-codigocamp)). |
+| `Error 400: redirect_uri_mismatch` | URL de callback distinta en Google Cloud | Verifica que `GOOGLE_REDIRECT_URI` y Google Cloud tengan la misma URL con `/` al final. |
+| Inicio sin cursos | Base de datos recién creada sin datos | Ejecuta `flask --app app seed-retos`. |
+| Tutor IA deshabilitado | Falta clave de Gemini | Configura `GEMINI_API_KEY` en `.env` y reinicia Flask. |

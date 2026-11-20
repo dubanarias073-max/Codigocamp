@@ -2,9 +2,17 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <script src="/js/carga.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Configura tu ruta · CódigoCamp</title>
   <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0d1b1a">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CódigoCamp">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <script src="/js/tema.js"></script>
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/onboarding.css">
@@ -23,6 +31,7 @@
   </header>
 
   <main class="onb-main" id="main">
+    <div class="onb-layout">
     <form id="onb" novalidate>
 
       <!-- 1 · Quién eres -->
@@ -84,6 +93,12 @@
           <label class="op"><input type="radio" name="curso" value="rust"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#fdba74">RS</span><span class="txt">Rust<small>Rápido y seguro</small></span></span></label>
           <label class="op"><input type="radio" name="curso" value="c"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#94a3b8">C</span><span class="txt">C<small>Cerca de la máquina</small></span></span></label>
           <label class="op"><input type="radio" name="curso" value="cpp"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#818cf8">C++</span><span class="txt">C++<small>Rendimiento y videojuegos</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="terminal"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#4ade80">$_</span><span class="txt">Terminales<small>Bash, PowerShell y CMD</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="git"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#f97316">GIT</span><span class="txt">Git y GitHub<small>Versiones y trabajo en equipo</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="docker"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#38bdf8">DK</span><span class="txt">Docker<small>Contenedores para tus apps</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="node"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#84cc16">NODE</span><span class="txt">Node.js<small>JavaScript en el servidor</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="github"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#a78bfa">GH</span><span class="txt">GitHub<small>Equipo, Actions y Pages</small></span></span></label>
+          <label class="op"><input type="radio" name="curso" value="nosql"><em class="rec">Recomendado</em><span class="caja"><span class="ico sigla" style="--c:#22c55e">NoSQL</span><span class="txt">NoSQL<small>MongoDB, Redis y más</small></span></span></label>
         </fieldset>
       </section>
 
@@ -109,6 +124,18 @@
         <p class="nota">Comienza con retos breves, gana experiencia y desbloquea nuevas etapas.</p>
       </section>
     </form>
+    <aside class="onb-panel" aria-label="Tu perfil mientras respondes">
+      <ol class="onb-pasos" id="pasosLista">
+        <li data-p="rol">Punto de partida</li><li data-p="intereses">Lo que quieres crear</li><li data-p="nivel">Experiencia</li>
+        <li data-p="curso">Primer lenguaje</li><li data-p="meta">Ritmo</li><li data-p="listo">Tu ruta</li>
+      </ol>
+      <div class="onb-term" aria-hidden="true">
+        <div class="onb-term-cab"><i></i><i></i><i></i><span>perfil.js</span></div>
+        <pre id="codigoVivo"></pre>
+      </div>
+      <p class="onb-tip" id="tip">Tip: usa las teclas <kbd>1</kbd>–<kbd>9</kbd> para elegir y <kbd>Enter</kbd> para seguir.</p>
+    </aside>
+    </div>
   </main>
 
   <footer class="onb-pie">
@@ -116,5 +143,6 @@
   </footer>
 
   <script src="/js/onboarding.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

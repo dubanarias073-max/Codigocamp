@@ -311,3 +311,58 @@ button.cl:focus-visible{outline:2px solid var(--c);outline-offset:-2px}
 @keyframes cl-pulso{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 @keyframes cl-parpadeo{50%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.cl.actual .cl-g::after,.cl.actual .cl-s,.cursor{animation:none}}
+
+/* Foto de perfil y chip de la barra lateral */
+.foto-inicial{display:grid;place-items:center;border-radius:50%;background:linear-gradient(135deg,var(--cy),var(--acc));color:#04130d;font-weight:800}
+.yo-chip{display:flex;align-items:center;gap:10px;margin-top:auto;padding:10px 12px;border-radius:14px;color:var(--txt);text-decoration:none;border:1px solid transparent}
+.yo-chip:hover{border-color:var(--borde);background:var(--panel2)}
+.yo-chip span{display:grid;line-height:1.15;min-width:0}
+.yo-chip small{color:var(--sub);font-size:11px;overflow:hidden;text-overflow:ellipsis}
+
+/* Widget de racha (columna derecha) */
+.widget-racha{display:grid;gap:10px;text-decoration:none;color:var(--txt);border-color:color-mix(in srgb,#f97316 45%,var(--borde))}
+.widget-racha:hover{transform:translateY(-1px)}
+.wr-cab{display:flex;align-items:center;gap:10px}
+.wr-cab b{font-size:28px;line-height:1;color:#f97316}.wr-cab small{display:block;color:var(--sub)}
+.wr-fuego{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:linear-gradient(160deg,#fdba74,#ea580c);color:#fff;filter:drop-shadow(0 4px 10px rgba(249,115,22,.45))}
+.wr-svg{width:26px;height:26px}.wr-mini{width:14px;height:14px;vertical-align:-2px}.wr-dia{width:15px;height:15px;color:#ea580c}
+.widget-racha:not(.hecho) .wr-fuego{background:linear-gradient(160deg,#cbd5e1,#64748b);filter:none}
+.wr-hielo{margin-left:auto;font-weight:800;color:#38bdf8}
+.wr-semana{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.wr-semana span{display:grid;justify-items:center;gap:2px}
+.wr-semana small{font-size:11px;color:var(--sub);font-weight:800}
+.wr-semana i{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--panel2);border:1px solid var(--borde);font-style:normal;font-size:14px}
+.wr-semana .si i{background:color-mix(in srgb,#f97316 25%,transparent);border-color:#f97316}
+.wr-semana .hoy i{border:2px solid var(--acc)}
+.wr-estado{color:var(--sub);font-weight:700}
+.widget-racha.peligro .wr-estado{color:#f97316}
+
+.foto-avatar{display:grid;place-items:center;border-radius:50%;overflow:hidden}.foto-avatar svg{display:block;width:100%;height:100%}
+
+/* Salvarrachas en la barra de arriba */
+.chip-salva{color:inherit;text-decoration:none}
+.chip-salva .stat-icon{color:#5ec8f2}
+.chip-salva small{opacity:.6;font-size:.8em;margin-left:1px}
+.chip-salva:hover{border-color:#5ec8f2}
+
+/* ===== Responsivo: de 320 px (celular pequeño) a laptops ===== */
+img,video,canvas,svg{max-width:100%}
+.campo{min-width:0}.campo input,.campo select,.campo textarea{width:100%;min-width:0}
+.conf,.conf-cuerpo,.conf-sec,.centro{min-width:0}
+@media(max-width:1100px){.app .centro{max-width:100%}}
+@media(max-width:700px){
+  /* Fichas de diamantes, monedas, racha, salvarrachas y vidas: una sola fila que se desliza */
+  .tope{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -14px 12px;padding:0 14px;gap:6px}
+  .tope::-webkit-scrollbar{display:none}
+  .tope .chip{flex:none}
+}
+@media(max-width:380px){
+  .centro{padding:12px 10px 92px}
+  .cabecera-fija{margin:-12px -10px 6px!important;padding:10px!important}
+  .tope{margin-inline:-10px;padding-inline:10px}
+  .chip{padding:4px 7px;font-size:11.5px;gap:4px}
+  h1{font-size:clamp(24px,8vw,30px);overflow-wrap:anywhere}
+  .tarjeta{padding-left:14px;padding-right:14px}
+  .inf-i{padding:6px 0}.inf-i .nav-icon{width:20px;height:20px}
+}
+@media(max-height:560px) and (max-width:700px){.inf{padding-top:4px;padding-bottom:calc(4px + env(safe-area-inset-bottom,0px))}}

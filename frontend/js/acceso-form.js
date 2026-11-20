@@ -58,6 +58,25 @@ if (yaDentro) {
     actualizarReglas();
   }
 
+  // Si Google no dejó entrar, el servidor vuelve con ?error=…: se explica qué pasó (antes no se veía nada).
+  const params = new URLSearchParams(location.search);
+  const ERRORES_GOOGLE = {
+    google_config: "«Continuar con Google» no está configurado: faltan GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en backend/.env.",
+    google_email: "Tu cuenta de Google no tiene un correo verificado. Usa otra cuenta de Google o entra con tu correo y contraseña.",
+    google_conflict: "Ese correo ya está unido a OTRA cuenta de Google. Entra con la cuenta de Google que usaste la primera vez, o con tu correo y contraseña (si no la recuerdas: «¿Olvidaste tu contraseña?»).",
+    google_inactive: "Esta cuenta está desactivada.",
+  };
+  const MOTIVOS_GOOGLE = {
+    estado: "Google volvió a una dirección distinta a la que usaste para entrar. Abre CódigoCamp siempre con la misma dirección (por ejemplo http://localhost:5000, no 127.0.0.1) y vuelve a intentarlo.",
+    rechazo: "Cancelaste el inicio de sesión en Google.",
+    otro: "Google no pudo completar el inicio de sesión. Vuelve a intentarlo; si sigue, revisa que la dirección de redirección esté registrada en Google Cloud.",
+  };
+  const codigo = params.get("error");
+  if (codigo) {
+    mostrarError(codigo === "google" ? (MOTIVOS_GOOGLE[params.get("motivo")] || MOTIVOS_GOOGLE.otro) : (ERRORES_GOOGLE[codigo] || "No se pudo iniciar sesión con Google. Inténtalo otra vez."));
+    history.replaceState(null, "", location.pathname + location.hash);
+  }
+
   // Al escribir de nuevo, se quita el mensaje de error anterior
   form.addEventListener("input", limpiarError);
 

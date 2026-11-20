@@ -6,6 +6,14 @@
   <title>Crear cuenta · CódigoCamp</title>
   <meta name="description" content="Crea tu cuenta gratis en CódigoCamp y empieza a aprender a programar con un tutor de IA en español.">
   <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0d1b1a">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CódigoCamp">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="/js/carga.js"></script>
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/portada.css">
   <link rel="stylesheet" href="/css/registro.css">
@@ -32,7 +40,7 @@
 
       <div class="card authbox">
         <h2>Crear cuenta</h2>
-        <p class="note">Solo necesitas un nombre, un correo y una contraseña.</p>
+        <p class="note">Solo necesitas un nombre, un correo y una contraseña, o tu cuenta de Google.</p>
         <form id="formAcceso" class="authform" data-tipo="registro" novalidate>
           <label for="nombre">Nombre
             <input type="text" id="nombre" name="nombre" required minlength="2" maxlength="50" autocomplete="name" placeholder="Cómo quieres que te llamemos">
@@ -65,6 +73,8 @@
           </label>
           <button class="btn pri" type="submit">Crear cuenta</button>
         </form>
+        <div class="separador-acceso"><span>o</span></div>
+        <a class="google-acceso" href="/auth/google/"><span aria-hidden="true">G</span> Registrarse con Google</a>
         <p id="autherr" class="err" role="alert" aria-live="assertive"></p>
         <p class="cambio">¿Ya tienes cuenta? <a href="/pages/login.html">Inicia sesión</a></p>
       </div>
@@ -72,5 +82,6 @@
   </main>
 
   <script type="module" src="/js/registro.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

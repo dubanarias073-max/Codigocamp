@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tienda · CódigoCamp</title>
   <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0d1b1a">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CódigoCamp">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="/js/carga.js"></script>
   <script src="/js/tema.js"></script>
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/tienda.css">
@@ -14,14 +22,22 @@
   <div class="app">
     <nav class="lado" id="lado" aria-label="Principal"></nav>
     <main class="centro" id="contenido">
-      <h1 class="titulo-pag">Tienda de diamantes</h1>
-      <p class="sub">Completa tus misiones en Recompensas, junta diamantes y cámbialos por cofres, impulsos y objetos de colección.</p>
+      <h1 class="titulo-pag">Tienda</h1>
+      <p class="sub">Fondos animados, punteros, temas, marcos, efectos y avatares ilustrados. Pruébalos antes de comprar: lo legendario cuesta, pero se nota.</p>
       <section class="billetera" aria-label="Tu saldo de diamantes">
         <div class="saldo-mineral diamante"><span id="iconoSaldo"></span><div><small>Diamantes</small><strong id="saldo-diamante">0</strong></div></div>
       </section>
-      <div class="tienda-categorias" aria-label="Categorías de la tienda">
-        <span>Todo se paga con diamantes</span><span>Gana más en Recompensas</span>
-      </div>
+      <nav class="tienda-tabs" id="tabs" role="tablist" aria-label="Categorías de la tienda">
+        <button type="button" role="tab" data-t="fondo" class="on"><span class="tab-ic" data-ic="fondo"></span>Fondos</button>
+        <button type="button" role="tab" data-t="cursor"><span class="tab-ic" data-ic="cursor"></span>Punteros</button>
+        <button type="button" role="tab" data-t="tema"><span class="tab-ic" data-ic="tema"></span>Temas</button>
+        <button type="button" role="tab" data-t="marco"><span class="tab-ic" data-ic="marco"></span>Marcos</button>
+        <button type="button" role="tab" data-t="efecto"><span class="tab-ic" data-ic="efecto"></span>Efectos</button>
+        <button type="button" role="tab" data-t="avatar"><span class="tab-ic" data-ic="avatar"></span>Avatares</button>
+        <button type="button" role="tab" data-t="potenciador"><span class="tab-ic" data-ic="potenciador"></span>Potenciadores</button>
+        <button type="button" role="tab" data-t="coleccion"><span class="tab-ic" data-ic="coleccion"></span>Mi colección</button>
+      </nav>
+      <p class="nota" id="ayudaTab"></p>
       <div class="rejilla" id="items"></div>
       <p class="nota"><a href="/pages/recompensas.html">¿Te faltan diamantes? Completa tus misiones →</a></p>
       <div class="cofre-fondo" id="cofreFondo" hidden><div class="cofre-caja" id="cofreCaja" role="dialog" aria-modal="true" aria-label="Resultado de la compra"></div></div>
@@ -30,5 +46,6 @@
   </div>
   <nav class="inf" id="inf" aria-label="Principal"></nav>
   <script type="module" src="/js/tienda.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

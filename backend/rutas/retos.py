@@ -1,4 +1,7 @@
 """Camino de retos: cursos, ruta, niveles, preguntas y completar niveles."""
+import random
+
+from constantes import MAX_SALVARRACHAS, MAX_VIDAS_REGEN
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import func
@@ -127,6 +130,32 @@ def reto_responder(challenge_id):
     )
 
 
+def _premios_de_cofre(profile, level):
+    """Cofre del camino (uno por sección): diamantes siempre, y además vidas llenas o un salvarrachas.
+    Más avanzada la sección, más diamantes. El sorteo es fijo por persona y cofre (no se repite recargando)."""
+    seccion = db.session.get(Section, level.seccion_id)
+    tramo = min(int(getattr(seccion, "orden", 1) or 1), 10)
+    suerte = random.Random(f"{profile.usuario_id}:{level.id}")
+    gemas = suerte.randint(25, 45) + 5 * tramo
+    if suerte.random() < 0.15:          # cofre dorado: el doble
+        gemas *= 2
+    profile.diamante += gemas
+    premios = [{"tipo": "diamante", "cantidad": gemas, "texto": f"+{gemas} diamantes"}]
+    if profile.salvarrachas < MAX_SALVARRACHAS and suerte.random() < 0.4:
+        profile.salvarrachas += 1
+        premios.append({"tipo": "salvarrachas", "cantidad": 1, "texto": "+1 salvarrachas"})
+    elif profile.vidas < MAX_VIDAS_REGEN:
+        ganadas = MAX_VIDAS_REGEN - profile.vidas
+        profile.vidas = MAX_VIDAS_REGEN
+        premios.append({"tipo": "vidas", "cantidad": ganadas, "texto": "Vidas llenas"})
+    else:
+        extra = 10 + 5 * tramo
+        profile.diamante += extra
+        premios[0]["cantidad"] += extra
+        premios[0]["texto"] = f"+{premios[0]['cantidad']} diamantes"
+    return premios
+
+
 @bp.post("/api/nivel/<int:level_id>/completar/")
 @login_required
 def nivel_completar(level_id):
@@ -154,13 +183,19 @@ def nivel_completar(level_id):
     xp = level.xp if new else (0 if chest else 5)
     rewards = award_xp(profile, xp, levels=0 if chest else 1, perfect=(failures == 0 and not chest))
     minerals = {"diamante": 0}
-    if new:
+    premios = []
+    if new and chest:
+        premios = _premios_de_cofre(profile, level)
+        minerals["diamante"] = sum(p["cantidad"] for p in premios if p["tipo"] == "diamante")
+    if new and not chest:
         completed_count = CompletedLevel.query.filter_by(usuario_id=current_user.id).count()
-        if completed_count and completed_count % 5 == 0:   # cada cinco niveles nuevos, un diamante
-            profile.diamante += 1
-            minerals["diamante"] = 1
+        ganados = 5 + (10 if failures == 0 else 0)          # cada nivel nuevo da diamantes; sin fallos, más
+        if completed_count and completed_count % 5 == 0:   # y cada cinco niveles nuevos, un bono
+            ganados += 25
+        profile.diamante += ganados
+        minerals["diamante"] = ganados
     db.session.commit()
     return jsonify(
-        xp_ganado=xp, minerales_ganados=minerals, estrellas=completed.estrellas, nueva=new,
+        xp_ganado=xp, minerales_ganados=minerals, estrellas=completed.estrellas, nueva=new, premios=premios,
         desafios_completados=rewards, **progress(current_user),
     )

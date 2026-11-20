@@ -101,3 +101,28 @@ test("npm create vite: crea la carpeta con package.json de versiones actuales y 
   assert.equal(otra, 1);
   assert.match(err, /no está vacía/);
 });
+
+test("Vite: alias de vite.config.js, import.meta.env de .env y CSS Modules", async () => {
+  const py = normalizarProyecto({ files: {
+    "app/package.json": JSON.stringify({ dependencies: { react: "19.1.0", "react-dom": "19.1.0" } }),
+    "app/vite.config.js": "import { defineConfig } from 'vite'\nimport react from '@vitejs/plugin-react'\nimport path from 'path'\nexport default defineConfig({\n  plugins: [react()],\n  resolve: { alias: { '@': path.resolve(__dirname, './src'), '~assets': '/src/assets' } },\n})\n",
+    "app/.env": "VITE_API_URL=http://localhost:5000/api\nSECRETO=no-debe-llegar\nVITE_TITULO=\"Finanbot\" # comentario\n",
+    "app/index.html": '<div id="root"></div><script type="module" src="/src/main.jsx"></script>',
+    "app/src/main.jsx": "import { saludo } from '@/utils/saludo'\nimport s from './App.module.css'\nimport logo from '~assets/logo.svg'\nconsole.log(saludo(), import.meta.env.VITE_API_URL, import.meta.env.MODE, s.tarjeta, logo)\n",
+    "app/src/utils/saludo.js": "export const saludo = () => 'hola'",
+    "app/src/assets/logo.svg": "<svg/>",
+    "app/src/App.module.css": ".tarjeta { padding: .5rem; transition: opacity .3s } .tarjeta:hover .titulo { color: red }",
+  } });
+  const m = await modulosDePagina(py, "app/index.html", { transpilar });
+  assert.deepEqual(m.errores, []);
+  const main = decodificar(m.importmap.imports["@cc/app/src/main.jsx"]);
+  assert.match(main, /@cc\/app\/src\/utils\/saludo\.js/);
+  assert.match(main, /@cc\/app\/src\/assets\/logo\.svg/);
+  assert.match(main, /"VITE_API_URL":"http:\/\/localhost:5000\/api"/);
+  assert.match(main, /"VITE_TITULO":"Finanbot"/);
+  assert.doesNotMatch(main, /SECRETO/, "solo las VITE_* llegan al navegador");
+  const css = decodificar(m.importmap.imports["@cc/app/src/App.module.css"]);
+  assert.match(css, /\.tarjeta_\w+/);
+  assert.match(css, /padding: \.5rem/, "los valores como .5rem no se tocan");
+  assert.match(css, /export default \{"tarjeta":"tarjeta_\w+","titulo":"titulo_\w+"\}/);
+});

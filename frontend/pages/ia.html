@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>IA · CódigoCamp</title>
   <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0d1b1a">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CódigoCamp">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="/js/carga.js"></script>
   <script src="/js/tema.js"></script>
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/ia.css">
@@ -15,17 +23,27 @@
     <nav class="lado" id="lado" aria-label="Principal"></nav>
     <main class="centro" id="contenido">
       <h1 class="titulo-pag">Tutor de IA</h1>
-      <p class="sub">Pregunta lo que quieras o pega tu código para que lo revise. Conoce tu curso y tu nivel. Si quieres practicar con otras personas, ve a <a href="/pages/chats.html">Chats</a>.</p>
-      <section class="tarjeta ia">
-        <div class="chat-log" id="log" aria-live="polite"><div class="msg tutor">¡Hola! Soy tu tutor. ¿Qué quieres aprender hoy?</div></div>
-        <div class="sugerencias" id="sug"></div>
-        <div class="ia-barra"><button class="btn sm" id="codigo" type="button" title="Insertar un bloque de código">&lt;/&gt; Código</button><button class="btn sm ghost" id="nueva" type="button" title="Borrar la conversación">🗑 Nueva conversación</button><small id="cuenta">0 / 3500</small></div>
-        <form class="ia-form" id="f"><textarea id="q" rows="2" maxlength="3500" placeholder="Escribe tu pregunta… (Enter envía, Shift + Enter salto de línea)" aria-label="Tu pregunta"></textarea><button class="bj" id="enviar" type="submit">Enviar</button></form>
-      </section>
+      <p class="sub">Pregunta lo que quieras, pega tu código o adjunta archivos (hasta 1 GB). Tus conversaciones se guardan en tu cuenta: retómalas desde cualquier dispositivo.</p>
+      <div class="ia-cuerpo">
+        <aside class="tarjeta ia-lista" id="iaLista" aria-label="Tus conversaciones">
+          <button class="bj ia-nueva" id="nueva" type="button">＋ Nueva conversación</button>
+          <input class="ia-buscar" id="buscarConv" type="search" placeholder="Buscar en tus chats…" aria-label="Buscar conversaciones" autocomplete="off">
+          <nav class="ia-convs" id="convs" aria-label="Conversaciones guardadas"><p class="nota">Cargando…</p></nav>
+        </aside>
+        <section class="tarjeta ia">
+          <header class="ia-cab"><button class="btn sm ghost ia-menu-btn" id="verLista" type="button" aria-controls="iaLista" aria-expanded="false" title="Tus conversaciones">☰</button><h2 id="tituloConv">Conversación nueva</h2><div class="ia-cab-btns" id="cabBtns" hidden><button class="btn sm ghost" type="button" data-conv="renombrar" title="Renombrar">✏️</button><button class="btn sm ghost" type="button" data-conv="fijar" title="Fijar">📌</button><button class="btn sm ghost" type="button" data-conv="borrar" title="Borrar">🗑</button></div></header>
+          <div class="chat-log" id="log" aria-live="polite"></div>
+          <div class="sugerencias" id="sug"></div>
+          <div class="adj-bandeja" id="bandeja" hidden aria-label="Archivos para la IA"></div>
+          <div class="ia-barra"><button class="btn sm adj-clip" id="clip" type="button" title="Adjuntar imágenes, capturas, PDF, video, audio o código (hasta 1 GB)">📎 Adjuntar</button><input type="file" id="archivosIa" multiple hidden><button class="btn sm" id="codigo" type="button" title="Insertar un bloque de código">&lt;/&gt; Código</button><small id="cuenta">0 / 12000</small></div>
+          <form class="ia-form" id="f"><textarea id="q" rows="2" maxlength="12000" placeholder="Escribe tu pregunta, pega código o arrastra archivos… (Enter envía, Shift + Enter salto de línea)" aria-label="Tu pregunta"></textarea><button class="bj" id="enviar" type="submit">Enviar</button></form>
+        </section>
+      </div>
     </main>
     <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
   </div>
   <nav class="inf" id="inf" aria-label="Principal"></nav>
   <script type="module" src="/js/ia.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

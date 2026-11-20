@@ -5,7 +5,12 @@ from flask import request, session
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
 
-from models import User, db
+import hashlib
+from datetime import timezone
+
+from flask_login import login_user
+
+from models import User, db, utcnow
 from utilidades import api_error
 
 
@@ -16,10 +21,27 @@ def configurar_seguridad(app):
 
     @login_manager.user_loader
     def load_user(user_id):
+        # Solo valen las sesiones registradas y no cerradas (cerrar en un dispositivo o en todos es real).
         try:
-            return db.session.get(User, int(user_id))
+            uid, sid = str(user_id).split(":", 1)
+            uid = int(uid)
         except (TypeError, ValueError):
             return None
+        from models import UserSession
+        fila = UserSession.query.filter_by(token_hash=_hash(sid), usuario_id=uid, revocada=False).first()
+        if fila is None:
+            return None
+        user = db.session.get(User, uid)
+        if user is None or not user.activo:
+            return None
+        user._sid = sid
+        user._sesion_id = fila.id
+        ahora = utcnow()
+        ultima = fila.ultima if fila.ultima.tzinfo else fila.ultima.replace(tzinfo=timezone.utc)
+        if (ahora - ultima).total_seconds() > 300:
+            fila.ultima = ahora
+            db.session.commit()
+        return user
 
     @login_manager.unauthorized_handler
     def unauthorized():
@@ -52,3 +74,31 @@ def configurar_seguridad(app):
         if request.path.startswith("/api/"):
             return api_error(error.description, error.code or 400)
         return error
+
+
+def _hash(sid):
+    return hashlib.sha256(str(sid).encode()).hexdigest()
+
+
+def iniciar_sesion(user, *, metodo="contraseña", dispositivo="", ip=""):
+    """Crea la sesión de este dispositivo y deja a la persona dentro (cookie de sesión + «recordarme»)."""
+    from models import UserSession
+    sid = secrets.token_urlsafe(32)
+    fila = UserSession(usuario_id=user.id, token_hash=_hash(sid), dispositivo=(dispositivo or "")[:120], ip=(ip or "")[:45], metodo=metodo[:20])
+    db.session.add(fila)
+    db.session.commit()
+    user._sid = sid
+    user._sesion_id = fila.id
+    login_user(user, remember=True)
+    return fila
+
+
+def cerrar_sesiones(usuario_id, *, excepto=None):
+    """Revoca las sesiones de la persona (todas, o todas menos `excepto`). Devuelve cuántas cerró."""
+    from models import UserSession
+    q = UserSession.query.filter_by(usuario_id=usuario_id, revocada=False)
+    if excepto:
+        q = q.filter(UserSession.id != excepto)
+    n = q.update({UserSession.revocada: True}, synchronize_session=False)
+    db.session.commit()
+    return n

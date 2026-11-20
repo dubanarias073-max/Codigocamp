@@ -8,6 +8,8 @@ from models import Profile, Purchase, StoreItem, db
 from constantes import MAX_SALVARRACHAS, MAX_VIDAS, MAX_VIDAS_REGEN, PERMANENTES, RAREZA
 from servicios.perfil import apply_reward, get_profile, refresh_lives, reward_text
 from servicios.tienda import asegurar_articulos
+from cosmeticos import POR_CLAVE as COSMETICOS
+from models import OwnedCosmetic
 from utilidades import api_error, json_body
 
 bp = Blueprint("tienda", __name__)
@@ -20,13 +22,14 @@ def tienda():
     profile = get_profile(current_user)
     refresh_lives(profile)
     db.session.commit()
-    tuyos = {c.articulo.clave for c in Purchase.query.filter_by(usuario_id=current_user.id).all()} & PERMANENTES
+    tuyos = ({c.articulo.clave for c in Purchase.query.filter_by(usuario_id=current_user.id).all()} & PERMANENTES) | {c.clave for c in OwnedCosmetic.query.filter_by(usuario_id=current_user.id).all()}
     return jsonify(
         items=[{
             "clave": item.clave, "nombre": item.nombre, "descripcion": item.descripcion,
             "icono": item.icono, "precio": item.precio, "moneda": item.moneda,
             "categoria": item.categoria, "rareza": RAREZA.get(item.clave, "comun"),
             "permanente": item.clave in PERMANENTES, "tuyo": item.clave in tuyos,
+            "tipo": COSMETICOS[item.clave]["tipo"] if item.clave in COSMETICOS else ("cofre" if item.clave.startswith("cofre") else "avatar" if item.clave in PERMANENTES else "potenciador"),
         } for item in StoreItem.query.filter_by(activo=True).order_by(StoreItem.orden).all()],
         minerales={"diamante": profile.diamante},
         xp=profile.xp, vidas=profile.vidas, salvarrachas=profile.salvarrachas,
@@ -56,6 +59,8 @@ def tienda_comprar():
         return api_error("Ya tienes el máximo de salvarrachas.")
     if item.clave == "kit_experto" and (profile.vidas >= MAX_VIDAS and profile.salvarrachas >= MAX_SALVARRACHAS):
         return api_error("Ya tienes el máximo de vidas y salvarrachas.")
+    if item.clave in COSMETICOS and OwnedCosmetic.query.filter_by(usuario_id=current_user.id, clave=item.clave).first():
+        return api_error("Ya tienes este artículo en tu colección.")
     if item.clave in PERMANENTES and any(c.articulo_id == item.id for c in Purchase.query.filter_by(usuario_id=current_user.id).all()):
         return api_error("Ya tienes este artículo en tu colección.")
     if item.clave == "mega_vidas" and profile.vidas >= MAX_VIDAS:
@@ -67,7 +72,7 @@ def tienda_comprar():
     elif item.clave == "mega_vidas":
         profile.vidas = MAX_VIDAS
     elif item.clave == "cofre_misterioso":
-        premio = random.choice([{"xp": 40}, {"xp": 80}, {"xp": 120}, {"vidas": 2}, {"vidas": 3}, {"diamante": 1}, {"diamante": 3}])
+        premio = random.choice([{"xp": 40}, {"xp": 80}, {"xp": 120}, {"vidas": 2}, {"vidas": 3}, {"diamante": 10}, {"diamante": 40}])
     elif item.clave == "cofre_legendario":
         premio = {"xp": 150, "vidas": 3}
         if random.random() < 0.3:
@@ -84,6 +89,8 @@ def tienda_comprar():
         profile.vidas = min(MAX_VIDAS, profile.vidas + 3)
         profile.salvarrachas = min(MAX_SALVARRACHAS, profile.salvarrachas + 1)
     db.session.add(Purchase(usuario_id=current_user.id, articulo=item, precio=item.precio, moneda="diamante"))
+    if item.clave in COSMETICOS:
+        db.session.add(OwnedCosmetic(usuario_id=current_user.id, clave=item.clave, origen="tienda"))
     db.session.commit()
     return jsonify(
         ok=True, minerales={"diamante": profile.diamante},

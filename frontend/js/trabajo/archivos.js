@@ -92,7 +92,7 @@ export class ClienteArchivos {
   async #json(r) {
     const datos = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const e = new Error(datos.error || (r.status === 401 ? "Tu sesión venció: recarga la página." : r.status === 413 ? "El archivo es demasiado grande." : `El servidor respondió ${r.status}.`));
+      const e = new Error(datos.error || (r.status === 401 ? "Tu sesión venció: recarga la página." : r.status === 413 ? "El archivo es demasiado grande." : r.status >= 500 ? `Error del servidor (${r.status}). Si acabas de actualizar CódigoCamp, reinicia Flask; si sigue, revisa la terminal donde corre.` : `El servidor respondió ${r.status}.`));
       e.estado = r.status;
       throw e;
     }

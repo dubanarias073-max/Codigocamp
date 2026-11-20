@@ -91,9 +91,11 @@ def _ruta(usuario_id, huella):
 
 
 def hashes_usados(archivos, git):
-    """Huellas que aparecen en los archivos del proyecto o en su último commit."""
+    """Huellas que aparecen en los archivos del proyecto, en su último commit o en el respaldo de sus repositorios Git."""
     usados = set()
-    for fuente in (archivos or {}, (git or {}).get("committed") or {}):
+    repos = (git or {}).get("repos") or {}
+    respaldos = {c: i.get("respaldo", "") for c, i in repos.items() if isinstance(i, dict)} if isinstance(repos, dict) else {}
+    for fuente in (archivos or {}, (git or {}).get("committed") or {}, respaldos):
         if not isinstance(fuente, dict):
             continue
         for texto in fuente.values():
@@ -107,6 +109,8 @@ def hashes_usados(archivos, git):
 def limpiar_huerfanas(usuario_id, archivos, git):
     """Borra (fila y bytes) los archivos que el proyecto ya no usa y que tienen más de una hora."""
     usados = hashes_usados(archivos, git)
+    from models import Attachment  # lo adjuntado en chats o a la IA también está en uso
+    usados |= {h for (h,) in Attachment.query.filter_by(usuario_id=usuario_id).with_entities(Attachment.hash).all()}
     limite = datetime.now(timezone.utc) - MARGEN_LIMPIEZA
     borrar = []
     for ident, huella, creado in WorkspaceFile.query.filter_by(usuario_id=usuario_id).with_entities(
@@ -310,9 +314,9 @@ def limpiar_disco(app):
         for archivo in carpeta.rglob("*"):
             if not archivo.is_file():
                 continue
-            if archivo.name == "proyecto.json":
-                continue  # el proyecto de la cuenta, no un archivo subido
-            temporal = archivo.name.startswith((".subida-", ".proyecto-"))
+            if archivo.name == "proyecto.json" or (archivo.name.startswith("foto-") and archivo.parent == carpeta):
+                continue  # el proyecto de la cuenta y la foto de perfil, no archivos subidos
+            temporal = archivo.name.startswith((".subida-", ".proyecto-", ".foto-"))
             if (temporal and archivo.stat().st_mtime < viejo) or (not temporal and (uid, archivo.name) not in conocidos):
                 archivo.unlink(missing_ok=True)
                 borrados += 1

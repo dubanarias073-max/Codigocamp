@@ -167,7 +167,7 @@ export class Sincronizador {
     const vistos = new Set();
     for (const a of archivos) {
       vistos.add(a.ruta);
-      if (!FS.rutaValida(a.ruta)) { omitidos.set(a.ruta, "su nombre tiene espacios, tildes u otros caracteres que CódigoCamp no admite"); continue; }
+      if (!FS.rutaValida(a.ruta)) { omitidos.set(a.ruta, "su nombre tiene caracteres que no se admiten (\\ / : * ? \" < > |) o la ruta es demasiado larga"); continue; }
       let c = this.cacheDisco.get(a.ruta);
       if (!c || c.tamano !== a.tamano || c.modificado !== a.modificado) {
         if (a.tamano > this.maxArchivo) c = { tamano: a.tamano, modificado: a.modificado, omitir: `pesa ${formatoBytes(a.tamano)} (máximo ${formatoBytes(this.maxArchivo)} por archivo)` };

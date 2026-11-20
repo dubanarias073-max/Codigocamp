@@ -44,3 +44,16 @@
 .flot{border-color:#333c5a;border-radius:10px;background:#111629;box-shadow:0 16px 40px rgba(0,0,0,.45)}
 .bar{display:flex;align-items:center;gap:16px}
 .bar .userbar{margin-left:auto;display:flex;align-items:center;gap:10px}
+
+/* Encabezado de la portada en celulares pequeños */
+@media (max-width:480px){
+  .bar{gap:8px}
+  .bar .userbar{gap:6px}
+  .bar .btn.sm{padding:8px 10px;font-size:13px;white-space:nowrap}
+}
+@media (max-width:430px){
+  .bar .logo-txt{display:none}
+}
+@media (max-width:340px){
+  .bar .btn.sm{padding:7px 8px;font-size:12px}
+}

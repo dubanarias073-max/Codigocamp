@@ -1,0 +1,29 @@
+{
+  "type": "AdaptiveCard",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "version": "1.5",
+  "body": [
+    { "type": "ColumnSet", "columns": [
+      { "type": "Column", "width": "auto", "verticalContentAlignment": "Center", "items": [{ "type": "TextBlock", "text": "🔥", "size": "ExtraLarge" }] },
+      { "type": "Column", "width": "stretch", "items": [
+        { "type": "TextBlock", "text": "${racha}", "weight": "Bolder", "size": "ExtraLarge", "color": "Warning", "spacing": "None" },
+        { "type": "TextBlock", "text": "días de racha", "isSubtle": true, "spacing": "None" }
+      ] },
+      { "type": "Column", "width": "auto", "items": [
+        { "type": "TextBlock", "text": "💎 ${diamantes}", "weight": "Bolder", "horizontalAlignment": "Right" },
+        { "type": "TextBlock", "text": "❤️ ${vidas}", "horizontalAlignment": "Right", "spacing": "None" }
+      ] }
+    ] },
+    { "type": "ColumnSet", "spacing": "Medium", "columns": [
+      { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "${semana[0].letra}", "horizontalAlignment": "Center", "isSubtle": true, "size": "Small" }, { "type": "TextBlock", "text": "${semana[0].icono}", "horizontalAlignment": "Center", "spacing": "None" }] },
+      { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "${semana[1].letra}", "horizontalAlignment": "Center", "isSubtle": true, "size": "Small" }, { "type": "TextBlock", "text": "${semana[1].icono}", "horizontalAlignment": "Center", "spacing": "None" }] },
+      { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "${semana[2].letra}", "horizontalAlignment": "Center", "isSubtle": true, "size": "Small" }, { "type": "TextBlock", "text": "${semana[2].icono}", "horizontalAlignment": "Center", "spacing": "None" }] },
+      { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "${semana[3].letra}", "horizontalAlignment": "Center", "isSubtle": true, "size": "Small" }, { "type": "TextBlock", "text": "${semana[3].icono}", "horizontalAlignment": "Center", "spacing": "None" }] },
+      { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "${semana[4].letra}", "horizontalAlignment": "Center", "isSubtle": true, "size": "Small" }, { "type": "TextBlock", "text": "${semana[4].icono}", "horizontalAlignment": "Center", "spacing": "None" }] },
+      { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "${semana[5].letra}", "horizontalAlignment": "Center", "isSubtle": true, "size": "Small" }, { "type": "TextBlock", "text": "${semana[5].icono}", "horizontalAlignment": "Center", "spacing": "None" }] },
+      { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "${semana[6].letra}", "horizontalAlignment": "Center", "isSubtle": true, "size": "Small" }, { "type": "TextBlock", "text": "${semana[6].icono}", "horizontalAlignment": "Center", "spacing": "None" }] }
+    ] },
+    { "type": "TextBlock", "text": "${estado}", "wrap": true, "spacing": "Medium", "weight": "Bolder", "size": "Small" }
+  ],
+  "actions": [{ "type": "Action.OpenUrl", "title": "Practicar ahora", "url": "/pages/inicio.html?app=1" }]
+}

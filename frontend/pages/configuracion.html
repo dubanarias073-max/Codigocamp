@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Configuración · CódigoCamp</title>
   <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0d1b1a">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CódigoCamp">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="/js/carga.js"></script>
   <script src="/js/tema.js"></script>
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/configuracion.css">
@@ -15,24 +23,91 @@
     <nav class="lado" id="lado" aria-label="Principal"></nav>
     <main class="centro" id="contenido">
       <h1 class="titulo-pag">Configuración</h1>
-      <form id="f" class="tarjeta" style="margin-top:16px">
-        <label class="campo">Nombre<input id="nombre" maxlength="50" required></label>
-        <label class="campo">Nombre de usuario <small>(para que tus amigos te encuentren; 3 a 20 letras, números o _)</small><input id="alias" maxlength="20" required autocapitalize="off" spellcheck="false"></label>
-        <p class="nota" style="margin-top:-6px">Tu ID: <b id="codigo"></b></p>
-        <label class="campo">Curso que estudias<select id="curso"></select></label>
-        <label class="campo">Meta diaria<select id="meta"><option value="5">5 minutos</option><option value="10">10 minutos</option><option value="15">15 minutos</option><option value="30">30 minutos</option></select></label>
-        <label class="campo">Tema visual<select id="tema"><option value="auto">Predeterminado (según tu dispositivo)</option><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select></label>
-        <label class="preferencia-sonido" for="sonido">
-          <input id="sonido" type="checkbox">
-          <span><b>Sonidos de respuesta</b><small>Reproduce un tono al acertar o fallar en los retos.</small></span>
-        </label>
-        <button class="bj" type="submit">Guardar cambios</button>
-      </form>
-      <p><button class="bj rojo" id="salir" type="button">Cerrar sesión</button></p>
+      <div class="conf">
+        <nav class="conf-nav" aria-label="Secciones de configuración" role="tablist">
+          <a href="#cuenta" role="tab" data-sec="cuenta"><span class="cn-ic">👤</span><span class="cn-tx"><b>Cuenta</b><small>Nombre, usuario e ID</small></span></a>
+          <a href="#aprendizaje" role="tab" data-sec="aprendizaje"><span class="cn-ic">🎯</span><span class="cn-tx"><b>Aprendizaje</b><small>Curso y meta diaria</small></span></a>
+          <a href="#apariencia" role="tab" data-sec="apariencia"><span class="cn-ic">🎨</span><span class="cn-tx"><b>Apariencia</b><small>Tema, sonidos y cosméticos</small></span></a>
+          <a href="#seguridad" role="tab" data-sec="seguridad"><span class="cn-ic">🔒</span><span class="cn-tx"><b>Seguridad</b><small>Contraseña y dispositivos</small></span></a>
+          <a href="#correos" role="tab" data-sec="correos"><span class="cn-ic">✉️</span><span class="cn-tx"><b>Correos</b><small>Alertas y avisos de racha</small></span></a>
+          <a href="#app" role="tab" data-sec="app"><span class="cn-ic">📱</span><span class="cn-tx"><b>App y widgets</b><small>Instalar en tus dispositivos</small></span></a>
+          <a href="#sesion" role="tab" data-sec="sesion"><span class="cn-ic">🚪</span><span class="cn-tx"><b>Sesión</b><small>Cerrar sesión</small></span></a>
+        </nav>
+        <div class="conf-cuerpo">
+          <section role="tabpanel" class="tarjeta conf-sec" id="cuenta"><header class="sec-cab"><span class="sec-ic">👤</span><div><h2>Cuenta</h2><p>Nombre, usuario e ID</p></div></header>
+            <form id="fCuenta">
+              <label class="campo">Nombre<input id="nombre" maxlength="50" required autocomplete="name"></label>
+              <label class="campo">Nombre de usuario <small>(para que tus amigos te encuentren; 3 a 20 letras, números o _)</small><input id="alias" maxlength="20" required autocapitalize="off" spellcheck="false"></label>
+              <p class="nota">Tu ID: <b id="codigo"></b> <button type="button" class="mini" id="copiarId">Copiar</button> · Correo: <b id="correo"></b></p>
+              <button class="bj" type="submit">Guardar</button>
+            </form>
+          </section>
+          <section role="tabpanel" class="tarjeta conf-sec" id="aprendizaje"><header class="sec-cab"><span class="sec-ic">🎯</span><div><h2>Aprendizaje</h2><p>Curso y meta diaria</p></div></header>
+            <form id="fAprender">
+              <label class="campo">Curso que estudias<select id="curso"></select></label>
+              <label class="campo">Meta diaria<select id="meta"><option value="5">5 minutos · relajado</option><option value="10">10 minutos · normal</option><option value="15">15 minutos · serio</option><option value="30">30 minutos · intenso</option></select></label>
+              <button class="bj" type="submit">Guardar</button>
+            </form>
+          </section>
+          <section role="tabpanel" class="tarjeta conf-sec" id="apariencia"><header class="sec-cab"><span class="sec-ic">🎨</span><div><h2>Apariencia</h2><p>Tema, sonidos y cosméticos</p></div></header>
+            <div class="temas" role="radiogroup" aria-label="Tema visual">
+              <label class="tema-op"><input type="radio" name="tema" value="auto"><span class="tema-prev auto"></span>Según tu dispositivo</label>
+              <label class="tema-op"><input type="radio" name="tema" value="claro"><span class="tema-prev claro"></span>Claro</label>
+              <label class="tema-op"><input type="radio" name="tema" value="oscuro"><span class="tema-prev oscuro"></span>Oscuro</label>
+            </div>
+            <label class="preferencia-sonido" for="sonido"><input id="sonido" type="checkbox"><span><b>Sonidos de respuesta</b><small>Un tono al acertar o fallar en los retos.</small></span></label>
+            <label class="preferencia-sonido" for="movimiento"><input id="movimiento" type="checkbox"><span><b>Menos animaciones</b><small>Quita fondos animados, efectos y la lluvia de código al cargar.</small></span></label>
+            <div class="puestos" id="puestos"></div>
+            <p class="nota"><a href="/pages/tienda.html">Consigue fondos, punteros, temas, marcos y efectos en la tienda →</a> <button type="button" class="mini" id="quitarTodo">Quitar todos</button></p>
+          </section>
+          <section role="tabpanel" class="tarjeta conf-sec" id="seguridad"><header class="sec-cab"><span class="sec-ic">🔒</span><div><h2>Seguridad</h2><p>Contraseña y dispositivos</p></div></header>
+            <form id="fClave" autocomplete="on">
+              <input type="email" id="correoOculto" autocomplete="username" hidden>
+              <label class="campo">Contraseña actual<input type="password" id="claveActual" required autocomplete="current-password"></label>
+              <label class="campo">Nueva contraseña <small>(mínimo 6, con una mayúscula y un número)</small><input type="password" id="claveNueva" required minlength="6" autocomplete="new-password"></label>
+              <label class="campo">Repite la nueva<input type="password" id="claveNueva2" required minlength="6" autocomplete="new-password"></label>
+              <button class="bj" type="submit">Cambiar contraseña</button>
+              <p class="nota">Te avisamos por correo cada vez que cambie tu contraseña o entres desde un dispositivo nuevo.</p>
+            </form>
+            <h3>Dónde tienes la sesión abierta</h3>
+            <p class="nota">Si no reconoces un dispositivo, ciérralo: queda fuera al instante (aunque tenga «recordarme»). Cambiar la contraseña también cierra los demás.</p>
+            <ul class="dispositivos" id="sesiones"><li class="nota">Cargando…</li></ul>
+            <div class="sesiones-btns"><button class="bj" type="button" id="cerrarOtras">Cerrar sesión en los demás dispositivos</button><button class="bj rojo" type="button" id="cerrarTodas">Cerrar sesión en todos los dispositivos</button></div>
+            <h3>Historial de dispositivos</h3><ul class="dispositivos" id="dispositivos"><li class="nota">Cargando…</li></ul>
+          </section>
+          <section role="tabpanel" class="tarjeta conf-sec" id="correos"><header class="sec-cab"><span class="sec-ic">✉️</span><div><h2>Correos</h2><p>Alertas y avisos de racha</p></div></header>
+            <label class="preferencia-sonido"><input type="checkbox" data-correo="seguridad"><span><b>Alertas de seguridad</b><small>Inicio de sesión en un dispositivo nuevo y cambio de contraseña. Recomendado. (El correo de bienvenida al registrarte siempre se envía.)</small></span></label>
+            <label class="preferencia-sonido"><input type="checkbox" data-correo="racha"><span><b>Avisos de racha</b><small>Si un día se te olvida entrar, te avisamos por la tarde (6 p. m.) y otra vez en las últimas horas (9 p. m.) antes de perder tu racha.</small></span></label>
+            <label class="preferencia-sonido"><input type="checkbox" data-correo="novedades"><span><b>Novedades de CódigoCamp</b><small>Cursos nuevos y mejoras, muy de vez en cuando.</small></span></label>
+          </section>
+          <section role="tabpanel" class="tarjeta conf-sec" id="app"><header class="sec-cab"><span class="sec-ic">📱</span><div><h2>App y widgets</h2><p>Instalar en tus dispositivos</p></div></header>
+            <p>Instala CódigoCamp como una app: se abre en su propia ventana, aparece en el menú de inicio o en la pantalla de inicio, funciona sin conexión y tiene accesos directos a Practicar, Trabajo, IA y Chats.</p>
+            <div class="inst-fila"><button class="bj" type="button" id="instalar" hidden>⬇️ Instalar CódigoCamp</button><p class="nota" id="instalarAyuda"></p></div>
+            <div class="plataformas" id="plataformas">
+              <details data-so="windows"><summary><span>🪟</span> Windows 10 y 11</summary><ol><li>Abre CódigoCamp en <b>Edge</b> o <b>Chrome</b>.</li><li>Pulsa el botón <b>Instalar</b> de esta página o el ícono ⊕ de la barra de direcciones.</li><li>Queda en el menú Inicio y la barra de tareas. En Windows 11 agrega el <b>widget de racha</b>: tecla Windows + W → «+» → CódigoCamp.</li></ol></details>
+              <details data-so="macos"><summary><span>🍎</span> macOS</summary><ol><li><b>Safari 17 o más</b>: menú Archivo → <b>Agregar al Dock</b>.</li><li><b>Chrome / Edge</b>: ícono ⊕ de la barra de direcciones → Instalar.</li><li>La encuentras en Launchpad y en el Dock.</li></ol></details>
+              <details data-so="linux"><summary><span>🐧</span> Linux (Ubuntu, Fedora, Mint…)</summary><ol><li>Abre CódigoCamp en <b>Chrome</b>, <b>Chromium</b> o <b>Edge</b>.</li><li>Pulsa <b>Instalar</b> aquí o el ícono ⊕ de la barra de direcciones.</li><li>Aparece en el menú de aplicaciones con su propio ícono.</li></ol></details>
+              <details data-so="android"><summary><span>🤖</span> Android</summary><ol><li>Abre CódigoCamp en <b>Chrome</b> (o Samsung Internet, Edge).</li><li>Pulsa <b>Instalar</b> aquí o menú ⋮ → <b>Instalar aplicación</b>.</li><li>Queda en el cajón de apps; mantén pulsado el ícono para ver los accesos directos.</li></ol></details>
+              <details data-so="ios"><summary><span>📱</span> iPhone y iPad (iOS / iPadOS)</summary><ol><li>Abre CódigoCamp en <b>Safari</b> (en iOS 16.4+ también sirve Chrome o Edge).</li><li>Pulsa <b>Compartir</b> (el cuadro con la flecha ↑).</li><li>Elige <b>Agregar a pantalla de inicio</b> → Agregar.</li></ol></details>
+              <details data-so="chromeos"><summary><span>💻</span> ChromeOS</summary><ol><li>Pulsa <b>Instalar</b> aquí o el ícono ⊕ de la barra de direcciones.</li><li>Queda en el selector de apps y en la biblioteca.</li></ol></details>
+            </div>
+            <h3>Widgets</h3>
+            <p class="nota">En <b>Windows 11</b>: widgets de racha y del calendario de racha (tecla Windows + W). En cualquier dispositivo, la app muestra tu racha en el ícono (insignia) y en <a href="/pages/perfil.html#calendario">Perfil → Calendario de racha</a>. Android e iOS no permiten widgets de pantalla de inicio para apps web.</p>
+          </section>
+          <section role="tabpanel" class="tarjeta conf-sec" id="sesion"><header class="sec-cab"><span class="sec-ic">🚪</span><div><h2>Sesión</h2><p>Cerrar sesión</p></div></header>
+            <div class="salidas">
+              <div class="salida"><div><b>Cerrar sesión</b><small>Sales en este dispositivo. Los demás siguen dentro.</small></div><button class="bj" id="salir" type="button">Cerrar sesión</button></div>
+              <div class="salida"><div><b>Cerrar sesión en otro dispositivo</b><small>Elige cuál en Seguridad → Dónde tienes la sesión abierta.</small></div><a class="bj" href="#seguridad">Ver dispositivos</a></div>
+              <div class="salida peligro"><div><b>Cerrar sesión en todos los dispositivos</b><small>Sales en todos lados, incluido este. Tendrás que volver a entrar.</small></div><button class="bj rojo" id="salirTodos" type="button">Cerrar en todos</button></div>
+            </div>
+          </section>
+        </div>
+      </div>
     </main>
     <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
   </div>
   <nav class="inf" id="inf" aria-label="Principal"></nav>
   <script type="module" src="/js/configuracion.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

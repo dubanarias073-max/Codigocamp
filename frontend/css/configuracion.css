@@ -3,3 +3,51 @@
 .preferencia-sonido input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--acc)}
 .preferencia-sonido span{display:grid;gap:3px}
 .preferencia-sonido small{color:var(--sub);font-weight:400}
+.conf{display:grid;grid-template-columns:250px 1fr;gap:24px;margin-top:18px;align-items:start}
+.conf-nav{position:sticky;top:16px;display:grid;gap:6px;padding:10px;border:1px solid var(--borde);border-radius:18px;background:var(--panel)}
+.conf-nav a{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;color:var(--txt);text-decoration:none;border:1px solid transparent;transition:background .15s,border-color .15s}
+.conf-nav a:hover{background:var(--panel2)}
+.conf-nav a[aria-selected=true]{background:color-mix(in srgb,var(--acc) 14%,transparent);border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+.conf-nav a[aria-selected=true] b{color:var(--acc)}
+.cn-ic{font-size:20px;width:30px;text-align:center}
+.cn-tx{display:grid;line-height:1.25}.cn-tx b{font-size:14.5px}.cn-tx small{color:var(--sub);font-size:12px}
+.conf-cuerpo{min-width:0}
+.conf-sec{padding:26px 28px;animation:secEntra .22s ease}
+.conf-sec[hidden]{display:none}
+@keyframes secEntra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.sec-cab{display:flex;gap:14px;align-items:center;margin:0 0 22px;padding-bottom:16px;border-bottom:1px solid var(--borde)}
+.sec-ic{font-size:26px;width:52px;height:52px;display:grid;place-items:center;border-radius:14px;background:var(--panel2);border:1px solid var(--borde)}
+.sec-cab h2{margin:0;font-size:21px}.sec-cab p{margin:2px 0 0;color:var(--sub)}
+.inst-fila{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:14px 0}
+.plataformas{display:grid;gap:8px;margin:8px 0 18px}
+.plataformas details{border:1px solid var(--borde);border-radius:12px;background:var(--panel2);padding:0 14px}
+.plataformas summary{cursor:pointer;padding:12px 0;font-weight:700;display:flex;gap:10px;align-items:center}
+.plataformas details[open]{padding-bottom:6px}
+.plataformas details.tuyo{border-color:var(--acc)}
+.plataformas details.tuyo summary::after{content:"Tu dispositivo";margin-left:auto;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--acc);color:#04130d}
+.plataformas ol{margin:0 0 10px;padding-left:22px;line-height:1.6}
+.conf-sec h3{margin:18px 0 8px;font-size:15px}
+.mini{padding:3px 10px;border:1px solid var(--borde);border-radius:999px;background:var(--panel2);color:var(--txt);font-size:12px;font-weight:700;cursor:pointer}
+.temas{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.tema-op{display:grid;gap:6px;justify-items:center;padding:10px;border:2px solid var(--borde);border-radius:14px;cursor:pointer;font-weight:700;font-size:13px}
+.tema-op:has(input:checked){border-color:var(--acc)}
+.tema-op input{position:absolute;opacity:0;pointer-events:none}
+.tema-prev{width:120px;height:66px;border-radius:10px;border:1px solid var(--borde)}
+.tema-prev.claro{background:linear-gradient(#fff 0 30%,#e9f4ef 30%)}
+.tema-prev.oscuro{background:linear-gradient(#0d1b1a 0 30%,#06100f 30%)}
+.tema-prev.auto{background:linear-gradient(90deg,#fff 0 50%,#06100f 50%)}
+.puestos{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px 12px}
+.dispositivos{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.dispositivos li{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--borde);border-radius:12px;background:var(--panel2)}
+.dispositivos li span:last-child{display:grid}
+.dispositivos small{color:var(--sub)}
+.disp-ic{font-size:22px}
+.actual{font-style:normal;font-size:11px;padding:1px 8px;border-radius:999px;background:var(--acc);color:#04130d;margin-left:6px}
+@media (max-width:900px){.conf{grid-template-columns:1fr;gap:14px}.conf-nav{position:static;display:flex;overflow-x:auto;gap:6px;padding:6px;scrollbar-width:none}.conf-nav a{flex:0 0 auto;padding:8px 12px}.cn-tx small{display:none}.conf-sec{padding:20px 18px}}
+.sesiones-btns{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 6px}
+.dispositivos li .ses-cerrar{margin-left:auto;flex:none}
+.salidas{display:grid;gap:10px}
+.salida{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:14px 16px;border:1px solid var(--borde);border-radius:14px;background:var(--panel2)}
+.salida div{display:grid;gap:3px}.salida small{color:var(--sub)}
+.salida.peligro{border-color:color-mix(in srgb,var(--rojo,#ef4444) 45%,transparent)}
+@media (max-width:600px){.salida{flex-direction:column;align-items:stretch}}

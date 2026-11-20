@@ -22,6 +22,12 @@ const CONFIG = {
   swift:      { k: "swift", n: "Swift", c: "#fb7185", run: "srv" },
   kotlin:     { k: "kt", n: "Kotlin", c: "#c084fc", run: "srv" },
   ruby:       { k: "rb", n: "Ruby", c: "#f87171", run: "srv" },
+  terminal:   { k: "terminal", n: "Terminales", c: "#4ade80", run: "srv" },
+  git:        { k: "git", n: "Git", c: "#f97316", run: "srv" },
+  docker:     { k: "docker", n: "Docker", c: "#38bdf8", run: "srv" },
+  node:       { k: "node", n: "Node.js", c: "#84cc16", run: "srv" },
+  github:     { k: "github", n: "GitHub", c: "#a78bfa", run: "srv" },
+  nosql:      { k: "nosql", n: "NoSQL", c: "#22c55e", run: "srv" },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -147,7 +153,9 @@ $('next').onclick = () => {
   (hechas[lang] ||= []);
   if (!hechas[lang].includes(idx)) hechas[lang].push(idx);
   guardar();
-  api('/api/progreso/leccion/', { curso: LEC[lang].f, leccion: LEC[lang].l[idx][0] }).catch(() => {});
+  api('/api/progreso/leccion/', { curso: LEC[lang].f, leccion: LEC[lang].l[idx][0] })
+    .then((r) => import('/js/cofres.js').then((m) => m.abrirPremiosNuevos(r?.desafios_completados || [])))
+    .catch(() => {});
   if (idx < LEC[lang].l.length - 1) idx++;
   pintar();
   scrollTo({ top: 0, behavior: 'smooth' });

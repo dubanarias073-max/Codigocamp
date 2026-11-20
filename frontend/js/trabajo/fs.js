@@ -10,7 +10,9 @@ export const RAIZ = "/workspace";
 // caracteres: solo el texto editable; los archivos guardados en la cuenta (marcadores) no cuentan.
 export const LIMITES = { archivos: 5000, carpetas: 2000, caracteres: 5_000_000, ruta: 400, nombre: 120 };
 
-const NOMBRE = /^[A-Za-z0-9_.-]{1,120}$/;
+// Nombres como en Windows, macOS y Linux: se admiten espacios, tildes, ñ, paréntesis… Solo se prohíben los caracteres
+// que Windows no acepta (\ / : * ? " < > |), los de control, y los espacios o puntos al final (Windows los quita).
+const NOMBRE = /^(?!\s)[^\\/:*?"<>|\u0000-\u001f]{1,120}(?<![\s.])$|^\.[^\\/:*?"<>|\u0000-\u001f]{1,119}$/u;
 const PROHIBIDOS = new Set(["__proto__", "prototype", "constructor"]);
 
 export const nombreBase = (ruta) => ruta.slice(ruta.lastIndexOf("/") + 1);
@@ -34,8 +36,10 @@ export function errorDeNombre(nombre) {
   if (nombre.length > LIMITES.nombre) return `El nombre no puede pasar de ${LIMITES.nombre} caracteres.`;
   if (nombre === "." || nombre === "..") return "Ese nombre no es válido.";
   if (/[\\/]/.test(nombre)) return "El nombre no puede incluir barras (/ o \\).";
-  if (/\s/.test(nombre)) return "El nombre no puede tener espacios. Usa guion (-) o guion bajo (_).";
-  if (!NOMBRE.test(nombre)) return "Usa solo letras sin tilde, números, punto, guion y guion bajo.";
+  if (/[:*?"<>|]/.test(nombre)) return 'El nombre no puede tener estos caracteres: \\ / : * ? " < > |';
+  if (/^\s|\s$/.test(nombre)) return "El nombre no puede empezar ni terminar con un espacio.";
+  if (/\.$/.test(nombre) && nombre !== "." && nombre !== "..") return "El nombre no puede terminar en punto.";
+  if (!NOMBRE.test(nombre)) return "Ese nombre no es válido.";
   if (PROHIBIDOS.has(nombre.toLowerCase())) return "Ese nombre está reservado.";
   return null;
 }
@@ -168,7 +172,7 @@ export function crearArchivo(py, ruta, contenido = "", { padres = false } = {}) 
   if (problema) return problema;
   if (Object.keys(py.files).length >= LIMITES.archivos) return fallo(`Se alcanzó el límite de ${LIMITES.archivos} archivos.`);
   if (!esMarcadorFs(contenido) && usoCaracteres(py) + contenido.length > LIMITES.caracteres) return fallo("El proyecto superaría el límite de almacenamiento.");
-  if (padres) {
+  if (padres && carpetaDe(ruta)) {
     const r = crearCarpeta(py, carpetaDe(ruta), { padres: true });
     if (!r.ok) return r;
   }

@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chats · CódigoCamp</title>
   <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0d1b1a">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CódigoCamp">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="/js/carga.js"></script>
   <script src="/js/tema.js"></script>
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/chats.css">
@@ -30,7 +38,8 @@
           <div class="c-cab" id="cab" hidden><button class="btn sm c-volver" id="volver" type="button" aria-label="Volver a la lista">←</button><b id="cNombre"></b><button class="btn ghost sm" id="quitar" type="button">Quitar amigo</button></div>
           <div class="chat-log" id="log" aria-live="polite" hidden></div>
           <div class="c-emojis" id="emojis" hidden aria-label="Emojis rápidos"></div>
-          <form class="chat-form" id="fMsg" hidden><input id="texto" maxlength="300" placeholder="Escribe un mensaje… (usa `código` entre comillas invertidas)" autocomplete="off" aria-label="Mensaje"><button class="bj" type="submit">Enviar</button></form>
+          <div class="adj-bandeja" id="bandeja" hidden aria-label="Archivos para enviar"></div>
+          <form class="chat-form" id="fMsg" hidden><button type="button" class="adj-clip" id="clip" title="Adjuntar fotos, videos o archivos (hasta 1 GB)" aria-label="Adjuntar archivos">📎</button><input type="file" id="archivosMsg" multiple hidden><input id="texto" maxlength="300" placeholder="Escribe un mensaje… o arrastra/pega fotos y archivos" autocomplete="off" aria-label="Mensaje"><button class="bj" type="submit">Enviar</button></form>
         </section>
       </div>
     </main>
@@ -38,5 +47,6 @@
   </div>
   <nav class="inf" id="inf" aria-label="Principal"></nav>
   <script type="module" src="/js/chats.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

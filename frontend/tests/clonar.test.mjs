@@ -104,7 +104,7 @@ test("git clone en carpeta: copia sin historial y no toca el Git del proyecto", 
   const r = await sh("git clone https://github.com/ana/proy.git");
   assert.equal(r.codigo, 0, r.err);
   assert.equal(py.files["proy/README.md"], "# Hola\n");
-  assert.ok("proy/Mi-Archivo.txt" in py.files);
+  assert.ok("proy/Mi Archivo.txt" in py.files);
   assert.ok(!("proy/img/logo.png" in py.files), "sin cuenta no hay imágenes");
   assert.match(r.out, /sin historial/);
   assert.match(r.out, /img\/logo\.png — los archivos que no son texto solo se guardan/);
@@ -183,7 +183,7 @@ test("git clone completo en el proyecto: node_modules y carpetas de herramientas
   const s = shell.nuevaSesion(); let out = ""; s.out = (t) => { out += t; }; s.err = (t) => { out += t; };
   assert.equal(await shell.ejecutar("git clone https://github.com/ana/proy.git .", s), 0, out);
   assert.ok("node_modules/x/i.js" in py.files);
-  assert.ok("Mi-Archivo.txt" in py.files);
+  assert.ok("Mi Archivo.txt" in py.files);
   assert.doesNotMatch(quitarAnsi(out), /no se trajeron/);
 });
 

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ejecutarNpm, ejecutarPip, dependenciasDe, urlDeCdn, leerPackageJson, restaurarPaquetes } from "../js/trabajo/paquetes.js";
+import { ejecutarNpm, ejecutarPip, dependenciasDe, urlDeCdn, leerPackageJson, restaurarPaquetes, instalarTolerante } from "../js/trabajo/paquetes.js";
+import { decidirPorPyPI } from "../js/trabajo/disponibilidad.js";
 import { normalizarProyecto } from "../js/trabajo/almacen.js";
 import { Shell } from "../js/trabajo/shell.js";
 import { quitarAnsi } from "../js/trabajo/ansi.js";
@@ -76,7 +77,7 @@ function pyodideFalso({ falla = {} } = {}) {
   return { pyo, instalados, llamadas };
 }
 const memoria = () => { let l = []; return { leer: () => l, guardar: (x) => { l = x; } }; };
-const pip = async (args, py, almacen, extra = {}) => { let out = "", err = ""; const codigo = await ejecutarPip({ args, proyecto: py, cwd: "", out: (t) => { out += t; }, err: (t) => { err += t; }, almacen, cargarPy: async () => py.__pyo, ...extra }); return { codigo, out: quitarAnsi(out), err: quitarAnsi(err) }; };
+const pip = async (args, py, almacen, extra = {}) => { let out = "", err = ""; const codigo = await ejecutarPip({ args, proyecto: py, cwd: "", out: (t) => { out += t; }, err: (t) => { err += t; }, almacen, cargarPy: async () => py.__pyo, revisar: async () => ({ ok: true }), ...extra }); return { codigo, out: quitarAnsi(out), err: quitarAnsi(err) }; };
 
 test("pip install instala con micropip, lo recuerda y uninstall lo quita", async () => {
   const f = pyodideFalso(); const py = normalizarProyecto({ files: {} }); py.__pyo = f.pyo; const al = memoria();
@@ -102,6 +103,31 @@ test("pip: validación (sin URLs), -r requirements.txt, errores explicados", asy
   assert.ok(!al.leer().includes("lxml"));
   assert.match((await pip(["--version"], py, al)).out, /pip/);
   assert.match((await pip(["buscar"], py, al)).err, /orden desconocida/);
+});
+
+test("pip avisa antes si un paquete no existe para el navegador y propone alternativa", async () => {
+  const f = pyodideFalso(); const py = normalizarProyecto({ files: {} }); py.__pyo = f.pyo; const al = memoria();
+  const revisar = async (n) => (n === "psutil" ? { ok: false, motivo: "tiene código compilado", alternativa: "no hace falta en el navegador" } : { ok: true });
+  const r = await pip(["install", "psutil", "rich"], py, al, { revisar });
+  assert.equal(r.codigo, 1); assert.match(r.err, /psutil no se puede instalar[\s\S]*Alternativa: no hace falta/);
+  assert.deepEqual(f.instalados, ["rich"]);   // los demás sí se instalan
+  assert.match(r.out, /Resumen:.*1 instalado.*1 con error: psutil/);
+});
+
+test("pip instala por partes cuando una dependencia no existe para el navegador", async () => {
+  const instalados = [];
+  const install = async (e) => { if (e === "app-x" || e === "nativa") throw new Error("Can't find a pure Python 3 wheel for 'nativa'"); instalados.push(e); };
+  install.callKwargs = async (e, kw) => { assert.equal(kw.deps, false); instalados.push(e + "(sin deps)"); };
+  const r = await instalarTolerante({ install }, "app-x", { deps: async () => ["pura", "nativa"] });
+  assert.deepEqual(instalados, ["app-x(sin deps)", "pura"]);
+  assert.match(r.aviso, /sin nativa/);
+  await assert.rejects(instalarTolerante({ install: async () => { throw new Error("no"); } }, "otro", { deps: async () => [] }));
+});
+
+test("decidirPorPyPI distingue Python puro de código compilado", () => {
+  assert.equal(decidirPorPyPI({ urls: [{ filename: "requests-2.32.0-py3-none-any.whl" }] }).ok, true);
+  assert.equal(decidirPorPyPI({ urls: [{ filename: "psutil-6.0-cp312-win_amd64.whl" }, { filename: "psutil-6.0.tar.gz" }] }).ok, false);
+  assert.match(decidirPorPyPI({ urls: [{ filename: "x-1.0.tar.gz" }] }).motivo, /código fuente/);
 });
 
 test("pip list y freeze", async () => {
@@ -133,5 +159,6 @@ test("shell: pip, python -m pip, npm, npx", async () => {
   assert.match(quitarAnsi(out), /"lodash": "\^4\.17\.21"/);
   assert.equal(await shell.ejecutar("npx ts-node x.ts", s), 0); assert.deepEqual(llamadas, ["x.ts"]);
   assert.equal(await shell.ejecutar("npx cowsay hola", s), 127); assert.match(quitarAnsi(err), /no se puede descargar «cowsay»/);
-  assert.equal(await shell.ejecutar("python -m venv env", s), 1);
+  assert.equal(await shell.ejecutar("python -m venv env", s), 0, "ahora sí se crean entornos virtuales");
+  assert.ok("env/pyvenv.cfg" in py.files);
 });

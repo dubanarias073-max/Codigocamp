@@ -20,7 +20,7 @@ export const PLANTILLAS = {
   "script.js": "console.log(\"Proyecto listo\");\n",
 };
 
-export const gitNuevo = () => ({ initialized: false, branch: "main", staged: [], tracked: [], committed: {}, commits: [], remote: "", branches: {} });
+export const gitNuevo = () => ({ initialized: false, branch: "main", staged: [], tracked: [], committed: {}, commits: [], remote: "", branches: {}, repos: {} });
 export const proyectoNuevo = () => ({ ...normalizar({ files: { ...PLANTILLAS } }), git: gitNuevo() });
 
 const esObjeto = (v) => v && typeof v === "object" && !Array.isArray(v);
@@ -48,7 +48,23 @@ export function normalizarGit(crudo) {
     commits,
     remote: typeof g.remote === "string" ? g.remote.slice(0, 250) : "",
     branches,
+    repos: normalizarRepos(g.repos),
   };
+}
+
+/** Repositorios de Git real del proyecto: carpeta → { remote, respaldo (marcador del .git comprimido), rama }. */
+function normalizarRepos(crudo) {
+  const salida = {};
+  if (!esObjeto(crudo)) return salida;
+  for (const [carpeta, info] of Object.entries(crudo).slice(0, 50)) {
+    if (typeof carpeta !== "string" || carpeta.length > 400 || carpeta.startsWith("/") || carpeta.split("/").includes("..") || !esObjeto(info)) continue;
+    salida[carpeta] = {
+      remote: typeof info.remote === "string" ? info.remote.slice(0, 400) : "",
+      respaldo: typeof info.respaldo === "string" ? info.respaldo.slice(0, 200) : "",
+      rama: typeof info.rama === "string" ? info.rama.slice(0, 120) : "",
+    };
+  }
+  return salida;
 }
 
 export function normalizarProyecto(crudo) {

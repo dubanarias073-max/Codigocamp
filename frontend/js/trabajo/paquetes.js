@@ -8,6 +8,7 @@
 //            ejecutor de Node los carga desde el CDN esm.sh con la versión que dice tu package.json.
 import { color } from "./ansi.js";
 import * as FS from "./fs.js";
+import { dependenciasPip, revisarPip } from "./disponibilidad.js";
 import { PAQUETES, PLANTILLAS, VERSIONES_RESPALDO, archivosDePlantilla } from "./plantillas.js";
 
 // ================================================================================= pip ====
@@ -27,13 +28,46 @@ export async function restaurarPaquetes({ pyo, lista, out = () => {}, err = () =
   const faltan = lista.filter((e) => ESPEC_PIP.test(e) && !instaladosEnSesion.has(nombreDe(e))); // lo guardado en el navegador también se valida
   if (!faltan.length) return;
   out(color.gris(`Instalando paquetes guardados: ${faltan.join(", ")}…\n`));
-  try {
-    await pyo.loadPackage("micropip");
-    const micropip = pyo.pyimport("micropip");
-    for (const e of faltan) { await micropip.install(e); instaladosEnSesion.add(nombreDe(e)); }
-  } catch (error) {
-    err(`No se pudieron restaurar los paquetes: ${explicarErrorPip(error.message)}\n`);
+  let micropip;
+  try { await pyo.loadPackage("micropip"); micropip = pyo.pyimport("micropip"); }
+  catch (error) { err(`No se pudieron restaurar los paquetes: ${explicarErrorPip(error.message)}\n`); return; }
+  for (const e of faltan) {
+    try { await instalarTolerante(micropip, e); instaladosEnSesion.add(nombreDe(e)); }
+    catch (error) { err(`No se pudo restaurar ${e}: ${explicarErrorPip(error.message).split("\n")[0]}\n`); }
   }
+}
+
+/**
+ * Instala como pip pero sin rendirse al primer problema (como hace VS Code con un requirements.txt grande):
+ *  1. tal cual;  2. sin versión exacta ni extras;  3. el paquete solo y luego cada dependencia aparte,
+ *  saltando las que no existen para el navegador (casi siempre opcionales para lo que usa tu código).
+ */
+export async function instalarTolerante(micropip, espec, { deps = dependenciasPip } = {}) {
+  try { await micropip.install(espec); return { instalado: espec }; }
+  catch (primero) {
+    const simple = espec.replace(/\[.*?\]/, "").split(/[=<>~!]/)[0];
+    if (simple !== espec) {
+      try { await micropip.install(simple); return { instalado: simple, aviso: `${espec} no está disponible para el navegador; se instaló ${simple} (la versión más parecida).` }; }
+      catch { /* se intenta por partes */ }
+    }
+    try { await micropip.install.callKwargs(simple, { deps: false }); }
+    catch { throw primero; }
+    const saltadas = [];
+    for (const d of await deps(simple)) {
+      try { await micropip.install(d); } catch { saltadas.push(d); }
+    }
+    return { instalado: simple, aviso: saltadas.length ? `${simple} se instaló sin ${saltadas.join(", ")} (no existe${saltadas.length > 1 ? "n" : ""} para el navegador). Si tu código no lo${saltadas.length > 1 ? "s" : ""} importa directamente, funciona igual.` : null };
+  }
+}
+
+// Lo que en tu PC hace de servidor web: aquí no se instala porque CódigoCamp sirve la app (fastapi dev, uvicorn, flask run).
+const SERVIDORES = new Set(["uvicorn", "gunicorn", "uvloop", "httptools", "watchfiles", "hypercorn", "waitress", "daphne", "fastapi-cli", "gevent", "eventlet", "granian"]);
+// Solo existen para Windows / macOS o necesitan el sistema: se omiten.
+const DEL_SISTEMA = new Set(["pywin32", "pywin32-ctypes", "pypiwin32", "pyobjc", "appnope", "colorama-win", "wmi", "pyinstaller", "pyinstaller-hooks-contrib", "pip", "setuptools", "wheel"]);
+
+/** Limpia una línea de requirements.txt: quita marcadores de entorno («; python_version…»), espacios y hashes. */
+export function limpiarRequisito(linea) {
+  return linea.replace(/#.*/, "").replace(/\s--hash=\S+/g, "").split(";")[0].replace(/\s+/g, "").trim();
 }
 
 /**
@@ -44,7 +78,7 @@ export async function restaurarPaquetes({ pyo, lista, out = () => {}, err = () =
  * @param {()=>Promise<object>} o.cargarPy   devuelve la instancia de Pyodide
  * @param {{leer:()=>string[], guardar:(l:string[])=>void}} o.almacen
  */
-export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy, almacen }) {
+export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy, almacen, revisar = revisarPip }) {
   const [sub, ...resto] = args;
   if (!sub || sub === "help" || sub === "--help") { out("Uso: pip install <paquete>[==versión] | install -r requirements.txt | uninstall <paquete> | list | freeze\n"); return sub ? 0 : 1; }
   if (sub === "--version" || sub === "-V") { out("pip (micropip en Pyodide, CódigoCamp)\n"); return 0; }
@@ -56,7 +90,9 @@ export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy
     try { err(color.gris("Cargando Python…\n")); pyo = await cargarPy(); } catch (e) { err(`${e.message}\n`); return 1; }
     const filas = JSON.parse(pyo.runPython("import importlib.metadata as _m, json\njson.dumps(sorted((d.metadata['Name'], d.version) for d in _m.distributions() if d.metadata['Name']))"));
     const propios = new Set(lista.map(nombreDe));
-    const mostrar = sub === "freeze" ? filas.filter(([n]) => propios.has(nombreDe(n))) : filas;
+    const enVenv = Boolean(almacen.venv);
+    const mostrar = sub === "freeze" ? filas.filter(([n]) => propios.has(nombreDe(n)))
+      : enVenv ? [["pip", "24.0"], ...filas.filter(([n]) => propios.has(nombreDe(n)))] : filas;
     out(sub === "freeze" ? mostrar.map(([n, v]) => `${n}==${v}`).join("\n") + (mostrar.length ? "\n" : "")
       : `${"Package".padEnd(28)}Version\n${"-".repeat(28)} ${"-".repeat(10)}\n${mostrar.map(([n, v]) => n.padEnd(28) + v).join("\n")}\n`);
     return 0;
@@ -68,10 +104,43 @@ export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy
     if (resto[i] === "-r" || resto[i] === "--requirement") { archivoReq = resto[i + 1] ?? ""; i += 1; }
     else if (!resto[i].startsWith("-")) especs.push(resto[i]);
   }
+  const omitidos = [];
   if (archivoReq !== null) {
-    const ruta = FS.resolver(cwd, archivoReq);
-    if (ruta === null || !FS.tieneArchivo(proyecto, ruta)) { err(`ERROR: no se encontró el archivo de requisitos «${archivoReq}»\n`); return 1; }
-    especs.push(...proyecto.files[ruta].split("\n").map((l) => l.replace(/#.*/, "").trim()).filter((l) => l && !l.startsWith("-")));
+    const leidos = new Set();
+    const leer = (nombre, desde) => {
+      const ruta = FS.resolver(desde, nombre);
+      if (ruta === null || !FS.tieneArchivo(proyecto, ruta)) { err(`ERROR: no se encontró el archivo de requisitos «${nombre}»\n`); return false; }
+      if (leidos.has(ruta)) return true;
+      leidos.add(ruta);
+      for (const cruda of proyecto.files[ruta].split("\n")) {
+        const l = cruda.replace(/#.*/, "").trim();
+        if (!l) continue;
+        const r = /^(?:-r|--requirement)\s*(\S+)/.exec(l);
+        if (r) { leer(r[1], FS.carpetaDe(ruta)); continue; }
+        if (l.startsWith("-") || /^(git\+|https?:|file:|\.)/.test(l)) { omitidos.push([l, "opción o ruta local (no aplica en el navegador)"]); continue; }
+        especs.push(limpiarRequisito(l));
+      }
+      return true;
+    };
+    if (!leer(archivoReq, cwd)) return 1;
+    out(`Leyendo ${archivoReq}: ${especs.length} paquete${especs.length === 1 ? "" : "s"}\n`);
+  }
+  if (sub === "install") {
+    for (let i = especs.length - 1; i >= 0; i -= 1) {
+      const n = nombreDe(especs[i]);
+      if (SERVIDORES.has(n)) { omitidos.push([especs[i], "CódigoCamp ya hace de servidor: usa fastapi dev main.py o uvicorn main:app --reload"]); especs.splice(i, 1); }
+      else if (DEL_SISTEMA.has(n)) { omitidos.push([especs[i], n === "pip" || n === "setuptools" || n === "wheel" ? "ya viene con Python" : "solo existe para Windows/macOS de escritorio"]); especs.splice(i, 1); }
+    }
+    for (const [e, motivo] of omitidos.reverse()) out(`${color.gris("○")} ${e} ${color.gris("— " + motivo)}\n`);
+    if (!especs.length && omitidos.length) return 0;
+  }
+  // Conectores de bases de datos: ya vienen con CódigoCamp (los reales usan sockets, que el navegador no tiene).
+  const MYSQL = new Set(["pymysql", "mysql-connector-python", "mysql-connector", "mysqlclient", "psycopg2", "psycopg2-binary", "psycopg", "psycopg-binary", "pymongo", "redis", "bson"]);
+  const yaIncluidos = especs.filter((e) => MYSQL.has(nombreDe(e)));
+  if (yaIncluidos.length) {
+    out(`${color.verde("✔")} ${yaIncluidos.join(", ")}: ya incluido en CódigoCamp (conecta con tus bases: MySQL/XAMPP, PostgreSQL, MongoDB, Redis)\n`);
+    for (let i = especs.length - 1; i >= 0; i -= 1) if (MYSQL.has(nombreDe(especs[i]))) especs.splice(i, 1);
+    if (!especs.length) return 0;
   }
   if (!especs.length) { err(sub === "install" ? "ERROR: indica qué instalar: pip install <paquete>\n" : "ERROR: indica qué desinstalar: pip uninstall <paquete>\n"); return 1; }
   const malos = especs.filter((e) => !ESPEC_PIP.test(e));
@@ -86,15 +155,24 @@ export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy
   const micropip = pyo.pyimport("micropip");
   let guardados = almacen.leer();
   let codigo = 0;
+  const fallidos = [];
+  const version = (n) => { try { return pyo.runPython(`import importlib.metadata as _m\ntry:\n    _v = _m.version(${JSON.stringify(n)})\nexcept Exception:\n    _v = ""\n_v`); } catch { return ""; } };
   for (const espec of especs) {
     const n = nombreDe(espec);
     try {
       if (sub === "install") {
+        const rev = await revisar(n);
+        if (!rev.ok) {
+          err(`ERROR: ${espec} no se puede instalar en Trabajo: ${rev.motivo}.\n${rev.alternativa ? `  Alternativa: ${rev.alternativa}\n` : ""}`);
+          if (rev.existe !== false) err(color.gris("  Trabajo ejecuta Python dentro del navegador. En tu PC (VS Code) sí se instala con pip normal.\n"));
+          fallidos.push(espec); codigo = 1; continue;
+        }
         out(`Instalando ${espec}…\n`);
-        await micropip.install(espec);
+        const { instalado, aviso } = await instalarTolerante(micropip, espec);
+        if (aviso) out(`${color.amarillo("⚠")} ${aviso}\n`);
         instaladosEnSesion.add(n);
-        guardados = [...guardados.filter((g) => nombreDe(g) !== n), espec];
-        out(`${color.verde("✔")} ${espec} instalado\n`);
+        guardados = [...guardados.filter((g) => nombreDe(g) !== n), instalado];
+        out(`${color.verde("✔")} ${instalado}${instalado === espec && version(n) && !espec.includes("==") ? " " + version(n) : ""} instalado\n`);
       } else {
         await micropip.uninstall(n);
         instaladosEnSesion.delete(n);
@@ -102,12 +180,20 @@ export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy
         out(`Desinstalado ${n}\n`);
       }
     } catch (error) {
-      err(`ERROR: ${explicarErrorPip(error.message)}\n`);
+      err(`ERROR: ${espec}: ${explicarErrorPip(error.message)}\n`);
+      fallidos.push(espec);
       codigo = 1;
     }
   }
   almacen.guardar(guardados);
-  if (sub === "install" && codigo === 0) out(color.gris("Los paquetes quedan disponibles al ejecutar python y se reinstalan solos en tu próxima sesión.\n"));
+  if (sub === "install" && especs.length > 1) {
+    const bien = especs.length - fallidos.length;
+    out(`\n${color.negrita("Resumen:")} ${color.verde(`${bien} instalado${bien === 1 ? "" : "s"}`)}${omitidos.length ? ` · ${color.gris(`${omitidos.length} omitido${omitidos.length === 1 ? "" : "s"} (no hacen falta aquí)`)}` : ""}${fallidos.length ? ` · ${color.rojo(`${fallidos.length} con error: ${fallidos.join(", ")}`)}` : ""}\n`);
+    if (fallidos.length) out(color.gris("Los que fallan suelen tener código en C sin versión para el navegador. Si tu código no los importa, puedes ignorarlos; si los usa, busca una alternativa en Extensiones (Ctrl+Shift+X).\n"));
+  }
+  if (sub === "install" && codigo === 0) out(color.gris(almacen.venv
+    ? `Instalado en el entorno virtual «${almacen.venv.split("/").pop()}» (queda en ${almacen.venv}/lib/python3.12/site-packages/cc-requisitos.txt). pip freeze > requirements.txt lo guarda para compartir.\n`
+    : "Los paquetes quedan disponibles al ejecutar python y se reinstalan solos en tu próxima sesión.\n"));
   return codigo;
 }
 
@@ -313,4 +399,42 @@ export async function crearProyecto({ py, cwd = "", args, out, err, cambio = () 
   out(`\n${color.verde("Listo.")} Ahora ejecuta:\n\n${dir && dir !== cwd ? `  cd ${nombre}\n` : ""}  npm run dev\n\n`);
   out(color.gris("npm run dev abre la vista previa. No hace falta npm install: React y las demás librerías se cargan desde esm.sh con las versiones de package.json.\n"));
   return 0;
+}
+
+// ============================================================ sugerencias ante errores ====
+// Nombre del import → nombre del paquete en pip (cuando no coinciden).
+const IMPORT_A_PIP = {
+  cv2: "opencv-python", PIL: "Pillow", sklearn: "scikit-learn", yaml: "PyYAML", bs4: "beautifulsoup4", dotenv: "python-dotenv",
+  jose: "python-jose", jwt: "PyJWT", multipart: "python-multipart", dateutil: "python-dateutil", docx: "python-docx", pptx: "python-pptx",
+  Crypto: "pycryptodome", serial: "pyserial", usb: "pyusb", magic: "python-magic", OpenSSL: "pyOpenSSL", attr: "attrs", git: "GitPython",
+  telegram: "python-telegram-bot", discord: "discord.py", google: "google-api-python-client", sqlmodel: "sqlmodel", passlib: "passlib[bcrypt]",
+  email_validator: "email-validator", jinja2: "Jinja2", markdown: "Markdown", fitz: "PyMuPDF", skimage: "scikit-image", MySQLdb: "mysqlclient",
+};
+
+/** Si `mensaje` es un ModuleNotFoundError, devuelve el texto de ayuda (qué instalar y dónde); si no, null. */
+export function sugerenciaPython(mensaje, { py = null, cwd = "", venv = null } = {}) {
+  const m = /ModuleNotFoundError: No module named '([\w.]+)'/.exec(String(mensaje));
+  if (!m) return null;
+  const raiz = m[1].split(".")[0];
+  if (["ssl", "_ssl", "hashlib", "_hashlib", "lzma", "_lzma", "sqlite3", "_sqlite3"].includes(raiz)) {
+    return `💡 «${raiz.replace(/^_/, "")}» es parte de Python, pero en el navegador se descarga aparte. Trabajo lo carga solo: vuelve a ejecutar (Ctrl+C y otra vez el comando). Si sigue, revisa tu conexión a internet.`;
+  }
+  if (py && Object.keys(py.files).some((r) => r === `${raiz}.py` || r.endsWith(`/${raiz}.py`) || r.startsWith(`${raiz}/`) || r.includes(`/${raiz}/`))) {
+    return `💡 «${raiz}» es un archivo o carpeta de tu proyecto: ejecuta el programa desde la carpeta correcta (cd …) o agrega un __init__.py a la carpeta.`;
+  }
+  const pip = IMPORT_A_PIP[raiz] ?? raiz.replace(/_/g, "-");
+  const req = py && ["requirements.txt", FS.unir(cwd, "requirements.txt")].find((r) => FS.tieneArchivo(py, r) && new RegExp(`^\\s*${pip.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\[.*$/, "")}\\b`, "im").test(py.files[r]));
+  const donde = venv ? ` en el entorno «${venv}»` : "";
+  return `💡 Falta instalar el paquete «${pip}»${donde}. Escribe:  pip install ${pip}` +
+    (req ? `\n   Está en ${req}: instala todo con  pip install -r ${req}` : "") +
+    "\n   También puedes buscarlo en Extensiones (Ctrl+Shift+X).";
+}
+
+/** Igual para Node: «Cannot find module 'x'» o un import de un paquete que no está en package.json. */
+export function sugerenciaNode(mensaje) {
+  const m = /Cannot find (?:module|package) '([^']+)'|Failed to resolve module specifier "([^"]+)"/.exec(String(mensaje));
+  if (!m) return null;
+  const nombre = (m[1] || m[2]).startsWith("@") ? (m[1] || m[2]).split("/").slice(0, 2).join("/") : (m[1] || m[2]).split("/")[0];
+  if (nombre.startsWith(".") || nombre.startsWith("node:")) return null;
+  return `💡 Falta el paquete «${nombre}». Escribe:  npm install ${nombre}   (o búscalo en Extensiones, Ctrl+Shift+X)`;
 }

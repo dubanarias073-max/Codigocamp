@@ -45,7 +45,7 @@
 html:has(.trabajo-pagina) { height: 100%; }
 .trabajo-app.ide {
   display: grid; grid-template-columns: 84px minmax(0, 1fr); width: 100%; max-width: none; height: 100vh; height: 100dvh; margin: 0; padding: 0; gap: 0;
-  --w-exp: 260px; --w-asist: 330px; color: var(--txt);
+  --w-exp: clamp(230px, 18vw, 300px); --w-asist: clamp(290px, 23vw, 400px); color: var(--txt);
 }
 .trabajo-app.ide *, .trabajo-app.ide *::before, .trabajo-app.ide *::after { box-sizing: border-box; }
 .trabajo-app .tope { display: none !important; }
@@ -76,8 +76,18 @@ html:has(.trabajo-pagina) { height: 100%; }
 /* ---------- Archivos ---------- */
 .explorador { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; }
 .exp-cab { display: flex; align-items: center; justify-content: space-between; flex: none; height: 46px; padding: 0 10px 0 16px; }
-.exp-titulo { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
-.exp-acciones { display: flex; gap: 2px; }
+.exp-titulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
+.exp-acciones { display: flex; gap: 2px; flex: none; }
+.exp-vistas { display: flex; gap: 4px; flex: none; margin: 0 10px 8px; padding: 3px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--borde); }
+.vista-btn { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; height: 30px; padding: 0 6px; border: 0; border-radius: 9px; background: transparent; color: var(--sub); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.vista-btn svg { width: 15px; height: 15px; flex: none; }
+.vista-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vista-btn.solo-ic { flex: none; width: 32px; }
+.vista-btn:hover { color: var(--cy); background: var(--hover); }
+.vista-btn.activo { background: var(--surf); color: var(--txt); box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
+.vista-num { min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: #e2c08d; color: #2a1d05; font-style: normal; font-size: 10.5px; line-height: 17px; text-align: center; }
+.vista-num.aviso { background: var(--cy); color: #04131a; }
+@media (max-width: 1500px) { .vista-btn span { display: none; } .vista-btn { flex: 1; } }
 .exp-seccion { display: flex; align-items: center; justify-content: space-between; flex: none; margin: 0 10px 6px; padding: 6px 10px; border-radius: 12px; background: var(--chip-bg); border: 1px solid var(--chip-bd); font-size: 13px; }
 .exp-seccion b { font-weight: 800; }
 .exp-nube { font-size: 10px; font-weight: 800; letter-spacing: .08em; color: var(--acc); }
@@ -89,7 +99,16 @@ html:has(.trabajo-pagina) { height: 100%; }
 .fila.sel { background: var(--sel-fila); }
 .arbol:focus-within .fila.sel:not(.edicion) { border-color: color-mix(in srgb, var(--cy) 60%, transparent); }
 .fila.activo .nom { font-weight: 800; color: var(--cy); }
-.fila .nom { overflow: hidden; text-overflow: ellipsis; }
+.fila .nom { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+/* Colores de Git (como VS Code) */
+.fila.g-M .nom, .pestana.g-M .nom { color: #e2c08d; }
+.fila.g-U .nom, .fila.g-A .nom, .pestana.g-U .nom, .pestana.g-A .nom { color: #73c991; }
+.fila.g-C .nom, .pestana.g-C .nom { color: #f48771; }
+.git-d { margin-left: auto; padding: 0 8px 0 6px; font-size: 11.5px; font-weight: 700; font-family: var(--mono, monospace); flex: none; }
+.fila.g-M .git-d { color: #e2c08d; } .fila.g-U .git-d, .fila.g-A .git-d { color: #73c991; } .fila.g-C .git-d { color: #f48771; }
+.fila.dir .git-d { font-size: 9px; opacity: .9; }
+:root[data-tema=claro] .fila.g-M .nom, :root[data-tema=claro] .pestana.g-M .nom, :root[data-tema=claro] .fila.g-M .git-d { color: #9a6700; }
+:root[data-tema=claro] .fila.g-U .nom, :root[data-tema=claro] .fila.g-A .nom, :root[data-tema=claro] .pestana.g-U .nom, :root[data-tema=claro] .fila.g-U .git-d, :root[data-tema=claro] .fila.g-A .git-d { color: #1a7f37; }
 .fila .chev { width: 16px; height: 16px; flex: none; color: var(--sub); transition: transform .12s; }
 .fila[aria-expanded="true"] .chev { transform: rotate(90deg); }
 .chev-vacio { width: 16px; flex: none; }
@@ -348,3 +367,169 @@ button.estado-item:hover { background: var(--hover); color: var(--cy); }
 .fi-media { background: #e05d44; } .fi-bin { background: #57606a; }
 
 .visor-imagen .visor-texto { align-self: stretch; flex: 1; min-height: 200px; margin: 0; padding: 14px 16px; overflow: auto; border-radius: 10px; background: var(--campo-bg); color: var(--txt); font: 12.5px/1.5 ui-monospace, Consolas, monospace; white-space: pre; }
+
+/* ---- Como VS Code: editor Monaco, paleta (Ctrl+P), buscar en archivos, Git y problemas ---- */
+.ed.ed-monaco { position: absolute; inset: 0; display: block; padding: 0; }
+.ed.ed-monaco[hidden] { display: none; }
+.paleta-fondo { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: center; align-items: flex-start; padding-top: 8vh; background: rgba(4, 6, 16, .35); }
+.paleta { width: min(640px, 94vw); border: 1px solid var(--borde); border-radius: 14px; background: var(--panel); color: var(--txt); box-shadow: 0 24px 70px rgba(0, 0, 0, .45); overflow: hidden; font: 14px/1.4 system-ui, sans-serif; }
+.paleta-entrada { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 0; border-bottom: 1px solid var(--borde); background: var(--campo-bg); color: var(--txt); font: inherit; outline: none; }
+.paleta-lista { max-height: 55vh; overflow: auto; padding: 4px; }
+.paleta-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+.paleta-item.on, .paleta-item:hover { background: rgba(96, 165, 250, .18); }
+.paleta-etiqueta { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paleta-etiqueta b { color: #60a5fa; }
+.paleta-detalle { color: var(--sub); font-size: 12px; white-space: nowrap; }
+.paleta-item kbd { color: var(--sub); font-size: 11px; }
+.paleta-vacia { padding: 14px; color: var(--sub); }
+.buscador { width: min(760px, 95vw); }
+.buscador-fila { display: flex; gap: 6px; margin: 6px 0; }
+.buscador-fila input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--borde); border-radius: 8px; background: var(--campo-bg); color: var(--txt); font: 13px ui-monospace, Consolas, monospace; }
+.buscador .opcion { min-width: 34px; border: 1px solid var(--borde); border-radius: 8px; background: transparent; color: var(--sub); font: 700 12px ui-monospace, monospace; cursor: pointer; }
+.buscador .opcion[aria-pressed="true"] { border-color: #60a5fa; color: #60a5fa; background: rgba(96, 165, 250, .12); }
+.buscador details { margin: 4px 0; color: var(--sub); font-size: 12.5px; }
+.buscador-resultados { max-height: 50vh; overflow: auto; margin-top: 6px; }
+.buscador-ruta { margin-top: 8px; font-weight: 700; font-size: 13px; }
+.buscador-ruta span { margin-left: 6px; padding: 0 6px; border-radius: 8px; background: var(--campo-bg); color: var(--sub); font-size: 11px; }
+.buscador-linea { display: block; width: 100%; padding: 3px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--txt); text-align: left; white-space: pre; overflow: hidden; text-overflow: ellipsis; font: 12.5px ui-monospace, Consolas, monospace; cursor: pointer; }
+.buscador-linea:hover { background: rgba(96, 165, 250, .14); }
+.buscador-linea .num { display: inline-block; min-width: 3.2em; color: var(--sub); }
+.buscador-linea mark { background: rgba(250, 204, 21, .45); color: inherit; border-radius: 3px; }
+.panel-git { flex: 1; overflow: auto; padding: 6px 10px 12px; font-size: 13px; }
+.panel-git[hidden] { display: none; }
+.panel-git textarea { width: 100%; box-sizing: border-box; margin: 6px 0; padding: 8px; border: 1px solid var(--borde); border-radius: 8px; background: var(--campo-bg); color: var(--txt); font: 13px system-ui, sans-serif; resize: vertical; }
+.git-cab { display: flex; justify-content: space-between; align-items: center; color: var(--sub); }
+.git-commit { width: 100%; justify-content: center; }
+.git-grupo { margin-top: 10px; }
+.git-titulo { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: var(--sub); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.git-titulo span { padding: 0 6px; border-radius: 8px; background: var(--campo-bg); }
+.git-titulo .icono-btn { margin-left: auto; }
+.git-fila { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 6px; cursor: pointer; }
+.git-fila:hover { background: rgba(96, 165, 250, .12); }
+.git-nombre { white-space: nowrap; }
+.git-dir { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sub); font-size: 11.5px; }
+.git-botones { display: none; gap: 2px; }
+.git-fila:hover .git-botones, .git-fila:focus-within .git-botones { display: inline-flex; }
+.git-botones .icono-btn { width: 22px; height: 22px; font-weight: 800; }
+.git-letra { width: 14px; text-align: center; font-weight: 800; font-size: 12px; }
+.git-M { color: #fbbf24; } .git-A, .git-U { color: #4ade80; } .git-D { color: #f87171; }
+.git-acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.git-commit-item { padding: 2px 0; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.git-commit-item code { color: #fbbf24; }
+.git-vacio { padding: 10px 2px; display: grid; gap: 8px; color: var(--sub); }
+.git-nota { color: var(--sub); font-size: 12px; }
+#verGit.activo { color: #60a5fa; }
+.dialogo-diff { width: min(1200px, 96vw); }
+.dialogo-diff h3 small { color: var(--sub); font-weight: 600; font-size: 12px; margin-left: 6px; }
+.diff-caja { height: 62vh; border: 1px solid var(--borde); border-radius: 10px; overflow: hidden; }
+#estProblemas .prob-e { color: #f87171; } #estProblemas .prob-a { color: #fbbf24; }
+
+/* Git real: selector de repositorio, sincronizar, ocupado, conflictos */
+.git-repo { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 6px; }
+.git-repo select { flex: 1; min-width: 0; font: inherit; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--borde, #d6dbe4); background: var(--fondo, #fff); color: inherit; }
+.git-sync { width: 100%; justify-content: center; margin-top: 6px; }
+.git-ocupado { opacity: .6; pointer-events: none; cursor: progress; }
+.git-C { color: #d9480f; }
+.git-commit-item { cursor: pointer; border-radius: 4px; padding: 2px 4px; }
+.git-commit-item:hover { background: rgba(127, 127, 127, .12); }
+#panelGit { box-sizing: border-box; padding: 6px 12px 12px; }
+
+/* Extensiones (librerías y frameworks) */
+.panel-ext { display: flex; flex-direction: column; gap: 8px; overflow-x: hidden; }
+.panel-ext[hidden] { display: none; }
+.ext-tabs { display: flex; gap: 4px; }
+.ext-tab { flex: 1; padding: 5px 6px; border: 1px solid var(--borde); border-radius: 8px; background: transparent; color: var(--sub); font: 700 12px system-ui, sans-serif; cursor: pointer; }
+.ext-tab.on { background: var(--campo-bg); color: var(--txt); border-color: #60a5fa; }
+.ext-buscar { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--borde); border-radius: 8px; background: var(--campo-bg); color: var(--txt); font: 13px system-ui, sans-serif; }
+.ext-lista { display: grid; gap: 2px; }
+.ext-item { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-radius: 8px; }
+.ext-item:hover { background: rgba(96, 165, 250, .1); }
+.ext-ico { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; font-weight: 800; font-size: 14px; }
+.ext-nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ext-nombre small, .ext-meta { color: var(--sub); font-size: 11px; }
+.ext-desc { color: var(--sub); font-size: 12px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.ext-btns { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
+.ext-ok { color: #16a34a; font-size: 11px; font-weight: 700; }
+#verExtensiones.activo { color: #60a5fa; }
+.ext-btns .btn { padding: 4px 10px; font-size: 11.5px; min-height: 0; border-radius: 8px; }
+
+/* Copiloto */
+.copiloto-op { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; border-style: solid; }
+.copiloto-op input { margin-top: 2px; accent-color: var(--acc, #22c55e); }
+.copiloto-op:has(input:checked) { border-color: #a855f7; background: color-mix(in srgb, #a855f7 10%, transparent); color: var(--txt); }
+.asistente-botones { display: flex; gap: 8px; }
+.asistente-botones .btn.pri { flex: 1; }
+.asistente-chat .msg.tutor { white-space: normal; }
+.asistente-chat .msg.tutor p { margin: 0 0 6px; }
+.asistente-chat .msg.tutor ul, .asistente-chat .msg.tutor ol { margin: 4px 0 6px; padding-left: 18px; }
+.asistente-chat .bloque { margin: 6px 0; border: 1px solid var(--borde); border-radius: 10px; overflow: hidden; }
+.asistente-chat .bloque-cab { display: flex; justify-content: space-between; align-items: center; padding: 3px 8px; background: rgba(0,0,0,.18); font-size: 11.5px; }
+.asistente-chat .bloque pre { margin: 0; padding: 8px 10px; overflow: auto; max-height: 340px; font: 12.5px ui-monospace, Consolas, monospace; white-space: pre; }
+.cambios-ia { border-color: #a855f7 !important; }
+.cambios-ia ul { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; }
+.cambios-ia li { display: flex; align-items: center; gap: 6px; }
+.cambios-ia li code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.cambios-ia li button { padding: 2px 8px; border: 1px solid var(--borde); border-radius: 8px; background: var(--panel); color: inherit; cursor: pointer; font-size: 12px; }
+.cambios-ia li button.ok { border-color: #22c55e; color: #16a34a; font-weight: 800; }
+.cambios-ia li em { font-size: 11px; color: var(--sub); }
+.cambios-ia li.cambio-rechazado code { text-decoration: line-through; opacity: .6; }
+.cambio-tipo { width: 18px; text-align: center; font-weight: 800; font-size: 12px; }
+.t-nuevo { color: #4ade80; } .t-modificar { color: #fbbf24; } .t-borrar { color: #f87171; }
+.cambios-acc { display: flex; gap: 6px; flex-wrap: wrap; }
+.cambio-errores { color: var(--rojo); display: block; margin: 4px 0; }
+.lado .yo-chip span{display:none}.lado .yo-chip{padding:6px;justify-content:center;margin-top:auto}
+
+/* Vista previa de un servidor (FastAPI, Flask…) */
+.vista-url { flex: 1; display: flex; gap: 4px; min-width: 0; }
+.vista-url input { flex: 1; min-width: 0; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--borde); background: var(--campo-bg, var(--panel2)); color: var(--txt); font: 12.5px var(--mono, ui-monospace, monospace); }
+.est-servidor { color: #73c991; font-weight: 700; }
+.est-servidor::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #73c991; box-shadow: 0 0 6px #73c991; }
+.ext-faltan { color: #e2c08d; }
+
+/* Extensiones: paquetes de Python que no existen para el navegador */
+.ext-no { margin-top: 4px; font-size: 11.5px; line-height: 1.35; color: #e5a50a; }
+.ext-no b { color: inherit; }
+.ext-btns .btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+/* ---------- Celular (hasta 760 px, pensado desde 320 × 505): pestañas y una sección a la vez ---------- */
+.movil-tabs { display: none; }
+@media (max-width: 760px) {
+  .trabajo-pagina { overflow: hidden; }
+  .trabajo-app.ide { display: block; height: 100dvh; min-height: 0; }
+  .ide-cuerpo, .ide.sin-asistente .ide-cuerpo, .ide.sin-explorador .ide-cuerpo, .ide.sin-explorador.sin-asistente .ide-cuerpo {
+    display: flex; flex-direction: column; gap: 6px; height: 100dvh;
+    padding: 6px 6px calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  .movil-tabs {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; flex: none;
+    padding: 4px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel);
+  }
+  .movil-tabs button {
+    min-height: 34px; padding: 0 2px; border: 0; border-radius: 7px; background: none;
+    color: var(--sub); font: 700 12.5px/1 inherit; font-family: inherit; cursor: pointer; white-space: nowrap;
+  }
+  .movil-tabs button.on { background: color-mix(in srgb, var(--acc) 18%, transparent); color: var(--txt); }
+  .movil-tabs button:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+
+  /* Solo la sección elegida ocupa la pantalla */
+  .ide .explorador, .ide .asistente, .ide .trabajo-centro { display: none !important; }
+  .ide[data-movil="archivos"] .explorador { display: flex !important; flex: 1; min-height: 0; max-height: none; }
+  .ide[data-movil="asistente"] .asistente { display: flex !important; flex: 1; min-height: 0; margin: 0; }
+  .ide[data-movil="codigo"] .trabajo-centro, .ide[data-movil="terminal"] .trabajo-centro { display: flex !important; flex: 1; min-height: 0; gap: 0; }
+  .ide[data-movil="codigo"] .editor-tarjeta { flex: 1; min-height: 0; }
+  .ide[data-movil="codigo"] #terminalPanel, .ide[data-movil="codigo"] .sash-h { display: none !important; }
+  .ide[data-movil="terminal"] .editor-tarjeta, .ide[data-movil="terminal"] .sash-h { display: none !important; }
+  .ide[data-movil="terminal"] #terminalPanel { flex: 1; height: auto !important; min-height: 0; }
+  .editor-tarjeta { min-height: 0; }
+  .asistente { min-height: 0; }
+
+  /* Barra de estado: una línea fina que se desliza, sin tapar el código */
+  .estado-barra { position: static; flex: none; overflow-x: auto; scrollbar-width: none; gap: 6px; font-size: 11.5px; }
+  .estado-barra::-webkit-scrollbar { display: none; }
+  .estado-izq, .estado-der { flex: none; gap: 4px; }
+  #terminalToggle, #asistenteToggle, #autoGuardado, .estado-menor, #estIndent { display: none; }
+}
+@media (max-width: 760px) and (max-height: 560px) {
+  .ide-cuerpo { gap: 4px; padding-top: 4px; }
+  .movil-tabs button { min-height: 30px; }
+}

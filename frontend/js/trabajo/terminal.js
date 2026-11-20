@@ -93,7 +93,8 @@ class Terminal {
     const py = this.panel.proyecto();
     const g = py.git;
     const rama = g.initialized ? ` \x1b[36m(\x1b[31m${g.branch}\x1b[36m)\x1b[0m` : "";
-    return `\x1b[32m@${nombreCorto(this.panel.shell.usuario)} \x1b[0m➜ \x1b[1;34m${rutaAbsoluta(this.sesion.cwd)}\x1b[0m${rama} $ `;
+    const venv = this.sesion.venv ? `\x1b[90m(${this.sesion.venv.split("/").pop()})\x1b[0m ` : "";
+    return `${venv}\x1b[32m@${nombreCorto(this.panel.shell.usuario)} \x1b[0m➜ \x1b[1;34m${rutaAbsoluta(this.sesion.cwd)}\x1b[0m${rama} $ `;
   }
 
   #crearEntrada(contenedor) {

@@ -5,9 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Recompensas · CódigoCamp</title>
   <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0d1b1a">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CódigoCamp">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="/js/carga.js"></script>
   <script src="/js/tema.js"></script>
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/recompensas.css">
+  <link rel="stylesheet" href="/css/cofres.css">
   <link rel="stylesheet" href="/css/tema.css">
 </head>
 <body class="cargando">
@@ -17,9 +26,34 @@
       <header class="misiones-head">
         <div><p class="misiones-kicker">CENTRO DE OPERACIONES <span>·</span> TEMPORADA ACTUAL</p>
           <h1 class="titulo-pag">Tu tablero de misiones</h1>
-          <p class="sub">Practica a tu ritmo. Todas las recompensas son diamantes y se acreditan solas.</p></div>
+          <p class="sub">Cumple encargos y logros, abre sus cofres y no pierdas tu racha.</p></div>
         <div class="misiones-stamp" aria-hidden="true"><span>CC</span><small>BUILD<br>STREAK</small></div>
       </header>
+
+      <div class="abrir-fondo" id="abrirFondo" hidden><div class="abrir-caja" id="abrirCaja" role="dialog" aria-modal="true" aria-label="Abriendo cofre"></div></div>
+
+      <div class="rc-resumen" id="rcResumen" aria-live="polite">
+        <div class="rc-dato"><b id="rsListos">0</b><small>cofres por abrir</small></div>
+        <div class="rc-dato"><b id="rsHoy">0/6</b><small>encargos de hoy</small></div>
+        <div class="rc-dato"><b id="cofresCuenta">0/10</b><small>cofres de logro</small></div>
+        <div class="rc-dato"><b id="rsMes">0/60</b><small>puntos de temporada</small></div>
+      </div>
+      <nav class="rc-tabs" role="tablist" aria-label="Secciones de recompensas">
+        <button type="button" role="tab" class="rc-tab on" data-rc="hoy" aria-selected="true">📋 Encargos de hoy</button>
+        <button type="button" role="tab" class="rc-tab" data-rc="logros" aria-selected="false">🎁 Cofres de logro <em class="rc-badge" id="badgeLogros" hidden></em></button>
+        <button type="button" role="tab" class="rc-tab" data-rc="temporada" aria-selected="false">🏆 Temporada</button>
+      </nav>
+      <section class="botin rc-panel" data-panel="hoy" aria-labelledby="t-hoy">
+        <div class="d-cab"><div><p class="misiones-kicker">CHECKLIST · <span id="dailyCount">00</span></p><h2 id="t-hoy">Encargos de hoy</h2></div><span class="d-cierre" id="horas"></span></div>
+        <p class="sub">Cada encargo trae un cofre: se abre solo dentro de la lección en cuanto lo cumples.</p>
+        <div id="hoy" class="d-lista" aria-live="polite"></div>
+      </section>
+      <section class="botin rc-panel" data-panel="logros" hidden aria-labelledby="t-logros">
+        <div class="d-cab"><div><p class="misiones-kicker">LOGROS</p><h2 id="t-logros">Cofres de logro</h2></div></div>
+        <p class="sub">Primero los que puedes abrir, luego los que tienes más cerca. Dan diamantes, salvarrachas y cosméticos exclusivos.</p>
+        <div class="cofres" id="cofres" aria-live="polite"></div>
+      </section>
+      <div class="rc-panel" data-panel="temporada" hidden>
       <section class="d-mes" aria-label="Desafío del mes">
         <div class="d-mes-art" aria-hidden="true"><span><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M32 5 38 22 56 15 47 31 62 39 44 42 46 60 32 48 18 60 20 42 2 39 17 31 8 15 26 22 32 5Z"/><circle cx="32" cy="34" r="7"/><path d="M32 27v14m-7-7h14"/></svg></span><i>01</i><b>OBJETIVO<br>DE TEMPORADA</b></div>
         <div class="d-mes-main">
@@ -33,15 +67,16 @@
           </div>
         </div>
       </section>
-      <section class="misiones-diarias" aria-labelledby="daily-title">
-        <div class="d-cab"><div><p class="misiones-kicker">CHECKLIST / <span id="dailyCount">00</span></p><h2 id="daily-title">Encargos de hoy</h2></div><span class="d-cierre" id="horas"></span></div>
-        <div id="hoy" class="d-lista" aria-live="polite"></div>
-        <p class="nota">Cada encargo completado suma a tu objetivo de temporada. Gasta tus diamantes en la <a href="/pages/tienda.html">tienda</a>.</p>
-      </section>
+        <p class="nota">Cada encargo cumplido suma 5 puntos. ¿Quieres ver tus días de práctica? Míralos en el <a href="/pages/perfil.html#calendario">calendario de racha de tu perfil</a>. Gasta tus diamantes en la <a href="/pages/tienda.html">tienda</a>.</p>
+      </div>
+
+
+
     </main>
     <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
   </div>
   <nav class="inf" id="inf" aria-label="Principal"></nav>
   <script type="module" src="/js/recompensas.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

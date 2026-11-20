@@ -2,6 +2,7 @@
 import { iniciar, api, esc, aviso, elegirCurso } from "/js/app.js";
 import { logo } from "/js/logos.js";
 import { pintarSeccion } from "/js/camino.js";
+import { mostrarCofre } from "/js/cofres.js";
 
 const { prog } = await iniciar("inicio");
 const $ = (id) => document.getElementById(id);
@@ -152,12 +153,18 @@ cont.onclick = async (e) => {
   if (b.dataset.estado === "bloqueado") { b.classList.add("sacudir"); setTimeout(() => b.classList.remove("sacudir"), 400); aviso("Completa la lección anterior primero.", true); return; }
   if (b.dataset.tipo === "cofre") {
     if (b.dataset.estado === "hecho") return aviso("Ya abriste este cofre.");
-    try {
-      const r = await api(`/api/nivel/${b.dataset.id}/completar/`, { fallos: 0 });
-      const gema = r.minerales_ganados.diamante ? ` · +${r.minerales_ganados.diamante} 💎` : "";
-      aviso(`¡Cofre abierto! +${r.xp_ganado} XP${gema}`);
-      setTimeout(() => location.reload(), 900);
-    } catch (x) { aviso(x.message, true); }
+    // Como en Duolingo: el cofre se abre en grande y muestra lo que trae.
+    const dorado = await mostrarCofre({
+      tipo: "plata", titulo: "Cofre de la sección", subtitulo: "Tu premio por llegar hasta aquí",
+      obtener: async () => {
+        const r = await api(`/api/nivel/${b.dataset.id}/completar/`, { fallos: 0 });
+        const premio = { xp: r.xp_ganado };
+        for (const p of r.premios || []) premio[p.tipo] = (premio[p.tipo] || 0) + p.cantidad;
+        if (!premio.diamante && r.minerales_ganados?.diamante) premio.diamante = r.minerales_ganados.diamante;
+        return { premio };
+      },
+    });
+    if (dorado !== null) location.reload();
     return;
   }
   location.href = "/pages/reto.html?nivel=" + b.dataset.id;

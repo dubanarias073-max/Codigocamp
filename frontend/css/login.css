@@ -25,10 +25,10 @@
 #reglasPw li.ok::marker{content:"✓ "}
 .cambio{margin:16px 0 0;text-align:center;color:var(--sub)}
 .cambio a{color:var(--acc);font-weight:700}
-.google-acceso{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;margin-top:16px;padding:11px 14px;border:1px solid var(--borde);border-radius:9px;background:var(--panel);font-weight:700;text-decoration:none}
+.google-acceso{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;color:inherit;padding:11px 14px;border:1px solid var(--borde);border-radius:9px;background:var(--panel);font-weight:700;text-decoration:none}
 .google-acceso:hover{border-color:var(--cy);background:var(--panel2)}
 .google-acceso span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#fff;color:#4285f4;font-weight:900}
-.separador-acceso{display:flex;align-items:center;gap:12px;margin:12px 0;color:var(--sub);font-size:12px}
+.separador-acceso{display:flex;align-items:center;gap:12px;margin:14px 0;color:var(--sub);font-size:12px}
 .separador-acceso::before,.separador-acceso::after{content:"";height:1px;flex:1;background:var(--borde)}
 @media (max-width:860px){.acceso-in{grid-template-columns:1fr;gap:28px}.beneficios{display:none}}
 /* Matching the CodeCamp studio interface. */
@@ -62,3 +62,9 @@ body{color:var(--txt);background-color:var(--bg);background-image:radial-gradien
 .authform input:focus{border-color:var(--cy);box-shadow:0 0 0 3px rgba(57,231,255,.08)}
 .cambio a{color:var(--cy)}
 
+
+/* ¿Olvidaste tu contraseña? */
+.olvide-link{justify-self:end;margin-top:-6px;font-size:13px;font-weight:700;color:var(--cy);text-decoration:none}
+.olvide-link:hover{text-decoration:underline}
+.authbox .ok-msg{color:#2f9e6b}
+.restablecer-in{grid-template-columns:minmax(320px,460px);justify-content:center}

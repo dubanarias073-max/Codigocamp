@@ -58,14 +58,15 @@ test("soporte: Chrome sí; Firefox, Safari, móvil, Brave y sin HTTPS explican p
 });
 
 test("vincular «carpeta»: el proyecto pasa a ser la carpeta; omite lo que no maneja sin tocarlo", async () => {
-  const disco = new DiscoMemoria({ "index.html": "﻿<h1>Hola</h1>\r\n", "img/logo.png": PNG, "Mi foto.png": PNG, "enorme.bin": new Uint8Array(3000), "node_modules/a.js": "x" });
+  const disco = new DiscoMemoria({ "index.html": "﻿<h1>Hola</h1>\r\n", "img/logo.png": PNG, "Mi foto.png": PNG, "raro?.png": PNG, "enorme.bin": new Uint8Array(3000), "node_modules/a.js": "x" });
   const { py, s, subidas } = montar({ "viejo.txt": "se va" }, disco, { maxArchivo: 2000 });
   const r = await s.vincular("carpeta");
-  assert.deepEqual(Object.keys(py.files).sort(), ["img/logo.png", "index.html"]);
+  assert.deepEqual(Object.keys(py.files).sort(), ["Mi foto.png", "img/logo.png", "index.html"]);
   assert.equal(py.files["index.html"], "<h1>Hola</h1>\n");
   assert.ok(esMarcador(py.files["img/logo.png"]));
-  assert.equal(subidas.length, 1);
-  assert.ok(r.omitidos.has("Mi foto.png") && r.omitidos.has("enorme.bin"));
+  assert.equal(subidas.length, 2);
+  assert.ok(r.omitidos.has("raro?.png") && r.omitidos.has("enorme.bin"));
+  assert.ok("Mi foto.png" in py.files, "los espacios ya se admiten");
   assert.equal(disco.texto("index.html"), "﻿<h1>Hola</h1>\r\n", "no se reescribe el archivo del computador");
   // Sin cambios: una vuelta no hace nada (sin ping-pong por BOM/CRLF) y no vuelve a leer archivos.
   const lecturas = disco.lecturas;

@@ -24,6 +24,7 @@ export class Explorador {
     this.seleccion = null;
     this.activo = null;
     this.edicion = null;
+    this.git = new Map();   // ruta → M | U | A | C (como los colores de Git en VS Code)
     raiz.tabIndex = 0;
     raiz.setAttribute("role", "tree");
     raiz.setAttribute("aria-label", "Archivos del proyecto");
@@ -57,6 +58,26 @@ export class Explorador {
     return filas;
   }
 
+  /** Colores de Git: mapa ruta → letra (M modificado, U sin seguimiento, A agregado, C conflicto). */
+  decorarGit(mapa) {
+    const nuevo = mapa instanceof Map ? mapa : new Map();
+    if (nuevo.size === this.git.size && [...nuevo].every(([r, l]) => this.git.get(r) === l)) return;
+    this.git = nuevo;
+    this.render();
+  }
+
+  #letraCarpeta(ruta) {
+    const pref = ruta ? ruta + "/" : "";
+    let letra = null;
+    for (const [r, l] of this.git) {
+      if (!r.startsWith(pref)) continue;
+      if (l === "C") return "C";
+      if (l === "M") letra = "M";
+      else if (!letra) letra = l;
+    }
+    return letra;
+  }
+
   render() {
     const py = this.proyecto();
     const filas = this.#filas();
@@ -64,9 +85,12 @@ export class Explorador {
     const html = filas.map((f) => {
       if (f.tipo === "edicion") return this.#filaEdicion(f.nivel, "", this.edicion.modo === "carpeta");
       if (this.edicion?.modo === "renombrar" && this.edicion.ruta === f.ruta) return this.#filaEdicion(f.nivel, f.nombre, f.tipo === "dir");
-      const clases = ["fila", f.tipo === "dir" ? "dir" : "", f.ruta === this.seleccion ? "sel" : "", f.ruta === this.activo ? "activo" : ""].filter(Boolean).join(" ");
+      const letra = this.git.size ? (f.tipo === "dir" ? this.#letraCarpeta(f.ruta) : this.git.get(f.ruta)) : null;
+      const clases = ["fila", f.tipo === "dir" ? "dir" : "", f.ruta === this.seleccion ? "sel" : "", f.ruta === this.activo ? "activo" : "", letra ? `g-${letra}` : ""].filter(Boolean).join(" ");
+      const NOMBRE_GIT = { M: "modificado", U: "sin seguimiento (nuevo)", A: "agregado", C: "en conflicto" };
+      const marca = letra ? (f.tipo === "dir" ? `<span class="git-d" aria-label="contiene cambios">●</span>` : `<span class="git-d" title="${NOMBRE_GIT[letra]}">${letra === "C" ? "!" : letra}</span>`) : "";
       const icono = f.tipo === "dir" ? `${chevron}${iconoCarpeta(f.abierta)}` : `<span class="chev-vacio"></span>${iconoArchivo(f.ruta)}`;
-      return `<div class="${clases}" role="treeitem" aria-level="${f.nivel + 1}" ${f.tipo === "dir" ? `aria-expanded="${f.abierta}"` : ""} aria-selected="${f.ruta === this.seleccion}" data-ruta="${esc(f.ruta)}" data-tipo="${f.tipo}" draggable="true" style="--n:${f.nivel}" title="${esc(f.ruta)}">${icono}<span class="nom">${esc(f.nombre)}</span></div>`;
+      return `<div class="${clases}" role="treeitem" aria-level="${f.nivel + 1}" ${f.tipo === "dir" ? `aria-expanded="${f.abierta}"` : ""} aria-selected="${f.ruta === this.seleccion}" data-ruta="${esc(f.ruta)}" data-tipo="${f.tipo}" draggable="true" style="--n:${f.nivel}" title="${esc(f.ruta)}${letra ? " · " + (f.tipo === "dir" ? "contiene cambios" : NOMBRE_GIT[letra]) : ""}">${icono}<span class="nom">${esc(f.nombre)}</span>${marca}</div>`;
     }).join("");
     this.raiz.innerHTML = html || '<p class="arbol-vacio">No hay archivos.<br>Usa los botones de arriba para crear uno.</p>';
     this.raiz.classList.toggle("vacio", !html);

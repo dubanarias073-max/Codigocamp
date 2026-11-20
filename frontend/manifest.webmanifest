@@ -1,0 +1,186 @@
+{
+  "id": "/",
+  "name": "CódigoCamp",
+  "short_name": "CódigoCamp",
+  "description": "Aprende a programar en español: retos, lecciones, tutor de IA y un espacio de trabajo como VS Code.",
+  "lang": "es",
+  "dir": "ltr",
+  "start_url": "/pages/inicio.html?app=1",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#06100f",
+  "theme_color": "#0d1b1a",
+  "categories": [
+    "education",
+    "productivity",
+    "developer"
+  ],
+  "icons": [
+    {
+      "src": "/img/app/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/img/app/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/img/app/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/img/app/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Practicar",
+      "short_name": "Practicar",
+      "description": "Sigue tu camino de retos",
+      "url": "/pages/inicio.html?app=1",
+      "icons": [
+        {
+          "src": "/img/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Trabajo",
+      "short_name": "Trabajo",
+      "description": "Tu espacio de código (como VS Code)",
+      "url": "/pages/trabajo.html",
+      "icons": [
+        {
+          "src": "/img/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Tutor de IA",
+      "short_name": "IA",
+      "description": "Pregúntale a la IA",
+      "url": "/pages/ia.html",
+      "icons": [
+        {
+          "src": "/img/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Chats",
+      "short_name": "Chats",
+      "description": "Habla con tus amigos",
+      "url": "/pages/chats.html",
+      "icons": [
+        {
+          "src": "/img/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "widgets": [
+    {
+      "name": "Tu racha",
+      "short_name": "Racha",
+      "description": "Tu racha, la semana con 🔥, diamantes y vidas.",
+      "tag": "racha",
+      "template": "racha",
+      "ms_ac_template": "/widgets/racha.json",
+      "data": "/api/widget/",
+      "type": "application/json",
+      "auth": false,
+      "update": 1800,
+      "icons": [
+        {
+          "src": "/img/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "screenshots": [
+        {
+          "src": "/img/app/icon-512.png",
+          "sizes": "512x512",
+          "label": "Widget de racha"
+        }
+      ]
+    },
+    {
+      "name": "Meta de hoy",
+      "short_name": "Meta",
+      "description": "Cuánto XP llevas hoy y cuánto te falta.",
+      "tag": "meta",
+      "template": "meta",
+      "ms_ac_template": "/widgets/meta.json",
+      "data": "/api/widget/",
+      "type": "application/json",
+      "auth": false,
+      "update": 1800,
+      "icons": [
+        {
+          "src": "/img/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "screenshots": [
+        {
+          "src": "/img/app/icon-512.png",
+          "sizes": "512x512",
+          "label": "Widget de racha"
+        }
+      ]
+    },
+    {
+      "name": "Calendario de racha",
+      "short_name": "Calendario",
+      "description": "Tu semana de práctica y tu mejor racha.",
+      "tag": "calendario",
+      "template": "calendario",
+      "ms_ac_template": "/widgets/calendario.json",
+      "data": "/api/widget/",
+      "type": "application/json",
+      "auth": false,
+      "update": 1800,
+      "icons": [
+        {
+          "src": "/img/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "screenshots": [
+        {
+          "src": "/img/app/icon-512.png",
+          "sizes": "512x512",
+          "label": "Widget de racha"
+        }
+      ]
+    }
+  ],
+  "edge_side_panel": {
+    "preferred_width": 420
+  },
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  }
+}

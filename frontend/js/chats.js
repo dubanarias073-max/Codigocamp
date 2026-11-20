@@ -1,11 +1,14 @@
 // Lógica de chats.html
-import { iniciar, api, esc, aviso } from "/js/app.js";
+import { avatarSVG } from "/js/avatares.js";
+import { iniciar, api, esc, aviso, fotoDe } from "/js/app.js";
+import { CSS_ADJUNTOS, crearAdjuntador, htmlAdjuntos } from "/js/adjuntar.js";
 await iniciar("chats");
+document.head.insertAdjacentHTML("beforeend", `<style>${CSS_ADJUNTOS}</style>`);
 const $ = (id) => document.getElementById(id);
 let datos, activo = null, ultimo = 0;
 const TITULO = document.title;
 const ini = (n) => esc((n || "?").charAt(0).toUpperCase());
-const avatar = (x) => `<span class="c-av${x.avatar ? " emoji" : ""}">${x.avatar ? esc(x.avatar) : ini(x.nombre)}</span>`;
+const avatar = (x) => (x.foto || avatarSVG(x.avatar) ? `<span class="c-av c-av-foto">${fotoDe({ ...x, cosmeticos: { marco: x.marco } }, { tam: 38 })}</span>` : `<span class="c-av">${ini(x.nombre)}</span>`);
 
 /* ===== Lista de amigos y solicitudes ===== */
 async function cargarLista() {
@@ -13,8 +16,9 @@ async function cargarLista() {
   if (activo && !datos.amigos.some((a) => a.id === activo)) cerrar();
   $("miCodigo").textContent = datos.yo.codigo;
   $("miAlias").textContent = "@" + datos.yo.alias;
-  $("miAv").textContent = datos.yo.avatar || (datos.yo.nombre || "?").charAt(0).toUpperCase();
-  $("miAv").classList.toggle("emoji", !!datos.yo.avatar);
+  if (datos.yo.foto) { $("miAv").innerHTML = fotoDe({ ...datos.yo, cosmeticos: { marco: datos.yo.marco } }, { tam: 44 }); $("miAv").classList.add("c-av-foto"); }
+  else if (avatarSVG(datos.yo.avatar)) $("miAv").innerHTML = avatarSVG(datos.yo.avatar, 40);
+  else $("miAv").textContent = (datos.yo.nombre || "?").charAt(0).toUpperCase();
   const rec = datos.recibidas.map((r) => `<div class="c-fila">${avatar(r)}<span><b>${esc(r.nombre)}</b><small>@${esc(r.alias)}</small></span>
     <span class="c-acc"><button class="btn sm pri" type="button" data-r="${r.id}" data-a="1">Aceptar</button><button class="btn sm" type="button" data-r="${r.id}" data-a="0">No</button></span></div>`).join("");
   const env = datos.enviadas.length ? `<small>Solicitudes enviadas: ${datos.enviadas.map((e) => "@" + esc(e.alias)).join(", ")}</small>` : "";
@@ -43,8 +47,9 @@ function pintar(ms) {
   const abajo = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
   for (const m of ms) {
     const d = document.createElement("div");
-    d.className = "cm" + (m.yo ? " yo" : "");
-    d.append(contenido(m.texto));
+    d.className = "cm" + (m.yo ? " yo" : "") + (m.adjuntos?.length && !m.texto ? " solo-adj" : "");
+    if (m.texto) d.append(contenido(m.texto));
+    if (m.adjuntos?.length) d.insertAdjacentHTML("beforeend", htmlAdjuntos(m.adjuntos));
     const h = document.createElement("small"); h.textContent = m.hora; d.append(h);
     log.appendChild(d); ultimo = m.id;
   }
@@ -56,7 +61,7 @@ async function abrir(id) {
   $("log").innerHTML = "";
   $("vacio").hidden = true; ["cab", "log", "fMsg", "emojis"].forEach((x) => { $(x).hidden = false; });
   const amigo = datos.amigos.find((a) => a.id === id);
-  $("cNombre").textContent = amigo ? `${amigo.avatar || ""} ${amigo.nombre} · @${amigo.alias}`.trim() : "";
+  $("cNombre").textContent = amigo ? `${amigo.nombre} · @${amigo.alias}` : "";
   $("cg").classList.add("en-chat");
   try {
     const ms = (await api(`/api/chat/${id}/`)).mensajes;
@@ -124,16 +129,22 @@ $("emojis").onclick = (e) => {
   const b = e.target.closest("button"); if (!b) return;
   const t = $("texto"); t.setRangeText(b.textContent, t.selectionStart, t.selectionEnd, "end"); t.focus();
 };
+const adj = crearAdjuntador({ boton: $("clip"), entrada: $("archivosMsg"), bandeja: $("bandeja"), zona: document.querySelector(".c-conv"), destino: "chat" });
 $("fMsg").onsubmit = async (e) => {
   e.preventDefault();
   const texto = $("texto").value.trim();
-  if (!texto || !activo) return;
+  if ((!texto && !adj.hay()) || !activo) return;
+  const boton = $("fMsg").querySelector("[type=submit]");
+  boton.disabled = true;
   try {
-    const r = await api(`/api/chat/${activo}/?despues=${ultimo}`, { texto });
+    const adjuntos = await adj.listos();
+    const r = await api(`/api/chat/${activo}/?despues=${ultimo}`, { texto, adjuntos });
+    adj.limpiar();
     $("texto").value = "";
     $("log").querySelector(".c-saludo")?.remove();
     pintar(r.mensajes);
   } catch (x) { aviso(x.message, true); }
+  boton.disabled = false;
 };
 
 await cargarLista();

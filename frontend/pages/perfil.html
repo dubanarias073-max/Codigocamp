@@ -5,34 +5,63 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Perfil · CódigoCamp</title>
   <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0d1b1a">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CódigoCamp">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="/js/carga.js"></script>
   <script src="/js/tema.js"></script>
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/perfil.css">
+  <link rel="stylesheet" href="/css/calendario.css">
   <link rel="stylesheet" href="/css/tema.css">
 </head>
 <body class="cargando">
   <div class="app">
     <nav class="lado" id="lado" aria-label="Principal"></nav>
     <main class="centro" id="contenido">
-      <div class="cab-p"><div class="avatar-p" id="av">?</div><div class="cab-t"><h1 class="titulo-pag" id="nom">…</h1><small id="desde"></small><br><small id="ident"></small></div>
-        <button class="bj" id="editar" type="button" aria-expanded="false" aria-controls="formPerfil">✏️ Editar perfil</button></div>
+      <section class="hero-p" id="hero">
+        <div class="hero-fondo" id="heroFondo" aria-hidden="true"></div>
+        <div class="hero-in">
+          <div class="foto-p"><div id="av" class="foto-p-img"></div>
+            <button type="button" class="foto-btn" id="cambiarFoto" title="Cambiar foto de perfil" aria-label="Cambiar foto de perfil"><span data-ic="camara"></span></button>
+            <input type="file" id="archivoFoto" accept="image/png,image/jpeg,image/webp,image/gif" hidden></div>
+          <div class="cab-t"><h1 class="titulo-pag" id="nom">…</h1><p class="ident" id="ident"></p><small id="desde"></small>
+            <div class="insignias" id="insignias"></div></div>
+          <div class="hero-acc"><button class="bj" id="editar" type="button" aria-expanded="false" aria-controls="formPerfil"><span data-ic="lapiz"></span> Editar perfil</button>
+            <a class="btn ghost" href="/pages/configuracion.html"><span data-ic="engranaje"></span> Configuración</a></div>
+        </div>
+      </section>
+      <dialog class="recorte" id="recorte"><form method="dialog">
+        <h3>Ajusta tu foto</h3><p class="nota">Arrastra para moverla y usa el control para acercar.</p>
+        <canvas id="lienzo" width="280" height="280" aria-label="Vista previa de la foto"></canvas>
+        <label class="zoom"><span data-ic="lupa"></span><input type="range" id="zoom" min="1" max="4" step="0.01" value="1" aria-label="Acercar"></label>
+        <div class="fila-btn"><button class="bj" value="guardar" id="guardarFoto">Guardar foto</button><button class="btn ghost" value="cancelar">Cancelar</button><button class="btn ghost rojo-t" value="quitar" id="quitarFoto">Quitar foto</button></div>
+      </form></dialog>
       <form id="formPerfil" class="tarjeta form-perfil" hidden>
-        <fieldset class="av-sel"><legend>Tu avatar</legend><div id="avatares" role="radiogroup" aria-label="Elige tu avatar"></div></fieldset>
+        <fieldset class="av-sel"><legend>Tu avatar <small>(se usa si no tienes foto · más en la <a href="/pages/tienda.html">tienda</a>)</small></legend><div id="avatares" role="radiogroup" aria-label="Elige tu avatar"></div></fieldset>
         <label class="campo">Nombre<input id="fNombre" maxlength="50" required></label>
         <label class="campo">Nombre de usuario <small>(3 a 20 letras, números o _)</small><input id="fAlias" maxlength="20" required autocapitalize="off" spellcheck="false"></label>
         <label class="campo">Curso que estudias<select id="fCurso"></select></label>
         <label class="campo">Meta diaria<select id="fMeta"><option value="5">5 minutos</option><option value="10">10 minutos</option><option value="15">15 minutos</option><option value="30">30 minutos</option></select></label>
-        <label class="campo">¿Qué te describe mejor?<select id="fRol"><option value="estudiante">🎓 Soy estudiante</option><option value="cambio">💼 Quiero cambiar de rumbo</option><option value="programador">💻 Ya programo y quiero mejorar</option><option value="curioso">🔍 Solo tengo curiosidad</option></select></label>
-        <label class="campo">Tu nivel<select id="fNivel"><option value="cero">🌱 Empiezo desde cero</option><option value="probado">🌿 He probado algo</option><option value="basico">🌳 Sé lo básico</option><option value="avanzado">🚀 Tengo experiencia</option></select></label>
+        <label class="campo">¿Qué te describe mejor?<select id="fRol"><option value="estudiante">Soy estudiante</option><option value="cambio">Quiero cambiar de rumbo</option><option value="programador">Ya programo y quiero mejorar</option><option value="curioso">Solo tengo curiosidad</option></select></label>
+        <label class="campo">Tu nivel<select id="fNivel"><option value="cero">Empiezo desde cero</option><option value="probado">He probado algo</option><option value="basico">Sé lo básico</option><option value="avanzado">Tengo experiencia</option></select></label>
         <div class="fila-btn"><button class="bj" type="submit">Guardar cambios</button><button class="btn ghost" id="cancelar" type="button">Cancelar</button></div>
       </form>
       <div class="stats-p" id="stats"></div>
-      <h2>Mi colección</h2><div id="coleccion" class="nota"></div>
-      <h2>Lecciones estudiadas</h2><div id="cursos" class="nota"></div>
+      <section class="bloque-p calendario-sec" id="calendario" aria-label="Calendario de racha"></section>
+      <section class="bloque-p"><div class="bloque-cab"><h2>Lo que llevas puesto</h2><a href="/pages/tienda.html">Ir a la tienda →</a></div><div id="puesto" class="puesto"></div></section>
+      <section class="bloque-p"><div class="bloque-cab"><h2>Cofres</h2><a href="/pages/recompensas.html">Ver todos →</a></div><div id="cofresP" class="cofres-mini"></div></section>
+      <section class="bloque-p"><h2>Cursos</h2><div id="cursos" class="cursos-p"></div></section>
+      <section class="bloque-p"><div class="bloque-cab"><h2>Mi colección</h2></div><div id="coleccion" class="nota"></div></section>
     </main>
     <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
   </div>
   <nav class="inf" id="inf" aria-label="Principal"></nav>
   <script type="module" src="/js/perfil.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

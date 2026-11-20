@@ -41,3 +41,7 @@
 .c-emojis{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px 0}
 .c-emojis[hidden]{display:none}
 .c-saludo{margin:auto;text-align:center}
+
+.c-av-foto{background:none!important;padding:0;width:auto!important;height:auto!important}
+.cm.solo-adj{background:transparent;padding:0}
+.chat-form{display:flex;gap:8px;align-items:stretch}

@@ -59,3 +59,29 @@ def local_time(value):
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone().strftime("%H:%M")
+
+
+def direcciones(texto, quitar_barra=True):
+    """«http://localhost:5000, https://codigocamp.tail.ts.net» -> lista. Para APP_URL se quita la barra final;
+    para GOOGLE_REDIRECT_URI NO (quitar_barra=False): Google exige la dirección idéntica a la registrada, con su «/»."""
+    return [(u.strip().rstrip("/") if quitar_barra else u.strip()) for u in str(texto or "").split(",") if u.strip()]
+
+
+def direccion_actual(lista):
+    """De varias direcciones del proyecto (localhost, el túnel…), la que coincide con cómo entró esta persona.
+    Fuera de una petición (avisos automáticos) o si ninguna coincide, la primera."""
+    from urllib.parse import urlsplit
+    from flask import has_request_context
+    if not lista:
+        return None
+    if has_request_context():
+        host = (request.host or "").lower()
+        exacta = f"{request.scheme}://{host}"
+        for u in lista:
+            p = urlsplit(u)
+            if f"{p.scheme}://{p.netloc}".lower() == exacta:
+                return u
+        for u in lista:   # detrás de un túnel sin PROXY_CONFIABLE el esquema llega como http: basta el host
+            if urlsplit(u).netloc.lower() == host:
+                return u
+    return lista[0]

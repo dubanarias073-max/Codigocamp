@@ -10,8 +10,15 @@
 --    4. Desde la carpeta backend:  flask --app app seed-retos
 --       (carga etapas, secciones, lecciones y preguntas desde backend/retos/*.py)
 --
---  Si ya habias creado la base con una version anterior de este archivo,
---  descomenta la siguiente linea UNA VEZ (borra los datos de prueba):
+--  Diagrama (EER) sin cierres de Workbench: este esquema no usa el tipo JSON
+--  ni restricciones de verificacion (con MariaDB/XAMPP hacen que Workbench se
+--  cierre al crear el diagrama) y ninguna columna usa palabras reservadas.
+--  Si tu base es de una version anterior, Flask la corrige sola al arrancar
+--  (o ejecuta: flask --app app reparar-workbench).
+--
+--  Si ya habias creado la base con una version anterior de este archivo y
+--  quieres empezar de cero, descomenta la siguiente linea UNA VEZ
+--  (BORRA todos los datos):
 -- =====================================================================
 DROP DATABASE IF EXISTS codigocamp;
 
@@ -49,9 +56,9 @@ CREATE TABLE usuarios (
 CREATE TABLE espacios_trabajo (
   id              INT          NOT NULL AUTO_INCREMENT,
   usuario_id      INT          NOT NULL,
-  archivos        JSON         NOT NULL,
-  carpetas        JSON         NOT NULL,
-  git             JSON         NOT NULL,
+  archivos        LONGTEXT         NOT NULL COMMENT 'JSON',
+  carpetas        LONGTEXT         NOT NULL COMMENT 'JSON',
+  git             LONGTEXT         NOT NULL COMMENT 'JSON',
   actualizado_en  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_espacios_trabajo_usuario (usuario_id),
@@ -140,10 +147,10 @@ CREATE TABLE retos (
   tipo        VARCHAR(10) NOT NULL DEFAULT 'opcion' COMMENT 'opcion, completar, ordenar, error, codigo, caso',
   enunciado   TEXT        NOT NULL,
   codigo      TEXT        NOT NULL,
-  opciones    JSON        NOT NULL,
+  opciones    LONGTEXT        NOT NULL COMMENT 'JSON',
   respuesta   TEXT        NOT NULL,
   explicacion TEXT        NOT NULL,
-  datos       JSON        NOT NULL,
+  datos       LONGTEXT        NOT NULL COMMENT 'JSON',
   PRIMARY KEY (id),
   UNIQUE KEY uq_reto_orden (nivel_id, orden),
   CONSTRAINT fk_retos_nivel FOREIGN KEY (nivel_id)
@@ -158,7 +165,7 @@ CREATE TABLE perfiles (
   id                  INT         NOT NULL AUTO_INCREMENT,
   usuario_id          INT         NOT NULL,
   rol                 VARCHAR(12) NOT NULL DEFAULT '',
-  intereses           JSON        NOT NULL,
+  intereses           LONGTEXT        NOT NULL COMMENT 'JSON',
   nivel_previo        VARCHAR(10) NOT NULL DEFAULT '',
   curso_actual_id     INT         NULL,
   meta_minutos        SMALLINT    NOT NULL DEFAULT 10,
@@ -186,9 +193,7 @@ CREATE TABLE perfiles (
   CONSTRAINT fk_perfiles_usuario FOREIGN KEY (usuario_id)
     REFERENCES usuarios (id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_perfiles_curso_actual FOREIGN KEY (curso_actual_id)
-    REFERENCES cursos (id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT ck_perfiles_meta CHECK (meta_minutos IN (5, 10, 15, 30)),
-  CONSTRAINT ck_perfiles_vidas CHECK (vidas >= 0)
+    REFERENCES cursos (id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Datos de aprendizaje, monedas y preferencias de cada usuario (1 a 1 con usuarios)';
 
@@ -205,8 +210,7 @@ CREATE TABLE niveles_completados (
   CONSTRAINT fk_niveles_completados_usuario FOREIGN KEY (usuario_id)
     REFERENCES usuarios (id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_niveles_completados_nivel FOREIGN KEY (nivel_id)
-    REFERENCES niveles (id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT ck_niveles_completados_estrellas CHECK (estrellas BETWEEN 0 AND 3)
+    REFERENCES niveles (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Niveles que cada usuario ya termino';
 
@@ -282,8 +286,7 @@ CREATE TABLE articulos_tienda (
   orden       SMALLINT     NOT NULL DEFAULT 0,
   activo      TINYINT(1)   NOT NULL DEFAULT 1,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_articulos_tienda_clave (clave),
-  CONSTRAINT ck_articulos_tienda_precio CHECK (precio > 0)
+  UNIQUE KEY uq_articulos_tienda_clave (clave)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Objetos que se compran con diamantes';
 
@@ -384,7 +387,157 @@ INSERT INTO cursos (id, slug, nombre, tipo, sigla, color, descripcion, orden, ac
   (14, 'go', 'Go', 'lenguaje', 'GO', '#22d3ee', 'Servidores rápidos', 14, 1),
   (15, 'rust', 'Rust', 'lenguaje', 'RS', '#fdba74', 'Rápido y seguro', 15, 1),
   (16, 'c', 'C', 'lenguaje', 'C', '#94a3b8', 'Cerca de la máquina', 16, 1),
-  (17, 'cpp', 'C++', 'lenguaje', 'C++', '#818cf8', 'Rendimiento y videojuegos', 17, 1);
+  (17, 'cpp', 'C++', 'lenguaje', 'C++', '#818cf8', 'Rendimiento y videojuegos', 17, 1),
+  (18, 'terminal', 'Terminales', 'lenguaje', '$_', '#4ade80', 'Bash, PowerShell y CMD', 18, 1),
+  (19, 'git', 'Git', 'lenguaje', 'GIT', '#f97316', 'Control de versiones: de cero a avanzado', 19, 1),
+  (20, 'docker', 'Docker', 'lenguaje', 'DK', '#38bdf8', 'Contenedores para tus apps y bases de datos', 20, 1),
+  (21, 'node', 'Node.js', 'lenguaje', 'NODE', '#84cc16', 'JavaScript en el servidor: npm, Express y APIs', 21, 1),
+  (22, 'github', 'GitHub', 'lenguaje', 'GH', '#a78bfa', 'Repositorios, equipo, Actions, Pages y seguridad', 22, 1),
+  (23, 'nosql', 'NoSQL', 'bd', 'NoSQL', '#22c55e', 'MongoDB, Redis, Firestore, grafos y más', 23, 1);
 
 -- Siguiente paso, desde la carpeta backend:
 --   flask --app app seed-retos
+
+
+-- Dispositivos desde los que cada persona inició sesión (alerta por correo de un dispositivo nuevo).
+CREATE TABLE IF NOT EXISTS dispositivos_conocidos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  usuario_id INT NOT NULL,
+  huella VARCHAR(64) NOT NULL,
+  nombre VARCHAR(120) NOT NULL DEFAULT '',
+  ip VARCHAR(45) NOT NULL DEFAULT '',
+  primero DATETIME NOT NULL,
+  ultimo DATETIME NOT NULL,
+  UNIQUE KEY uq_dispositivos_usuario_huella (usuario_id, huella),
+  KEY ix_dispositivos_usuario (usuario_id),
+  CONSTRAINT fk_dispositivos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Dispositivos desde los que cada usuario inicio sesion';
+
+-- Qué correos quiere recibir cada persona.
+CREATE TABLE IF NOT EXISTS ajustes_correo (
+  usuario_id INT PRIMARY KEY,
+  seguridad TINYINT(1) NOT NULL DEFAULT 1,
+  racha TINYINT(1) NOT NULL DEFAULT 1,
+  novedades TINYINT(1) NOT NULL DEFAULT 0,
+  ultimo_recordatorio DATE NULL,
+  nivel_recordatorio SMALLINT NOT NULL DEFAULT 0 COMMENT '1 = aviso de la tarde, 2 = ultima oportunidad',
+  CONSTRAINT fk_ajustes_correo_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Correos que quiere recibir cada usuario';
+
+-- Cosméticos (fondos, punteros, temas, marcos, efectos): los que tiene cada persona y los que lleva puestos.
+CREATE TABLE IF NOT EXISTS cosmeticos_propios (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  usuario_id INT NOT NULL,
+  clave VARCHAR(30) NOT NULL,
+  origen VARCHAR(12) NOT NULL DEFAULT 'tienda',
+  creado_en DATETIME NOT NULL,
+  UNIQUE KEY uq_cosmetico_usuario (usuario_id, clave),
+  KEY idx_cosmeticos_propios_usuario (usuario_id),
+  CONSTRAINT fk_cosmeticos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Cosmeticos comprados o ganados en cofres';
+
+CREATE TABLE IF NOT EXISTS cosmeticos_equipados (
+  usuario_id INT PRIMARY KEY,
+  fondo VARCHAR(30) NULL, puntero VARCHAR(30) NULL COMMENT 'Puntero del mouse', tema VARCHAR(30) NULL, marco VARCHAR(30) NULL, efecto VARCHAR(30) NULL,
+  CONSTRAINT fk_equipados_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Cosmeticos que lleva puestos cada usuario';
+
+-- Los 10 cofres de Recompensas que ya se abrieron.
+CREATE TABLE IF NOT EXISTS cofres_abiertos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  usuario_id INT NOT NULL,
+  clave VARCHAR(30) NOT NULL,
+  abierto_en DATETIME NOT NULL,
+  UNIQUE KEY uq_cofre_usuario (usuario_id, clave),
+  KEY idx_cofres_abiertos_usuario (usuario_id),
+  CONSTRAINT fk_cofres_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Cofres de Recompensas ya abiertos';
+
+-- Foto de perfil (los bytes en disco, en ALMACEN_ARCHIVOS/<usuario>/foto-<hash>).
+CREATE TABLE IF NOT EXISTS fotos_perfil (
+  usuario_id INT PRIMARY KEY,
+  hash CHAR(64) NOT NULL,
+  tipo VARCHAR(30) NOT NULL,
+  actualizada_en DATETIME NOT NULL,
+  CONSTRAINT fk_fotos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Foto de perfil (bytes en disco)';
+
+-- Adjuntos de chats e IA (los bytes son los de archivos_trabajo de su dueño).
+CREATE TABLE IF NOT EXISTS adjuntos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  usuario_id INT NOT NULL,
+  mensaje_id INT NULL,
+  destino VARCHAR(8) NOT NULL DEFAULT 'chat',
+  hash CHAR(64) NOT NULL,
+  nombre VARCHAR(160) NOT NULL,
+  tipo VARCHAR(100) NOT NULL,
+  tamano BIGINT NOT NULL,
+  gemini_uri VARCHAR(300) NULL,
+  gemini_expira DATETIME NULL,
+  creado_en DATETIME NOT NULL,
+  KEY ix_adjuntos_usuario (usuario_id), KEY ix_adjuntos_mensaje (mensaje_id),
+  CONSTRAINT fk_adjuntos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+  CONSTRAINT fk_adjuntos_mensaje FOREIGN KEY (mensaje_id) REFERENCES mensajes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Fotos, videos y archivos de chats e IA';
+
+-- Cambios de datos que se aplican una sola vez al actualizar (los hace Flask al arrancar).
+CREATE TABLE IF NOT EXISTS migraciones (
+  clave VARCHAR(40) NOT NULL,
+  hecha_en DATETIME NOT NULL,
+  PRIMARY KEY (clave)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Migraciones de datos ya aplicadas';
+INSERT IGNORE INTO migraciones (clave, hecha_en) VALUES ('economia_x10', NOW());
+
+-- Cada inicio de sesión (navegador o app en un dispositivo); revocada = 1 la cierra de verdad.
+CREATE TABLE IF NOT EXISTS sesiones (
+  id INT NOT NULL AUTO_INCREMENT,
+  usuario_id INT NOT NULL,
+  token_hash CHAR(64) NOT NULL COMMENT 'SHA-256 del identificador; el original solo vive en la cookie',
+  dispositivo VARCHAR(120) NOT NULL DEFAULT '',
+  ip VARCHAR(45) NOT NULL DEFAULT '',
+  metodo VARCHAR(20) NOT NULL DEFAULT 'contraseña',
+  creada DATETIME NOT NULL,
+  ultima DATETIME NOT NULL,
+  revocada TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_sesiones_token (token_hash),
+  KEY idx_sesiones_usuario (usuario_id),
+  CONSTRAINT fk_sesiones_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Sesiones abiertas por dispositivo';
+
+-- Conversaciones guardadas con la IA (historial como el de Claude o ChatGPT).
+CREATE TABLE IF NOT EXISTS conversaciones_ia (
+  id INT NOT NULL AUTO_INCREMENT,
+  usuario_id INT NOT NULL,
+  titulo VARCHAR(120) NOT NULL DEFAULT 'Conversación nueva',
+  fijada TINYINT(1) NOT NULL DEFAULT 0,
+  creada DATETIME NOT NULL,
+  actualizada DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_conversaciones_ia_usuario (usuario_id),
+  KEY idx_conversaciones_ia_actualizada (actualizada),
+  CONSTRAINT fk_conversaciones_ia_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Conversaciones guardadas con la IA';
+
+CREATE TABLE IF NOT EXISTS mensajes_ia (
+  id INT NOT NULL AUTO_INCREMENT,
+  conversacion_id INT NOT NULL,
+  rol VARCHAR(6) NOT NULL COMMENT 'yo o tutor',
+  texto LONGTEXT NOT NULL,
+  archivos LONGTEXT NOT NULL COMMENT 'JSON: nombres de los adjuntos',
+  creado DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_mensajes_ia_conversacion (conversacion_id),
+  CONSTRAINT fk_mensajes_ia_conversacion FOREIGN KEY (conversacion_id) REFERENCES conversaciones_ia (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Mensajes de cada conversación con la IA';

@@ -3,10 +3,15 @@
 // y redirecciones (> >>). Los comandos actúan sobre los archivos reales del proyecto (el sistema de archivos virtual).
 // No toca el DOM: la terminal le pasa una «sesión» con funciones para escribir y leer.
 import { color, quitarAnsi } from "./ansi.js";
+import { buscarArchivoApp, moduloDeArchivo } from "./servidorpy.js";
+import { activar as activarVenv, almacenDeVenv, crearVenv, desactivar as desactivarVenv, esVenv, rutaActivacion } from "./venv.js";
 import * as FS from "./fs.js";
 import { ejecutarGit } from "./git.js";
 import { esMarcador, leerMarcador, formatoBytes } from "./archivos.js";
 import { importarEn } from "./importar.js";
+import { comandoSqlite } from "./sqlite.js";
+import { ClienteBD, comandoMysql, comandoPuente } from "./bd.js";
+import { comandoMongo, comandoPsql, comandoRedis } from "./bdclientes.js";
 
 // ---------------------------------------------------------------- análisis ----
 function expandirVariable(linea, i, vars) {
@@ -58,7 +63,6 @@ export function tokenizar(linea, vars = {}) {
     } else if (c === "&" || c === "|" || c === ";" || c === ">" || c === "<") {
       cerrar();
       const doble = linea.slice(i, i + 2);
-      if (c === "<") return { error: "la redirección de entrada (<) no está disponible" };
       if (doble === "&&" || doble === "||" || doble === ">>") { tokens.push({ t: "op", v: doble }); i += 2; }
       else if (c === "&") return { error: "los procesos en segundo plano (&) no están disponibles" };
       else { tokens.push({ t: "op", v: c }); i += 1; }
@@ -84,6 +88,11 @@ function analizar(tokens) {
     else if (tk.v === "|") {
       if (vacia(etapa)) return { error: "error de sintaxis cerca de «|»" };
       etapas.push({ palabras: [], redir: null });
+    } else if (tk.v === "<") {
+      const origen = tokens[i + 1];
+      if (!origen || origen.t !== "w") return { error: "error de sintaxis: falta el archivo después de «<»" };
+      etapa.desde = origen;
+      i += 1;
     } else if (tk.v === ">" || tk.v === ">>") {
       const destino = tokens[i + 1];
       if (!destino || destino.t !== "w") return { error: `error de sintaxis: falta el archivo después de «${tk.v}»` };
@@ -176,8 +185,8 @@ const NO_DISPONIBLE = ["pnpm", "yarn", "apt", "apt-get", "brew", "sudo", "curl",
 
 export const NOMBRES_COMANDOS = [
   "cat", "cd", "clear", "cls", "code", "cp", "date", "echo", "env", "exit", "export", "find", "gcc", "g++", "gh", "git", "go", "grep", "head", "help",
-  "history", "java", "javac", "kotlinc", "ls", "vite", "mkdir", "mv", "node", "npm", "npx", "php", "pip", "pip3", "pwd", "python", "python3", "rm", "rmdir", "ruby", "run", "rustc", "sqlite3",
-  "swift", "tail", "tree", "touch", "ts-node", "wc", "whoami", "dotnet", "py", "dir", "type", "ll",
+  "history", "java", "javac", "kotlinc", "ls", "vite", "mkdir", "mv", "node", "npm", "npx", "php", "pip", "pip3", "pwd", "python", "python3", "rm", "rmdir", "ruby", "run", "rustc", "sqlite3", "mysql", "mariadb", "psql", "mongosh", "mongo", "redis-cli", "bd-puente",
+  "swift", "tail", "tree", "touch", "ts-node", "wc", "whoami", "dotnet", "py", "dir", "type", "ll", "virtualenv", "deactivate", "source", "which", "where", "fastapi", "uvicorn", "flask",
 ];
 
 const AYUDA = [
@@ -186,8 +195,11 @@ const AYUDA = [
   color.azul("Archivos") + "   ls  cd  pwd  cat  touch  mkdir  rm  rmdir  mv  cp  tree  find  head  tail  wc  grep  echo  code <archivo>",
   color.azul("Shell") + "      comillas, $VARIABLES, comodines (*.js), pipes ( | ), encadenar ( && ; || ) y redirigir ( > >> )",
   color.azul("Git") + "        git init | status | add | commit -m | log | diff | restore | branch | switch -c | remote | push · git clone <url> [carpeta|.]",
-  color.azul("Ejecutar") + "   node archivo.js      python archivo.py      ts-node archivo.ts      sqlite3 archivo.sql",
+  color.azul("Ejecutar") + "   node archivo.js      python archivo.py      ts-node archivo.ts",
+  color.azul("Bases") + "      sqlite3 tienda.db (consola; .help) · sqlite3 tienda.db < esquema.sql · mysql -u root mi_base (MySQL/XAMPP) · psql -U postgres · mongosh · redis-cli · bd-puente (si CódigoCamp está en internet)",
   color.azul("Paquetes") + "   pip install numpy      npm install dayjs react bootstrap… (se usan con import)      npm run <script>      npm init -y",
+  color.azul("APIs") + "       fastapi dev main.py · uvicorn main:app --reload · flask --app app run --debug   (la vista previa abre http://127.0.0.1:8000/docs)",
+  color.azul("venv") + "       python -m venv .venv → source .venv/bin/activate (o .venv\\Scripts\\activate) → pip install … → deactivate",
   color.azul("React") + "      npm create vite@latest mi-app -- --template react   (o react-ts, vanilla, preact) → cd mi-app → npm run dev",
   "            go run · php · ruby · swift · java Archivo.java · gcc/g++ archivo -o prog && ./prog · rustc · kotlinc   (se ejecutan en el servidor)",
   color.azul("Atajos") + "     ↑/↓ historial · Tab completar · Ctrl+C cancelar · Ctrl+L limpiar · Ctrl+D salir",
@@ -206,8 +218,10 @@ export class Shell {
    * @param {object} o.ejecutores   { node, python, ts, servidor, sql } (ver ejecucion.js)
    */
   constructor({ proyecto, cambio = () => {}, usuario = "estudiante", abrir = () => {}, ejecutores = {}, ahora = () => new Date(), github = null, paquetes = null,
-    importar = (origen, opciones) => importarEn(this.proyecto(), origen, opciones), leerArchivo = null, abrirVista = null }) {
-    Object.assign(this, { proyecto, cambio, usuario, abrir, ejecutores, ahora, github, paquetes, importar, leerArchivo, abrirVista });
+    importar = (origen, opciones) => importarEn(this.proyecto(), origen, opciones), leerArchivo = null, subirArchivo = null, abrirVista = null, bd = null, gitReal = null, abrirUrl = null }) {
+    Object.assign(this, { proyecto, cambio, usuario, abrir, ejecutores, ahora, github, paquetes, importar, leerArchivo, subirArchivo, abrirVista, abrirUrl });
+    this.bd = bd ?? new ClienteBD();
+    this.gitReal = gitReal; // () => Promise<MotorGit>: Git de verdad (isomorphic-git)
     this.tokenGitHub = null; // solo en memoria: se pierde al recargar la página y no se guarda en ningún sitio
   }
 
@@ -262,6 +276,14 @@ export class Shell {
         if (ruta === null || ruta === "") { sesion.err(`bash: ${d}: ${ruta === "" ? "Es un directorio" : "Ruta fuera del proyecto o con nombre no válido"}\n`); return 1; }
         destino = { ruta, anexar: etapa.redir.anexar, texto: d };
       }
+      if (etapa.desde) {
+        const [o] = this.#expandir([etapa.desde], sesion);
+        const r = FS.resolver(sesion.cwd, o);
+        const py = this.proyecto();
+        if (r === null || !FS.tieneArchivo(py, r)) { sesion.err(`bash: ${o}: ${NO_EXISTE}\n`); return 1; }
+        if (esMarcador(py.files[r])) { sesion.err(`bash: ${o}: es un archivo binario\n`); return 1; }
+        entrada = py.files[r];
+      }
       const alTerminal = ultima && !destino;
       const senal = sesion.senal; // la de ESTE comando: si se cancela, lo que llegue tarde se descarta
       const io = {
@@ -287,6 +309,8 @@ export class Shell {
     const fn = COMANDOS[nombre];
     try {
       if (fn) return (await conCancelacion(fn.call(this, a, io), io.sesion.senal)) ?? 0;
+      const venv = rutaActivacion(nombre, this.proyecto(), io.sesion.cwd);
+      if (venv !== null) return this.#activarVenv(venv, io);
       if (nombre.includes("/")) return await this.#ejecutarBinario(nombre, io);
       if (NO_DISPONIBLE.includes(nombre)) {
         io.err(`${nombre}: no está disponible en esta terminal.\nEs una terminal del navegador (no un sistema operativo): trabaja con tus archivos y ejecuta node, python, git y más. Escribe help.\n`);
@@ -299,6 +323,21 @@ export class Shell {
       io.err(`${nombre}: error inesperado: ${error?.message || error}\n`);
       return 1;
     }
+  }
+
+  #activarVenv(dir, io) {
+    activarVenv(io.sesion, dir);
+    io.out(`\x1b[90mEntorno virtual «${FS.nombreBase(dir)}» activado: pip install instala aquí y python usa sus paquetes. Escribe deactivate para salir.\x1b[0m\n`);
+    return 0;
+  }
+
+  /** Paquetes de pip de la sesión: los del entorno virtual activo (o null = el Python global). */
+  almacenVenv(io) {
+    const { sesion } = io;
+    if (!sesion.venv) return null;
+    const py = this.proyecto();
+    if (!esVenv(py, sesion.venv)) { desactivarVenv(sesion); return null; }
+    return almacenDeVenv(py, sesion.venv, () => this.cambio({ origen: "terminal" }));
   }
 
   async #ejecutarBinario(nombre, io) {
@@ -679,6 +718,11 @@ const COMANDOS = {
   },
   gh(a, io) { io.err("GitHub CLI (gh) no está conectado en esta terminal. Para practicar el flujo usa git; para publicar de verdad usa Git y gh en tu computadora (cli.github.com/manual).\n"); return 1; },
   async git(a, io) {
+    if (this.gitReal) {
+      let motor;
+      try { motor = await this.gitReal(); } catch (e) { io.err(`git: no se pudo cargar Git (${e.message}).\n`); return 1; }
+      return motor.ejecutar(a, { py: io.py(), cwd: io.sesion.cwd, out: io.out, err: io.err, leerLinea: io.sesion.leerLinea, cambio: () => this.cambio({ origen: "git" }) });
+    }
     if (a[0] === "clone") return clonarDeGitHub.call(this, a.slice(1), io);
     const r = ejecutarGit(io.py(), a, { cwd: io.sesion.cwd, usuario: this.usuario, ahora: this.ahora });
     if (r.salida) (r.error ? io.err : io.out)(r.salida + "\n");
@@ -863,8 +907,128 @@ COMANDOS["ts-node"] = async function tsNode(a, io) {
   const f = archivoAEjecutar(this, io, "ts-node", a[0], ["ts"]);
   return f ? ej({ ...contexto(this, io), ruta: f.ruta, codigo: f.codigo, args: a.slice(1) }) : 1;
 };
+function comandoVenv(shell, a, io, orden = "python -m venv") {
+  const opciones = a.filter((x) => x.startsWith("-"));
+  const destinos = a.filter((x) => !x.startsWith("-"));
+  if (opciones.includes("-h") || opciones.includes("--help") || !destinos.length) {
+    io[destinos.length ? "out" : "err"](`uso: ${orden} [--clear] [--system-site-packages] [--prompt NOMBRE] CARPETA\nEjemplo: ${orden} .venv   y luego   source .venv/bin/activate   (Windows: .venv\\Scripts\\activate)\n`);
+    return destinos.length ? 0 : 2;
+  }
+  const py = io.py();
+  let codigo = 0;
+  for (const destino of destinos) {
+    try {
+      const r = crearVenv(py, io.sesion.cwd, destino, { usuario: shell.usuario, limpiar: opciones.includes("--clear"), conPaquetesSistema: opciones.includes("--system-site-packages") });
+      shell.cambio({ origen: "terminal" });
+      io.out(`\x1b[32m✔\x1b[0m Entorno virtual ${r.yaEra ? "actualizado" : "creado"} en ${r.nombre}/ (Python 3.12)\n  Actívalo:  \x1b[36msource ${destino}/bin/activate\x1b[0m   (CMD: ${destino}\\Scripts\\activate · PowerShell: .\\${destino}\\Scripts\\Activate.ps1)\n`);
+    } catch (e) { io.err(`Error: ${e.message}\n`); codigo = 1; }
+  }
+  return codigo;
+}
+COMANDOS.virtualenv = function virtualenv(a, io) { return comandoVenv(this, a.filter((x) => !/^--(python|no-)/.test(x)), io, "virtualenv"); };
+COMANDOS.deactivate = function deactivate(a, io) {
+  if (!desactivarVenv(io.sesion)) { io.err("deactivate: no hay ningún entorno virtual activo\n"); return 1; }
+  return 0;
+};
+COMANDOS.source = function source(a, io) {
+  if (!a[0]) { io.err("source: se necesita un nombre de archivo\nuso: source .venv/bin/activate\n"); return 2; }
+  const dir = rutaActivacion(a[0], io.py(), io.sesion.cwd);
+  if (dir !== null) {
+    activarVenv(io.sesion, dir);
+    io.out(`\x1b[90mEntorno virtual «${FS.nombreBase(dir)}» activado: pip install instala aquí y python usa sus paquetes. Escribe deactivate para salir.\x1b[0m\n`);
+    return 0;
+  }
+  const ruta = FS.resolver(io.sesion.cwd, a[0]);
+  if (ruta === null || !FS.tieneArchivo(io.py(), ruta)) { io.err(`source: ${a[0]}: ${NO_EXISTE}\n`); return 1; }
+  io.err(`source: solo se pueden cargar scripts de activación de entornos virtuales (…/bin/activate)\n`);
+  return 1;
+};
+COMANDOS["."] = COMANDOS.source;
+COMANDOS.which = function which(a, io) {
+  let codigo = 0;
+  for (const n of a) {
+    const venv = io.sesion.venv ? FS.rutaAbsoluta(io.sesion.venv) : null;
+    if (venv && ["python", "python3", "pip", "pip3"].includes(n)) io.out(`${venv}/bin/${n.replace(/3$/, "")}\n`);
+    else if (COMANDOS[n]) io.out(`/usr/local/bin/${n}\n`);
+    else codigo = 1;
+  }
+  return codigo;
+};
+COMANDOS.where = COMANDOS.which;
+// ------------------------------------------------------------------ servidores de Python ----
+/** Lee --opcion valor / --opcion=valor; devuelve { opciones, libres }. */
+function leerOpciones(a, conValor) {
+  const opciones = {}, libres = [];
+  for (let i = 0; i < a.length; i += 1) {
+    const m = /^--?([\w-]+)(?:=(.*))?$/.exec(a[i]);
+    if (!m) { libres.push(a[i]); continue; }
+    if (m[2] !== undefined) opciones[m[1]] = m[2];
+    else if (conValor.includes(m[1]) && a[i + 1] !== undefined) { opciones[m[1]] = a[i + 1]; i += 1; }
+    else opciones[m[1]] = true;
+  }
+  return { opciones, libres };
+}
+
+function servidorPy(shell, io, datos) {
+  const ej = shell.ejecutores.servidorPy;
+  if (!ej) return ejecutorNo(io, datos.estilo.split("-")[0]);
+  const venv = shell.almacenVenv(io);
+  return ej({ ...contexto(shell, io), ...(venv ? { almacenPip: venv } : {}), abrir: shell.abrirUrl, ...datos });
+}
+
+async function comandoFastapi(a, io) {
+  const [sub, ...resto] = a;
+  if (!sub || sub === "--help" || !["dev", "run"].includes(sub)) {
+    io[sub && sub !== "--help" ? "err" : "out"]("Uso: fastapi dev [archivo.py] [--port 8000] [--host 127.0.0.1] [--app app] [--no-reload]\n     fastapi run [archivo.py]   (sin recarga automática)\n");
+    return sub === "--help" ? 0 : 2;
+  }
+  const { opciones, libres } = leerOpciones(resto, ["port", "host", "app", "entrypoint", "e"]);
+  const py = io.py();
+  const archivo = libres[0] ? FS.resolver(io.sesion.cwd, libres[0]) : buscarArchivoApp(py, io.sesion.cwd);
+  if (!archivo || !FS.tieneArchivo(py, archivo)) {
+    io.err(libres[0] ? `Error: Path does not exist ${libres[0]}\n` : "Error: Could not find a default file to run, please provide an explicit path (por ejemplo: fastapi dev main.py)\n");
+    return 1;
+  }
+  const { modulo, carpeta } = moduloDeArchivo(py, archivo);
+  return servidorPy(this, io, {
+    estilo: sub === "dev" ? "fastapi-dev" : "fastapi-run", spec: `${modulo}:${opciones.app || "app"}`, carpetaModulo: carpeta, archivo,
+    puerto: opciones.port, host: opciones.host, recargar: sub === "dev" && !opciones["no-reload"],
+  });
+}
+COMANDOS.fastapi = comandoFastapi;
+
+async function comandoUvicorn(a, io) {
+  const { opciones, libres } = leerOpciones(a, ["port", "host", "app-dir", "workers", "log-level", "root-path", "env-file", "reload-dir"]);
+  if (opciones.help || !libres[0]) { io[opciones.help ? "out" : "err"]("Uso: uvicorn modulo:app [--reload] [--port 8000] [--host 127.0.0.1] [--factory]\nEjemplo: uvicorn main:app --reload\n"); return opciones.help ? 0 : 2; }
+  const spec = libres[0];
+  const py = io.py();
+  const base = opciones["app-dir"] ? FS.resolver(io.sesion.cwd, opciones["app-dir"]) ?? io.sesion.cwd : io.sesion.cwd;
+  const archivo = FS.unir(base, spec.split(":")[0].replace(/\./g, "/") + ".py");
+  const paquete = FS.unir(base, spec.split(":")[0].replace(/\./g, "/") + "/__init__.py");
+  if (!FS.tieneArchivo(py, archivo) && !FS.tieneArchivo(py, paquete)) { io.err(`ERROR:    Error loading ASGI app. Could not import module "${spec.split(":")[0]}".\n`); return 1; }
+  return servidorPy(this, io, { estilo: "uvicorn", spec: spec.includes(":") ? spec : `${spec}:app`, carpetaModulo: base, factory: Boolean(opciones.factory), puerto: opciones.port, host: opciones.host, recargar: Boolean(opciones.reload) });
+}
+COMANDOS.uvicorn = comandoUvicorn;
+
+async function comandoFlask(a, io) {
+  const { opciones, libres } = leerOpciones(a, ["app", "A", "port", "p", "host", "h"]);
+  const sub = libres[0];
+  if (opciones.help || sub !== "run") { io[opciones.help ? "out" : "err"]("Uso: flask --app app run [--debug] [--port 5000]\n"); return opciones.help ? 0 : 2; }
+  const py = io.py();
+  let spec = opciones.app || opciones.A || io.sesion.vars.FLASK_APP || "";
+  if (!spec) spec = ["app", "wsgi"].find((n) => FS.tieneArchivo(py, FS.unir(io.sesion.cwd, n + ".py"))) || "";
+  if (!spec) { io.err("Error: Could not locate a Flask application. Use the 'flask --app' option, 'FLASK_APP' environment variable, or a 'wsgi.py' or 'app.py' file in the current directory.\n"); return 2; }
+  spec = spec.replace(/\.py$/, "").replace(/\//g, ".");
+  return servidorPy(this, io, { estilo: "flask", spec, puerto: opciones.port || opciones.p, host: opciones.host || opciones.h, recargar: Boolean(opciones.debug || opciones.reload || io.sesion.vars.FLASK_DEBUG === "1") });
+}
+COMANDOS.flask = comandoFlask;
+
 COMANDOS.python = async function python(a, io) {
   if (a[0] === "-m" && a[1] === "pip") return COMANDOS.pip.call(this, a.slice(2), io);
+  if (a[0] === "-m" && (a[1] === "venv" || a[1] === "virtualenv")) return comandoVenv(this, a.slice(2), io);
+  if (a[0] === "-m" && a[1] === "uvicorn") return comandoUvicorn.call(this, a.slice(2), io);
+  if (a[0] === "-m" && a[1] === "flask") return comandoFlask.call(this, a.slice(2), io);
+  if (a[0] === "-m" && (a[1] === "fastapi" || a[1] === "fastapi_cli")) return comandoFastapi.call(this, a.slice(2), io);
   const ej = this.ejecutores.python;
   if (!ej) return ejecutorNo(io, "python");
   if (a[0] === "--version" || a[0] === "-V") { io.out("Python 3.12 (Pyodide, en el navegador)\n"); return 0; }
@@ -873,15 +1037,38 @@ COMANDOS.python = async function python(a, io) {
     io.err(`python: el módulo -m ${a[1] ?? ""} no está disponible aquí (solo -m pip).\n`);
     return 1;
   }
-  if (a[0] === "-c") return ej({ ...contexto(this, io), ruta: "<cadena>", codigo: a[1] ?? "", args: [] });
+  const venv = this.almacenVenv(io);
+  const extra = venv ? { almacenPip: venv } : {};
+  if (a[0] === "-c") return ej({ ...contexto(this, io), ...extra, ruta: "<cadena>", codigo: a[1] ?? "", args: [] });
   if (!a.length) { io.err("python: el modo interactivo (REPL) no está disponible. Ejecuta un archivo: python archivo.py\n"); return 1; }
   const f = archivoAEjecutar(this, io, "python", a[0], ["py"]);
-  return f ? ej({ ...contexto(this, io), ruta: f.ruta, codigo: f.codigo, args: a.slice(1) }) : 1;
+  if (!f) return 1;
+  // python manage.py runserver [puerto]: Django, servido en la vista previa (las demás órdenes de manage.py corren normal).
+  if (FS.nombreBase(f.ruta) === "manage.py" && a[1] === "runserver" && this.ejecutores.servidorPy) {
+    const ajustes = /DJANGO_SETTINGS_MODULE["']\s*,\s*["']([\w.]+)["']/.exec(f.codigo)?.[1];
+    if (!ajustes) { io.err("No encontré DJANGO_SETTINGS_MODULE en manage.py.\n"); return 1; }
+    const dir = a.slice(2).find((x) => !x.startsWith("-")) || "8000";
+    const [host, puerto] = dir.includes(":") ? dir.split(":") : ["127.0.0.1", dir];
+    return servidorPy(this, io, { estilo: "django", spec: `django:${ajustes}`, carpetaModulo: FS.carpetaDe(f.ruta), cwd: FS.carpetaDe(f.ruta) || io.sesion.cwd, puerto, host: host || "127.0.0.1", recargar: !a.includes("--noreload") });
+  }
+  // python main.py con uvicorn.run(app) o app.run() de Flask al final: se sirve igual que uvicorn / flask run.
+  const arranque = /^if\s+__name__\s*==\s*["']__main__["']\s*:[\s\S]*?\b(uvicorn\.run|app\.run|socketio\.run)\(\s*["']?([\w.:]*)/m.exec(f.codigo);
+  if (arranque && this.ejecutores.servidorPy) {
+    const { modulo, carpeta } = moduloDeArchivo(io.py(), f.ruta);
+    const puerto = /port\s*=\s*(\d+)/.exec(f.codigo.slice(arranque.index))?.[1];
+    const recargar = /reload\s*=\s*True|debug\s*=\s*True/.test(f.codigo.slice(arranque.index));
+    const esFlask = arranque[1] !== "uvicorn.run";
+    const variable = !esFlask && arranque[2] && !arranque[2].includes(":") ? arranque[2] : "app";
+    io.out(`\x1b[90m(${FS.nombreBase(f.ruta)} inicia un servidor: CódigoCamp lo sirve como ${esFlask ? "flask run" : "uvicorn"} en la vista previa)\x1b[0m\n`);
+    return servidorPy(this, io, { estilo: esFlask ? "flask" : "uvicorn", spec: arranque[2]?.includes(":") ? arranque[2] : `${modulo}:${variable}`, carpetaModulo: carpeta, puerto, recargar });
+  }
+  return ej({ ...contexto(this, io), ...extra, ruta: f.ruta, codigo: f.codigo, args: a.slice(1) });
 };
 COMANDOS.python3 = COMANDOS.python;
 COMANDOS.pip = async function pip(a, io) {
   if (!this.paquetes) return ejecutorNo(io, "pip");
-  return this.paquetes.pip({ args: a, proyecto: io.py(), cwd: io.sesion.cwd, out: io.out, err: io.err });
+  const venv = this.almacenVenv(io);
+  return this.paquetes.pip({ args: a, proyecto: io.py(), cwd: io.sesion.cwd, out: io.out, err: io.err, ...(venv ? { almacen: venv } : {}) });
 };
 COMANDOS.pip3 = COMANDOS.pip;
 COMANDOS.npm = async function npm(a, io) {
@@ -918,11 +1105,32 @@ COMANDOS.npx = async function npx(a, io) {
 };
 COMANDOS.py = COMANDOS.python;
 COMANDOS.sqlite3 = async function sqlite3(a, io) {
-  const ej = this.ejecutores.sql;
-  if (!ej) return ejecutorNo(io, "sqlite3");
-  const f = archivoAEjecutar(this, io, "sqlite3", a[0], ["sql"]);
-  return f ? ej({ ...contexto(this, io), ruta: f.ruta, codigo: f.codigo }) : 1;
+  const cargar = this.ejecutores.cargarSQL;
+  if (!cargar) return ejecutorNo(io, "sqlite3");
+  if (a[0] === "--version" || a[0] === "-version") { io.out("3.x (sql.js, SQLite en WebAssembly)\n"); return 0; }
+  let SQL;
+  try { SQL = await cargar(); } catch (e) { io.err(`${e.message}\n`); return 1; }
+  return comandoSqlite({
+    args: a, py: io.py(), cwd: io.sesion.cwd, out: io.out, err: io.err, leerLinea: io.sesion.leerLinea, entrada: io.entrada, SQL,
+    leerArchivo: this.leerArchivo, subirArchivo: this.subirArchivo, cambio: () => this.cambio({ origen: "terminal" }),
+  });
 };
+COMANDOS.sqlite = COMANDOS.sqlite3;
+COMANDOS.mysql = function mysql(a, io) {
+  return comandoMysql({ args: a, py: io.py(), cwd: io.sesion.cwd, out: io.out, err: io.err, leerLinea: io.sesion.leerLinea, entrada: io.entrada, cliente: this.bd });
+};
+COMANDOS.mariadb = COMANDOS.mysql;
+COMANDOS.psql = function psql(a, io) {
+  return comandoPsql({ args: a, py: io.py(), cwd: io.sesion.cwd, out: io.out, err: io.err, leerLinea: io.sesion.leerLinea, entrada: io.entrada, cliente: this.bd, entorno: io.sesion.vars });
+};
+COMANDOS.mongosh = function mongosh(a, io) {
+  return comandoMongo({ args: a, py: io.py(), cwd: io.sesion.cwd, out: io.out, err: io.err, leerLinea: io.sesion.leerLinea, entrada: io.entrada, cliente: this.bd });
+};
+COMANDOS.mongo = COMANDOS.mongosh;
+COMANDOS["redis-cli"] = function redis(a, io) {
+  return comandoRedis({ args: a, out: io.out, err: io.err, leerLinea: io.sesion.leerLinea, entrada: io.entrada, cliente: this.bd });
+};
+COMANDOS["bd-puente"] = function puente(a, io) { return comandoPuente({ args: a, out: io.out, err: io.err, cliente: this.bd }); };
 
 async function enServidor(shell, io, lenguaje, f, { guardarComo, nombreBin } = {}) {
   const ej = shell.ejecutores.servidor;

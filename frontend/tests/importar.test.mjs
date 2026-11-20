@@ -11,14 +11,16 @@ const txt = (ruta, t) => ({ ruta, bytes: enc.encode(t) });
 const marcador = (c, tipo = "image/png", n = 11) => `ccbin:v1:${c.repeat(64)}:${tipo}:${n}`;
 
 test("limpiarNombre y limpiarRuta: tildes, espacios, carpetas ignoradas y rutas peligrosas", () => {
-  assert.equal(limpiarNombre("Mi Foto (1).PNG"), "Mi-Foto-_1.PNG");
-  assert.equal(limpiarNombre("canción ñandú.mp3"), "cancion-nandu.mp3");
+  assert.equal(limpiarNombre("Mi Foto (1).PNG"), "Mi Foto (1).PNG");
+  assert.equal(limpiarNombre("a:b?.txt"), "a_b_.txt");
+  assert.equal(limpiarNombre("canción ñandú.mp3"), "canción ñandú.mp3");
   assert.equal(limpiarNombre(".gitignore"), ".gitignore");
   for (const n of ["__init__.py", "__main__.py", "_config.yml", "a__b.js", "mi-archivo_2.js", ".env"]) assert.equal(limpiarNombre(n), n, `${n} no se toca`);
   assert.deepEqual(limpiarRuta("backend/application/__init__.py"), { ruta: "backend/application/__init__.py", renombrada: false });
   assert.equal(limpiarNombre(".."), null);
   assert.equal(limpiarNombre("x".repeat(150) + ".js").length, 120);
-  assert.deepEqual(limpiarRuta("Mis Documentos/índice.html"), { ruta: "Mis-Documentos/indice.html", renombrada: true });
+  assert.deepEqual(limpiarRuta("Mis Documentos/índice.html"), { ruta: "Mis Documentos/índice.html", renombrada: false });
+  assert.deepEqual(limpiarRuta("docs/qué es?.md"), { ruta: "docs/qué es_.md", renombrada: true });
   assert.deepEqual(limpiarRuta("node_modules/x/index.js"), { ignorar: true });
   assert.deepEqual(limpiarRuta(".git/HEAD"), { ignorar: true });
   assert.deepEqual(limpiarRuta("a/.DS_Store"), { ignorar: true });
@@ -46,7 +48,7 @@ test("planificar: quita la raíz común, renombra, ignora y trae todo tipo de ar
     txt("repo-main/node_modules/lib/i.js", "no"), { ruta: "repo-main/video.mp4", bytes: MP4 }], carpetas: ["repo-main/", "repo-main/vacia/"] };
   const plan = planificar(py, origen);
   assert.equal(plan.raiz, "repo-main");
-  assert.deepEqual(plan.textos.map((t) => t.ruta).sort(), ["Mi-Carpeta/a-b.js", "index.html"]);
+  assert.deepEqual(plan.textos.map((t) => t.ruta).sort(), ["Mi Carpeta/a b.js", "index.html"]);
   assert.deepEqual(plan.binarios.map((i) => [i.ruta, i.tipo]), [["img/logo.png", "image/png"], ["video.mp4", "video/mp4"]]);
   assert.deepEqual(plan.reemplazados, ["index.html"]);
   assert.equal(plan.ignorados, 1);
@@ -55,7 +57,7 @@ test("planificar: quita la raíz común, renombra, ignora y trae todo tipo de ar
   const escritos = aplicar(py, plan, new Map([["img/logo.png", marcador("a")], ["video.mp4", marcador("b", "video/mp4", 14)]]));
   assert.equal(escritos, 4);
   assert.ok(esMarcador(py.files["video.mp4"]));
-  assert.ok(py.folders.includes("vacia") && py.folders.includes("Mi-Carpeta") && py.folders.includes("img"));
+  assert.ok(py.folders.includes("vacia") && py.folders.includes("Mi Carpeta") && py.folders.includes("img"));
 });
 
 test("planificar: límites de archivos, caracteres, espacio de la cuenta y choques archivo/carpeta", () => {

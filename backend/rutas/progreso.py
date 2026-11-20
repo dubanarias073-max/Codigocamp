@@ -61,5 +61,6 @@ def desafios():
             "clave": item["clave"], "icono": item["icono"], "titulo": item["titulo"], "meta": item["meta"],
             "progreso": min(item["meta"], getattr(activity, item["campo"], 0) if activity else 0),
             "premio": reward_text(item["premio"]), "completado": item["clave"] in completed,
+            "datos": dict(item["premio"]), "cofre": "plata" if item["premio"].get("diamante", 0) >= 20 else "madera",
         } for item in DAILY_CHALLENGES],
     )

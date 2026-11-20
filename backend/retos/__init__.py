@@ -16,7 +16,56 @@ from .base import PREGUNTAS_POR_LECCION, XP_ETAPA
 
 # Mismo `slug` que la tabla `cursos`; el archivo se llama igual (javascript.py, csharp.py...).
 ORDEN = ["html", "css", "javascript", "python", "sql", "bd", "typescript", "java", "csharp",
-         "kotlin", "swift", "php", "ruby", "go", "rust", "c", "cpp"]
+         "kotlin", "swift", "php", "ruby", "go", "rust", "c", "cpp", "terminal", "git", "github", "docker", "node", "nosql"]
+
+# Cursos que se crean solos en la tabla `cursos` si faltan (los demás vienen de codigocamp.sql).
+CURSOS_NUEVOS = {
+    "terminal": dict(nombre="Terminales", tipo="lenguaje", sigla="$_", color="#4ade80", descripcion="Bash, PowerShell y CMD", orden=18),
+    "git": dict(nombre="Git", tipo="lenguaje", sigla="GIT", color="#f97316", descripcion="Control de versiones: de cero a avanzado", orden=19),
+    "docker": dict(nombre="Docker", tipo="lenguaje", sigla="DK", color="#38bdf8", descripcion="Contenedores para tus apps y bases de datos", orden=20),
+    "node": dict(nombre="Node.js", tipo="lenguaje", sigla="NODE", color="#84cc16", descripcion="JavaScript en el servidor: npm, Express y APIs", orden=21),
+    "github": dict(nombre="GitHub", tipo="lenguaje", sigla="GH", color="#a78bfa", descripcion="Repositorios, equipo, Actions, Pages y seguridad", orden=22),
+    "nosql": dict(nombre="NoSQL", tipo="bd", sigla="NoSQL", color="#22c55e", descripcion="MongoDB, Redis, Firestore, grafos y más", orden=23),
+}
+
+
+def asegurar_cursos(session):
+    """Crea en la tabla `cursos` los cursos nuevos que falten. Devuelve los slugs creados."""
+    from models import Course
+    existentes = {c.slug: c for c in session.query(Course).all()}
+    creados, cambios = [], False
+    for slug, datos in CURSOS_NUEVOS.items():
+        if slug not in existentes:
+            session.add(Course(slug=slug, activo=True, **datos))
+            creados.append(slug)
+        else:   # nombre y descripción siguen a este archivo (p. ej. «Git y GitHub» pasó a «Git» al crear el curso GitHub)
+            c = existentes[slug]
+            for campo in ("nombre", "descripcion", "sigla", "color"):
+                if getattr(c, campo) != datos[campo]:
+                    setattr(c, campo, datos[campo]); cambios = True
+    if creados or cambios:
+        session.commit()
+    return creados
+
+
+def _cargar_curso(session, course, slug, etapas, desde=0):
+    """Carga las etapas (desde la número `desde`, contando desde 0) con sus secciones, niveles y retos."""
+    from models import Challenge, Level, Section, Stage
+    for i, etapa in enumerate(etapas):
+        if i < desde:
+            continue
+        stage = Stage(course=course, orden=i + 1, titulo=etapa["titulo"], descripcion=etapa["descripcion"])
+        session.add(stage)
+        planas = secciones_del_camino(etapa)
+        for j, seccion in enumerate(planas):
+            section = Section(etapa=stage, orden=j + 1, titulo=seccion["titulo"])
+            session.add(section)
+            specs = _especificaciones_niveles(slug, i, etapa, seccion, j + 1, len(planas))
+            for k, spec in enumerate(specs, 1):
+                level = Level(seccion=section, orden=k, titulo=spec["titulo"], tipo=spec["tipo"], xp=spec["xp"])
+                session.add(level)
+                for n, reto in enumerate(spec["retos"], 1):
+                    session.add(Challenge(nivel=level, orden=n, **reto))
 
 # Cursos cuyo camino SÍ lleva repaso (ninguno por ahora). Para activarlo en uno: añade su slug y pasa repaso=True a construir_etapas.
 CON_REPASO = set()   # ningún curso lleva repaso (ni lección «Repaso de …» ni nodo «Práctica de repaso»)
@@ -169,13 +218,37 @@ def sincronizar_catalogo(session):
     if problemas:
         raise RuntimeError("Hay errores en los retos; ejecuta `flask --app app check-retos`:\n" + "\n".join(problemas[:10]))
 
+    asegurar_cursos(session)
     en_bd = {curso.slug: curso for curso in session.query(Course).all()}
     faltan = sorted(set(cursos) - set(en_bd))
     if faltan:
         raise RuntimeError(f"Faltan cursos en la base de datos: {faltan}")
 
+    # Cursos nuevos (sin etapas todavía): se cargan enteros, no hay progreso que proteger.
+    nuevos = [slug for slug in cursos if not list(en_bd[slug].etapas)]
+    for slug in nuevos:
+        _cargar_curso(session, en_bd[slug], slug, cursos[slug])
+    if nuevos:
+        session.commit()
+        en_bd = {curso.slug: curso for curso in session.query(Course).all()}
+
+    # Cursos que ganaron etapas nuevas al final (p. ej. de 3 a 5): se agregan sin tocar el progreso de las existentes.
+    ampliados = []
+    for slug, etapas in cursos.items():
+        if slug in nuevos:
+            continue
+        actuales = sorted(en_bd[slug].etapas, key=lambda e: e.orden)
+        if len(actuales) < len(etapas) and all(e.titulo == etapas[i]["titulo"] for i, e in enumerate(actuales)):
+            _cargar_curso(session, en_bd[slug], slug, etapas, desde=len(actuales))
+            ampliados.append(slug)
+    if ampliados:
+        session.commit()
+        en_bd = {curso.slug: curso for curso in session.query(Course).all()}
+
     planes = []
     for slug, etapas in cursos.items():
+        if slug in nuevos:
+            continue
         db_etapas = list(en_bd[slug].etapas)
         if len(db_etapas) != len(etapas):
             raise RuntimeError(f"{slug}: cambió la cantidad de etapas; no se sincronizó para proteger el progreso. Si el camino cambió de estructura, usa `flask --app app migrar-camino` (traslada el progreso).")
@@ -348,6 +421,7 @@ def poblar_catalogo(session, reset=False):
     if any(existente):
         raise RuntimeError("El catálogo está cargado a medias o desactualizado; prueba `flask --app app sync-retos`. `seed-retos --reset` borra el progreso.")
 
+    asegurar_cursos(session)
     en_bd = {c.slug: c for c in session.query(Course).all()}
     faltan = sorted(set(cursos) - set(en_bd))
     if faltan:

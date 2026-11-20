@@ -7,7 +7,9 @@
 //  · SQL         -> sql.js (SQLite en el navegador), igual que en Aprende.
 import { color } from "./ansi.js";
 import * as FS from "./fs.js";
-import { dependenciasDe, restaurarPaquetes, urlDeCdn } from "./paquetes.js";
+import { leerMarcador } from "./archivos.js";
+import { cerrarMysqlEnPython, instalarMysqlEnPython } from "./pymysql.js";
+import { dependenciasDe, restaurarPaquetes, sugerenciaNode, sugerenciaPython, urlDeCdn } from "./paquetes.js";
 
 const MAX_SALIDA = 200_000;
 const TIEMPO_MAXIMO = 120_000;
@@ -498,6 +500,8 @@ export async function ejecutarNode(o) {
       if (codigo === 1 && /\b(document|window|alert|navigator|localStorage|sessionStorage|location) is not defined/.test(textoErr)) {
         o.err(color.gris("Pista: ese código es de navegador (usa document/window…) y Node no lo tiene. Para verlo funcionar, abre la vista previa de tu página HTML.\n"));
       }
+      const ayuda = codigo === 1 ? sugerenciaNode(textoErr + (mensaje || "")) : null;
+      if (ayuda) o.err(color.amarillo(ayuda) + "\n");
       resolver(codigo);
     };
     const limite = setTimeout(() => terminar(124, `\n${color.rojo("Tiempo máximo agotado")} (2 minutos): se detuvo el programa.\n`), TIEMPO_MAXIMO);
@@ -519,17 +523,31 @@ export async function ejecutarNode(o) {
 }
 
 // ---------------------------------------------------------------------------- TypeScript ----
-const cargarScript = (url) => new Promise((ok, ko) => {
+// El cargador AMD del editor (Monaco) define `define.amd`: los motores UMD (Pyodide, sql.js…) se registrarían como
+// módulos AMD en vez de crear su variable global. Mientras se carga un motor se oculta esa marca.
+let cargasUmd = 0;
+export const cargarScript = (url) => new Promise((ok, ko) => {
   const s = document.createElement("script");
+  const def = globalThis.define;
+  const amd = def?.amd;
+  if (def && amd) { cargasUmd += 1; def.amd = undefined; }
+  const fin = () => { if (def && amd && --cargasUmd === 0) def.amd = amd; };
   s.src = url;
-  s.onload = ok;
-  s.onerror = () => { s.remove(); ko(new Error("No se pudo descargar el motor. Revisa tu conexión.")); };
+  s.onload = () => { fin(); ok(); };
+  s.onerror = () => { fin(); s.remove(); ko(new Error("No se pudo descargar el motor. Revisa tu conexión.")); };
   document.head.appendChild(s);
 });
 
+/** Compilador de TypeScript: la copia incluida en CódigoCamp y, si faltara, el CDN. */
+async function cargarTypeScript() {
+  if (globalThis.ts) return;
+  try { await cargarScript("/vendor/typescript/typescript.min.js"); } catch { /* se intenta el CDN */ }
+  if (!globalThis.ts) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/typescript/5.4.5/typescript.min.js");
+}
+
 /** JSX / TSX / TypeScript → módulo ES para la vista previa (JSX automático: react/jsx-runtime o preact/jsx-runtime). */
 export async function transpilarModulo(codigo, ruta, { jsxImportSource = "react" } = {}) {
-  if (!globalThis.ts) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/typescript/5.4.5/typescript.min.js");
+  await cargarTypeScript();
   const ts = globalThis.ts;
   const nombre = /\.(m?js|cjs)$/.test(ruta) ? ruta.replace(/\.(m?js|cjs)$/, ".jsx") : ruta; // un .js con JSX se trata como .jsx
   const r = ts.transpileModule(codigo, {
@@ -547,7 +565,7 @@ export async function transpilarModulo(codigo, ruta, { jsxImportSource = "react"
 
 /** Transpila un archivo TypeScript a CommonJS con el compilador oficial (se descarga la primera vez). */
 export async function transpilarTS(codigo) {
-  if (!globalThis.ts) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/typescript/5.4.5/typescript.min.js");
+  await cargarTypeScript();
   const ts = globalThis.ts;
   const r = ts.transpileModule(codigo, { reportDiagnostics: true, compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } });
   const errores = (r.diagnostics || []).filter((d) => d.category === 1);
@@ -571,25 +589,79 @@ export async function ejecutarTS(o) {
 let pyodidePromesa = null;
 export const cargarPyodide = () => {
   pyodidePromesa ??= (async () => {
-    if (!globalThis.loadPyodide) await cargarScript("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js");
-    return globalThis.loadPyodide();
+    // Python base incluido en CódigoCamp (/vendor/pyodide); los paquetes extra (numpy, sqlite3, micropip…) se bajan del CDN al usarlos.
+    let indexURL = "/vendor/pyodide/";
+    if (!globalThis.loadPyodide) {
+      try { await cargarScript(indexURL + "pyodide.js"); }
+      catch { indexURL = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"; await cargarScript(indexURL + "pyodide.js"); }
+    }
+    try { return await globalThis.loadPyodide({ indexURL }); }
+    catch (e) {
+      if (indexURL.startsWith("https:")) throw e;
+      return globalThis.loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/" });
+    }
   })().catch((error) => { pyodidePromesa = null; throw error; });
   return pyodidePromesa;
 };
 
-const RAIZ_PY = "/workspace";
+export const RAIZ_PY = "/workspace";
+/** Sube cada vez que un programa de Python reescribe /workspace (los servidores de servidorpy.js lo vuelven a sincronizar). */
+export let generacionFsPy = 0;
+export const nuevaGeneracionFsPy = () => { generacionFsPy += 1; return generacionFsPy; };
 
-export function escribirEnPyodide(pyo, py) {
+/** Escribe el proyecto en /workspace de Python. Los archivos de la cuenta que vienen en `binarios` van con sus bytes reales. */
+export function escribirEnPyodide(pyo, py, binarios = new Map()) {
   const { FS: sis } = pyo;
   const asegurar = (dir) => { let acc = ""; for (const p of dir.split("/").filter(Boolean)) { acc += "/" + p; try { sis.mkdir(acc); } catch { /* ya existe */ } } };
   asegurar(RAIZ_PY);
   py.folders.forEach((c) => asegurar(`${RAIZ_PY}/${c}`));
-  for (const [ruta, texto] of Object.entries(py.files)) { asegurar(`${RAIZ_PY}/${FS.carpetaDe(ruta)}`); sis.writeFile(`${RAIZ_PY}/${ruta}`, texto); }
+  for (const [ruta, texto] of Object.entries(py.files)) { asegurar(`${RAIZ_PY}/${FS.carpetaDe(ruta)}`); sis.writeFile(`${RAIZ_PY}/${ruta}`, binarios.get(ruta) ?? texto); }
 }
+
+// Archivos binarios que Python recibe con sus bytes (bases SQLite, imágenes, Excel, CSV grandes…). Tope por si la cuenta es enorme.
+const PARA_PYTHON = new Set(["db", "sqlite", "sqlite3", "db3", "png", "jpg", "jpeg", "gif", "webp", "bmp", "csv", "tsv", "json", "xlsx", "xls", "parquet", "npy", "npz", "pkl", "txt", "wav", "mp3", "pdf", "zip"]);
+const MAX_PYTHON = { porArchivo: 50 * 1024 * 1024, total: 200 * 1024 * 1024 };
+
+/** Bytes de los archivos de la cuenta que se le pasan a Python (Map ruta → Uint8Array). */
+export async function binariosParaPython(py, archivos) {
+  const salida = new Map();
+  if (!archivos) return salida;
+  let total = 0;
+  for (const [ruta, texto] of Object.entries(py.files)) {
+    const m = leerMarcador(texto);
+    if (!m || !PARA_PYTHON.has(FS.extension(ruta)) || m.tamano > MAX_PYTHON.porArchivo || total + m.tamano > MAX_PYTHON.total) continue;
+    try { salida.set(ruta, await archivos.bytes(texto)); total += m.tamano; } catch { /* sin conexión: Python verá el marcador */ }
+  }
+  return salida;
+}
+
+const decodificadorEstricto = new TextDecoder("utf-8", { fatal: true });
+/** Texto si los bytes son UTF-8 sin NUL; si no, null (es binario). */
+export function comoTexto(bytes) {
+  try { const t = decodificadorEstricto.decode(bytes); return t.includes("\u0000") ? null : t; } catch { return null; }
+}
+
+/**
+ * Los binarios que dejó Python: los que no cambiaron conservan su marcador; los nuevos o cambiados se suben a la cuenta.
+ * Escribe el resultado en `despues.files` (para que diferencias() los trate como cualquier archivo).
+ */
+export async function consolidarBinarios(antes, despues, { subir, hash, err = () => {} }) {
+  for (const [ruta, bytes] of despues.binarios) {
+    const previo = leerMarcador(antes.files[ruta]);
+    if (previo && previo.tamano === bytes.length && previo.hash === await hash(bytes)) { despues.files[ruta] = antes.files[ruta]; continue; }
+    if (!subir) { err(`No se pudo guardar ${ruta}: los archivos binarios necesitan la sesión iniciada.\n`); if (antes.files[ruta] !== undefined) despues.files[ruta] = antes.files[ruta]; continue; }
+    try { despues.files[ruta] = await subir(bytes, { nombre: ruta }); }
+    catch (e) { err(`No se pudo guardar ${ruta}: ${e.message}\n`); if (antes.files[ruta] !== undefined) despues.files[ruta] = antes.files[ruta]; }
+  }
+  return despues;
+}
+
+const sha256Hex = async (bytes) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 export function leerDePyodide(pyo) {
   const { FS: sis } = pyo;
   const salida = { files: {}, folders: [] };
+  Object.defineProperty(salida, "binarios", { value: new Map(), enumerable: false });
   if (!existeEnPyodide(sis, RAIZ_PY)) return salida;
   const recorrer = (dir) => {
     for (const nombre of sis.readdir(dir)) {
@@ -598,7 +670,11 @@ export function leerDePyodide(pyo) {
       const rel = ruta.slice(RAIZ_PY.length + 1);
       if (nombre === "__pycache__" || nombre.endsWith(".pyc")) continue;
       if (sis.isDir(sis.stat(ruta).mode)) { salida.folders.push(rel); recorrer(ruta); } else {
-        try { salida.files[rel] = sis.readFile(ruta, { encoding: "utf8" }); } catch { /* binario: se ignora */ }
+        try {
+          const bytes = sis.readFile(ruta);
+          const t = typeof bytes === "string" ? bytes : comoTexto(bytes);
+          if (t === null) salida.binarios.set(rel, bytes); else salida.files[rel] = t;
+        } catch { /* ilegible: se ignora */ }
       }
     }
   };
@@ -611,6 +687,9 @@ const existeEnPyodide = (sis, ruta) => { try { sis.stat(ruta); return true; } ca
 /** Vacía /workspace. La primera vez la carpeta aún no existe (readdir fallaría): en ese caso se crea. */
 export function borrarEnPyodide(pyo, dir = RAIZ_PY, raiz = true) {
   const { FS: sis } = pyo;
+  // Python no puede borrar la carpeta en la que está parado (EBUSY): tras `cd backend` o un servidor en backend/,
+  // la siguiente ejecución fallaba con «[object Object]». Primero se sale a la raíz.
+  if (raiz) { try { const actual = sis.cwd(); if (actual === dir || actual.startsWith(dir + "/")) sis.chdir("/"); } catch { /* nada */ } }
   if (raiz && !existeEnPyodide(sis, dir)) { sis.mkdir(dir); return; }
   for (const nombre of sis.readdir(dir)) {
     if (nombre === "." || nombre === "..") continue;
@@ -630,6 +709,29 @@ export function diferencias(antes, despues) {
   return cambios;
 }
 
+// Números de error de Pyodide/Emscripten (WASI), con su equivalente de Linux para que el mensaje se parezca al de tu PC.
+const ERRNO = { 2: [13, "Permission denied"], 10: [16, "Device or resource busy"], 20: [17, "File exists"], 28: [22, "Invalid argument"], 31: [21, "Is a directory"],
+  37: [36, "File name too long"], 44: [2, "No such file or directory"], 51: [28, "No space left on device"], 54: [20, "Not a directory"], 55: [39, "Directory not empty"], 63: [1, "Operation not permitted"] };
+/** Texto legible de cualquier error (los del sistema de archivos de Pyodide no traen .message y salían como «[object Object]»). */
+export function textoError(e) {
+  if (e && typeof e === "object" && typeof e.errno === "number" && !e.message) {
+    const [n, texto] = ERRNO[e.errno] || [e.errno, "error del sistema de archivos"];
+    return `OSError: [Errno ${n}] ${texto}`;
+  }
+  if (e && typeof e.message === "string" && e.message) return e.message;
+  if (e && typeof e === "object") { try { return JSON.stringify(e); } catch { /* nada */ } }
+  return String(e);
+}
+
+// Partes de la biblioteca estándar que Pyodide trae aparte. Las importan los frameworks por dentro (anyio importa ssl,
+// Werkzeug usa hashlib para las contraseñas), aunque tu código no las importe: se cargan antes de ejecutar.
+export const STDLIB_APARTE = { ssl: "ssl", _ssl: "ssl", hashlib: "hashlib", _hashlib: "hashlib", lzma: "lzma", _lzma: "lzma", sqlite3: "sqlite3", _sqlite3: "sqlite3", _pydecimal: "pydecimal", pydoc_data: "pydoc-data" };
+const USA_RED_O_CIFRADO = /^\s*(?:from|import)\s+(?:requests|httpx|urllib3|aiohttp|fastapi|starlette|anyio|flask|werkzeug|jwt|jose|passlib|bcrypt|smtplib|ssl|hashlib|hmac|secrets|email|http|urllib|django|sqlalchemy|sqlmodel|pydantic|dotenv|itsdangerous|authlib|google)\b/m;
+/** Carga ssl, hashlib y sqlite3 de Pyodide (una vez). Sin red o sin ellos, sigue: el error real lo dirá Python. */
+export async function cargarStdlibAparte(pyo, nombres = ["ssl", "hashlib", "sqlite3"]) {
+  try { await pyo.loadPackage(nombres); } catch { /* nada */ }
+}
+
 const limpiarTraza = (mensaje) => String(mensaje).split("\n").filter((l) => !/_pyodide|pyodide\/|python3\d+\.zip/.test(l)).join("\n").trim();
 
 export async function ejecutarPython(o) {
@@ -640,41 +742,69 @@ export async function ejecutarPython(o) {
   } catch (error) { o.err(`${error.message}\n`); return 1; }
   if (o.senal?.aborted) return 130;
   if (o.almacenPip) await restaurarPaquetes({ pyo, lista: o.almacenPip.leer(), out: o.out, err: o.err });
-  try { await pyo.loadPackagesFromImports(o.codigo); } catch { /* si falta un paquete, Python mostrará su propio error */ }
+  // Paquetes de Pyodide que importa el programa (o sus módulos), p. ej. sqlite3, numpy. pymysql y mysql.connector vienen de CódigoCamp.
+  const fuentesPy = [o.codigo, ...Object.entries(o.proyecto.files).filter(([r, t]) => r.endsWith(".py") && t.length < 200_000).map(([, t]) => t)].join("\n")
+    .replace(/^\s*(?:import|from)\s+(?:pymysql|mysql|MySQLdb|psycopg2?|pymongo|bson|redis)\b.*$/gm, "");
+  try { await pyo.loadPackagesFromImports(fuentesPy); } catch { /* si falta un paquete, Python mostrará su propio error */ }
+  if (USA_RED_O_CIFRADO.test(fuentesPy)) await cargarStdlibAparte(pyo);
+  // Bases de datos: tu servidor real por el puente o, si no se puede llegar, SQLite en el proyecto (bdpython.js).
+  let conBd = false;
+  if (/^\s*(?:from|import)\s+(?:pymysql|mysql|MySQLdb|psycopg2?|pymongo|bson|redis|sqlalchemy|sqlmodel|flask_sqlalchemy|flask_mysqldb|django|requests|httpx|urllib|smtplib|email|google|openai|anthropic|fastapi|flask|aiohttp)\b/m.test(fuentesPy + "\n" + o.codigo)) {
+    try {
+      const { prepararBdPython } = await import("./bdpython.js");
+      await prepararBdPython(pyo, { bd: o.bd ?? null });
+      conBd = true;
+    } catch (e) {
+      if (o.bd) { try { instalarMysqlEnPython(pyo, o.bd); } catch { /* nada */ } }
+      o.err(color.gris(`(bases de datos: ${e.message})\n`));
+    }
+  }
   const py = o.proyecto;
   const antes = { files: { ...py.files }, folders: [...py.folders] };
+  const binarios = await binariosParaPython(py, o.archivos);
   let codigo = 0;
   try {
+    nuevaGeneracionFsPy();
     borrarEnPyodide(pyo);
-    escribirEnPyodide(pyo, py);
+    escribirEnPyodide(pyo, py, binarios);
     const cwd = `${RAIZ_PY}${o.cwd ? "/" + o.cwd : ""}`;
     pyo.FS.chdir(cwd);
     pyo.setStdout({ batched: (s) => o.out(s + "\n") });
     pyo.setStderr({ batched: (s) => o.err(s + "\n") });
     pyo.setStdin({ stdin: () => { const r = globalThis.prompt?.("Entrada para input():"); if (r === null || r === undefined) return undefined; o.out(r + "\n"); return r; } });
     pyo.runPython(`import sys\nfor _p in (${JSON.stringify(cwd)}, ${JSON.stringify(RAIZ_PY)}):\n    if _p not in sys.path: sys.path.insert(0, _p)\nsys.argv = ${JSON.stringify([o.ruta === "<cadena>" ? "-c" : FS.nombreBase(o.ruta), ...(o.args || [])])}`);
+    if (conBd) pyo.runPython(`preparar_bd(${JSON.stringify(RAIZ_PY)})`);
     await pyo.runPythonAsync(o.codigo, { filename: o.ruta === "<cadena>" ? "<cadena>" : `${RAIZ_PY}/${o.ruta}` });
   } catch (error) {
-    o.err(limpiarTraza(error.message) + "\n");
+    o.err(limpiarTraza(textoError(error)) + "\n");
+    const ayuda = sugerenciaPython(textoError(error), { py, cwd: o.cwd, venv: o.almacenPip?.venv ?? null });
+    if (ayuda) o.err(color.amarillo(ayuda) + "\n");
     codigo = 1;
   } finally {
+    if (conBd) { try { pyo.runPython("guardar_mongo()"); } catch { /* nada */ } }   // antes de copiar los archivos al proyecto
     try {
-      if (aplicarCambios(py, diferencias(antes, leerDePyodide(pyo)))) o.cambio?.({});
+      const despues = await consolidarBinarios(antes, leerDePyodide(pyo), { subir: o.archivos ? (b, op) => o.archivos.subir(b, op) : null, hash: sha256Hex, err: o.err });
+      if (aplicarCambios(py, diferencias(antes, despues))) o.cambio?.({});
       borrarEnPyodide(pyo);
     } catch { /* el programa no dejó nada que guardar */ }
+    if (o.bd) cerrarMysqlEnPython(pyo);
   }
   return codigo;
 }
 
 // ------------------------------------------------------------------------------------ SQL ----
 let SQL;
+/** Motor SQLite (sql.js): copia incluida en CódigoCamp; si faltara, el CDN. */
+export async function cargarSQL() {
+  if (SQL) return SQL;
+  let base = "/vendor/sqljs/";
+  try { await cargarScript(base + "sql-wasm.js"); } catch { base = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/"; await cargarScript(base + "sql-wasm.js"); }
+  SQL = await globalThis.initSqlJs({ locateFile: (f) => base + f });
+  return SQL;
+}
+
 export async function ejecutarSQL(o) {
-  try {
-    if (!SQL) {
-      await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js");
-      SQL = await globalThis.initSqlJs({ locateFile: (f) => "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/" + f });
-    }
-  } catch (error) { o.err(`${error.message}\n`); return 1; }
+  try { await cargarSQL(); } catch (error) { o.err(`${error.message}\n`); return 1; }
   const db = new SQL.Database();
   try {
     const rs = db.exec(o.codigo);
@@ -685,12 +815,14 @@ export async function ejecutarSQL(o) {
 }
 
 /** Los ejecutores que usa el shell. `api` es la función de llamadas al servidor (js/auth.js). */
-export function crearEjecutores({ api, almacenPip = null }) {
+export function crearEjecutores({ api, almacenPip = null, archivos = null, bd = null }) {
   return {
     node: ejecutarNode,
     ts: ejecutarTS,
-    python: (o) => ejecutarPython({ ...o, almacenPip }),
+    python: (o) => ejecutarPython({ ...o, almacenPip: o.almacenPip ?? almacenPip, archivos, bd }),
+    servidorPy: async (o) => (await import("./servidorpy.js")).ejecutarServidorPy({ ...o, almacenPip: o.almacenPip ?? almacenPip, archivos, bd }),
     sql: ejecutarSQL,
+    cargarSQL,
     async servidor({ lenguaje, codigo }) {
       let reloj;
       const limite = new Promise((resolver) => { reloj = setTimeout(() => resolver({ salida: "El servidor tardó demasiado en responder. Inténtalo de nuevo.", error: true }), 45_000); });

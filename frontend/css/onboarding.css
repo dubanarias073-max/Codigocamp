@@ -212,3 +212,50 @@
   .cursos .caja{flex-direction:column}
   .onb::after{display:none}
 }
+
+/* ===== Onboarding renovado: dos columnas, íconos de línea, panel con tu perfil en código ===== */
+.onb-main,.onb-main.ancho{max-width:1180px}
+.onb-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:28px;align-items:start}
+.onb-main form::before{content:none}
+.onb-main form{border-radius:22px;border-color:color-mix(in srgb,#267e86 20%,#d9d5c9)}
+.opciones:not(.cursos){grid-template-columns:repeat(2,minmax(0,1fr))}
+.opciones .ico:not(.sigla){display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:12px;background:color-mix(in srgb,#267e86 10%,transparent);color:#267e86}
+.opciones .ico svg{width:26px;height:26px}
+.op input:checked ~ .caja .ico:not(.sigla){background:#267e86;color:#fff}
+.caja{min-height:84px;transition:transform .18s,box-shadow .18s,border-color .18s,background .18s}
+.op:hover .caja{transform:translateY(-2px);box-shadow:0 10px 24px rgba(38,126,134,.12)}
+.op input:checked ~ .caja{box-shadow:inset 3px 0 #ef7047,0 10px 24px rgba(239,112,71,.14)}
+.op{counter-increment:op}
+.opciones{counter-reset:op}
+.op .caja::after{content:counter(op);margin-left:auto;align-self:flex-start;min-width:20px;padding:1px 6px;border:1px solid #d9d5c9;border-radius:6px;color:#737a7e;font:700 11px ui-monospace,Consolas,monospace;text-align:center}
+.cursos .op .caja::after{content:none}
+.paso.entra-der{animation:onb-der .35s cubic-bezier(.2,.8,.2,1)}
+.paso.entra-izq{animation:onb-izq .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes onb-der{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes onb-izq{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+.onb-panel{position:sticky;top:20px;display:grid;gap:14px}
+.onb-pasos{list-style:none;margin:0;padding:16px 18px;border:1px solid #d9d5c9;border-radius:18px;background:#fffefa;display:grid;gap:10px;counter-reset:paso}
+.onb-pasos li{counter-increment:paso;display:flex;align-items:center;gap:10px;color:#737a7e;font-weight:700;font-size:14px}
+.onb-pasos li::before{content:counter(paso);display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1.5px solid #d9d5c9;font:800 12px ui-monospace,Consolas,monospace}
+.onb-pasos li.actual{color:#252c33}
+.onb-pasos li.actual::before{border-color:#ef7047;color:#ef7047;box-shadow:0 0 0 4px rgba(239,112,71,.15)}
+.onb-pasos li.hecho{color:#267e86}
+.onb-pasos li.hecho::before{content:"✓";background:#267e86;border-color:#267e86;color:#fff}
+.onb-term{border-radius:18px;overflow:hidden;background:#0b1514;border:1px solid #1f3a38;box-shadow:0 20px 50px rgba(6,16,15,.25)}
+.onb-term-cab{display:flex;align-items:center;gap:6px;padding:10px 14px;background:#102423;color:#7aa39c;font:600 12px ui-monospace,Consolas,monospace}
+.onb-term-cab i{width:10px;height:10px;border-radius:50%;background:#f87171}.onb-term-cab i:nth-child(2){background:#fbbf24}.onb-term-cab i:nth-child(3){background:#4ade80}
+.onb-term-cab span{margin-left:8px}
+#codigoVivo{margin:0;padding:16px 18px 20px;min-height:220px;color:#d1fae5;font:13.5px/1.65 ui-monospace,Consolas,monospace;white-space:pre-wrap}
+#codigoVivo b{color:#c084fc;font-weight:700}#codigoVivo s{color:#fbbf24;text-decoration:none}#codigoVivo em{color:#64748b;font-style:normal}#codigoVivo u{color:#38bdf8;text-decoration:none}#codigoVivo i{color:#6b8f89}
+#codigoVivo .cursor{color:#4ade80;animation:onb-parpadeo 1s steps(1) infinite}
+#codigoVivo.pulso{animation:onb-pulso .4s ease}
+@keyframes onb-parpadeo{50%{opacity:0}}
+@keyframes onb-pulso{from{filter:brightness(1.6)}to{filter:none}}
+.onb-tip{margin:0;color:#737a7e;font-size:12.5px}
+.onb-tip kbd{padding:1px 6px;border:1px solid #d9d5c9;border-bottom-width:2px;border-radius:5px;background:#fffefa;font:700 11px ui-monospace,Consolas,monospace}
+.onb-confeti{position:fixed;top:-20px;z-index:80;width:9px;height:14px;border-radius:2px;pointer-events:none;animation:onb-cae 2.4s ease-in forwards}
+@keyframes onb-cae{to{transform:translateY(110vh) rotate(720deg);opacity:.7}}
+@media (max-width:980px){.onb-layout{grid-template-columns:1fr}.onb-panel{position:static;order:-1}.onb-term,.onb-tip{display:none}.onb-pasos{display:flex;flex-wrap:wrap;gap:6px 14px;padding:10px 14px}.onb-pasos li{font-size:12px}}
+@media (max-width:640px){.opciones:not(.cursos){grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.paso.entra-der,.paso.entra-izq,#codigoVivo .cursor{animation:none}}
+:root[data-tema="oscuro"] .onb-pasos{background:#0d1b1a;border-color:rgba(255,255,255,.13)}

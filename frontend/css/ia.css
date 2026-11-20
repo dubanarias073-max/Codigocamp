@@ -14,3 +14,32 @@
 .bloque pre{margin:0;padding:12px;overflow:auto}
 .bloque pre code{padding:0;background:none;white-space:pre}
 .ia-form button:disabled{opacity:.6}
+
+.ia-adj{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.ia-adj img{max-width:180px;max-height:140px;border-radius:10px;object-fit:cover}
+.ia-adj span{padding:4px 8px;border-radius:8px;background:rgba(0,0,0,.12);font-size:12px}
+
+/* Conversaciones guardadas */
+.ia-cuerpo{display:grid;grid-template-columns:270px minmax(0,1fr);gap:16px;margin-top:14px;align-items:stretch}
+.ia-lista{display:flex;flex-direction:column;gap:10px;padding:14px;height:calc(100vh - 170px);min-height:420px;overflow:hidden}
+.ia-nueva{width:100%}
+.ia-buscar{width:100%;padding:9px 12px;border-radius:12px;border:1px solid var(--borde);background:var(--bg);color:var(--txt)}
+.ia-convs{flex:1;overflow:auto;display:grid;align-content:start;gap:2px;margin:0 -6px;padding:0 6px}
+.ia-grupo{margin:12px 6px 4px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--sub)}
+.ia-conv{display:flex;align-items:center;gap:6px;padding:9px 10px;border-radius:10px;color:var(--txt);text-decoration:none;cursor:pointer;border:1px solid transparent;background:none;text-align:left;font:inherit;font-size:14px;width:100%}
+.ia-conv:hover{background:var(--panel2)}
+.ia-conv.on{background:color-mix(in srgb,var(--acc) 15%,transparent);border-color:color-mix(in srgb,var(--acc) 40%,transparent);font-weight:700}
+.ia-conv span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ia-conv .pin{font-size:11px}
+.ia{height:calc(100vh - 170px)}
+.ia-cab{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:2px solid var(--borde)}
+.ia-cab h2{flex:1;min-width:0;margin:0;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ia-cab-btns{display:flex;gap:4px}
+.ia-menu-btn{display:none}
+@media (max-width:900px){
+  .ia-cuerpo{grid-template-columns:1fr}
+  .ia-lista{position:fixed;z-index:70;inset:0 auto 0 0;width:min(320px,86vw);height:100%;border-radius:0 18px 18px 0;transform:translateX(-105%);transition:transform .2s}
+  .ia-lista.abierta{transform:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.35)}
+  .ia-menu-btn{display:inline-flex}
+  .ia{height:calc(100dvh - 210px)}
+}

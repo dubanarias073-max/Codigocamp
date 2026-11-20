@@ -16,13 +16,14 @@ from datetime import datetime, timezone
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 
-from models import UserWorkspace, db
+from models import User, UserWorkspace, db
 from rutas.archivos import limpiar_huerfanas
 from utilidades import api_error
 
 bp = Blueprint("trabajo", __name__)
 
-_COMPONENTE = re.compile(r"^[A-Za-z0-9_.-]{1,120}$")
+# Igual que en el navegador (fs.js): todo menos  \ / : * ? " < > |, caracteres de control y espacio/punto al final.
+_COMPONENTE = re.compile(r'^(?!\s)[^\\/:*?"<>|\x00-\x1f]{1,120}(?<![\s.])$|^\.[^\\/:*?"<>|\x00-\x1f]{1,119}$')
 _RAMA = re.compile(r"^[A-Za-z0-9._/-]{1,80}$")
 _HASH = re.compile(r"^[a-f0-9]{1,12}$")
 _MAX_ARCHIVOS = 5000
@@ -80,6 +81,19 @@ def _validar_proyecto(data):
     commits = git.get("commits", [])
     remote = git.get("remote", "")
     branches = git.get("branches", {})
+    repos = git.get("repos", {})
+    if (
+        not isinstance(repos, dict) or len(repos) > 50
+        or any(
+            not isinstance(carpeta, str) or not (carpeta == "" or _ruta_valida(carpeta))
+            or not isinstance(info, dict)
+            or not isinstance(info.get("remote", ""), str) or len(info.get("remote", "")) > 400
+            or not isinstance(info.get("respaldo", ""), str) or len(info.get("respaldo", "")) > 200
+            or not isinstance(info.get("rama", ""), str) or len(info.get("rama", "")) > 120
+            for carpeta, info in repos.items()
+        )
+    ):
+        return None
     if (
         not isinstance(branches, dict) or len(branches) > 50
         or any(
@@ -125,6 +139,10 @@ def _validar_proyecto(data):
             ],
             "remote": remote,
             "branches": branches,
+            "repos": {
+                carpeta: {"remote": info.get("remote", ""), "respaldo": info.get("respaldo", ""), "rama": info.get("rama", "")}
+                for carpeta, info in repos.items()
+            },
         },
     }
 
@@ -143,6 +161,22 @@ def _archivo_proyecto(usuario_id):
     return Path(current_app.config["ALMACEN_ARCHIVOS"]) / str(int(usuario_id)) / "proyecto.json"
 
 
+def limpiar_almacen_de_id(usuario_id):
+    """Cuenta nueva: si en disco quedó una carpeta con este id (de una base de datos anterior), se borra entera.
+    Así una persona nueva nunca hereda proyectos, commits ni archivos de otra."""
+    carpeta = Path(current_app.config["ALMACEN_ARCHIVOS"]) / str(int(usuario_id))
+    if carpeta.exists():
+        import shutil
+        shutil.rmtree(carpeta, ignore_errors=True)
+
+
+def dueno_de(usuario):
+    """Marca de la cuenta dueña de una carpeta del almacén. Si la base se reinicia y otra persona recibe el mismo id,
+    la marca no coincide (otra fecha de registro) y no puede leer lo que quedó en disco de la anterior."""
+    creado = usuario.creado_en.replace(tzinfo=None).isoformat(timespec="seconds") if usuario and usuario.creado_en else ""
+    return f"{usuario.id}:{creado}"
+
+
 def leer_proyecto(workspace):
     """El proyecto guardado de una cuenta: desde disco o, si es de antes, desde las columnas de la tabla."""
     if workspace is None:
@@ -150,7 +184,12 @@ def leer_proyecto(workspace):
     ruta = _archivo_proyecto(workspace.usuario_id)
     if ruta.exists():
         with open(ruta, encoding="utf-8") as f:
-            return json.load(f)
+            proyecto = json.load(f)
+        dueno = proyecto.pop("_dueno", None)
+        usuario = db.session.get(User, workspace.usuario_id)
+        if dueno is not None and usuario is not None and dueno != dueno_de(usuario):
+            return None   # es de otra cuenta que tuvo este id antes: nunca se entrega
+        return proyecto
     return {"files": workspace.archivos or {}, "folders": workspace.carpetas or [], "git": workspace.git or {}}
 
 
@@ -206,7 +245,7 @@ def guardar_proyecto():
     if workspace is None:
         workspace = UserWorkspace(usuario_id=current_user.id)
         db.session.add(workspace)
-    _escribir_proyecto(current_user.id, project)
+    _escribir_proyecto(current_user.id, {**project, "_dueno": dueno_de(current_user)})
     workspace.archivos, workspace.carpetas, workspace.git = {}, [], {}  # el contenido vive en disco
     workspace.actualizado_en = datetime.now(timezone.utc)
     limpiar_huerfanas(current_user.id, project["files"], project["git"])

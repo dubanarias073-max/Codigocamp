@@ -1,36 +1,79 @@
-// Lógica de tienda.html
-import { iniciar, api, esc, aviso, actualizarStats } from "/js/app.js";
+// Lógica de tienda.html: cosméticos (fondos, punteros, temas, marcos, efectos) con vista previa en vivo, potenciadores y tu colección.
+import { iniciar, api, esc, aviso, actualizarStats, aplicarCosmeticos } from "/js/app.js";
 import { iconoSVG } from "/js/iconos.js";
-await iniciar("tienda");
+import { vistaPrevia } from "/js/cosmeticos.js";
+import { avatarSVG } from "/js/avatares.js";
+const { user } = await iniciar("tienda");
 const $ = (id) => document.getElementById(id);
-const moneda = { diamante: { nombre: "diamantes" } };
 const RAREZA = { comun: "Común", raro: "Raro", epico: "Épico", legendario: "Legendario" };
-const COFRES = new Set(["cofre_misterioso", "cofre_legendario"]);
-let saldo = {};
+const COSMETICO = new Set(["fondo", "cursor", "tema", "marco", "efecto"]);
+const AYUDA = {
+  fondo: "El fondo se ve detrás de todas las páginas. Prueba cómo queda con «Probar».",
+  cursor: "Pasa el mouse sobre la tarjeta para probar el puntero.",
+  tema: "Cambia el color de botones, barras y enlaces en todo CódigoCamp.",
+  marco: "Un aro alrededor de tu foto de perfil: se ve en tu perfil, en los chats y en la barra lateral.",
+  efecto: "Haz clic en la vista previa para ver el efecto.",
+  avatar: "Avatares ilustrados para tu perfil, los chats y la barra lateral. Se usan cuando no tienes foto (elígelo en Perfil → Editar).",
+  potenciador: "Vidas, salvarrachas, XP y cofres sorpresa.",
+  coleccion: "Todo lo que tienes. Ponte o quítate cada cosmético cuando quieras. Los exclusivos salen de los cofres de Recompensas.",
+};
+let saldo = 0, items = [], equipados = { ...(user.cosmeticos || {}) }, catalogo = [], tab = "fondo", probando = null;
+{ const h = location.hash.slice(1); if (h && document.querySelector(`#tabs [data-t="${CSS.escape(h)}"]`)) tab = h; }   // /tienda.html#potenciador
+
+function boton(i) {
+  const iconoMoneda = iconoSVG("diamante", "icono-moneda");
+  if (COSMETICO.has(i.tipo) && i.tuyo) {
+    const puesto = equipados[i.tipo] === i.clave;
+    return `<button class="bj${puesto ? " puesto" : ""}" type="button" data-equipar="${esc(i.clave)}" data-tipo="${i.tipo}">${puesto ? `${iconoSVG("check", "btn-ic")} Puesto · quitar` : "Ponérmelo"}</button>`;
+  }
+  if (i.tuyo) return `<button class="bj" type="button" disabled>${iconoSVG("check", "btn-ic")} ${i.tipo === "avatar" ? "Tuyo · elígelo en Perfil" : "En tu colección"}</button>`;
+  if (i.exclusivo) return `<button class="bj" type="button" disabled>${iconoSVG("cofre", "btn-ic")} Solo en cofres</button>`;
+  const falta = i.precio - saldo;
+  if (falta > 0) return `<button class="bj" type="button" disabled>${iconoMoneda} ${i.precio} · te faltan ${falta}</button>`;
+  return `<button class="bj" type="button" data-c="${esc(i.clave)}">${iconoMoneda} ${i.precio} diamantes</button>`;
+}
 
 function tarjeta(i) {
-  const tipo = moneda.diamante;
-  const tengo = saldo.diamante ?? 0;
-  const falta = i.precio - tengo;
-  const iconoMoneda = iconoSVG("diamante", "icono-moneda");
-  let boton;
-  if (i.tuyo) boton = `<button class="bj" type="button" disabled>✓ En tu colección</button>`;
-  else if (falta > 0) boton = `<button class="bj" type="button" disabled>${iconoMoneda} ${i.precio} · te faltan ${falta}</button>`;
-  else boton = `<button class="bj" type="button" data-c="${esc(i.clave)}">${iconoMoneda} ${i.precio} ${tipo.nombre}</button>`;
-  const etq = i.permanente ? "Colección" : (COFRES.has(i.clave) ? "Sorpresa" : "Un uso");
-  return `<div class="tarjeta producto producto-${esc(i.categoria)} rareza-${esc(i.rareza)}${i.tuyo ? " tuyo" : ""}">
+  const cos = COSMETICO.has(i.tipo);
+  return `<div class="tarjeta producto rareza-${esc(i.rareza)}${i.tuyo ? " tuyo" : ""}${cos ? " cosmetico" : ""}" data-clave="${esc(i.clave)}" data-tipo="${esc(i.tipo)}">
     <span class="producto-rango">${esc(RAREZA[i.rareza] || "Común")}</span>
-    <span class="ic">${iconoSVG(i.clave, "producto-icon")}</span><h3>${esc(i.nombre)}</h3>
-    <small>${esc(i.descripcion)}</small>
-    <em class="etq-tipo">${etq}</em>${boton}</div>`;
+    ${cos ? `<div class="vista vista-${i.tipo}" data-prev="${esc(i.clave)}"></div>` : i.tipo === "avatar" && avatarSVG(i.icono) ? `<div class="vista vista-avatar">${avatarSVG(i.icono, 76)}</div>` : `<span class="ic ic-${esc(i.rareza)}">${iconoSVG(i.clave, "producto-icon")}</span>`}
+    <h3>${esc(i.nombre)}</h3><small>${esc(i.descripcion)}</small>
+    ${cos && i.tipo !== "cursor" && i.tipo !== "efecto" ? `<button type="button" class="probar" data-probar="${esc(i.clave)}" data-tipo="${i.tipo}">${probando?.clave === i.clave ? "Dejar de probar" : "Probar"}</button>` : ""}
+    ${boton(i)}</div>`;
+}
+
+document.querySelectorAll("#tabs [data-ic]").forEach((el) => { el.innerHTML = iconoSVG(el.dataset.ic, "tab-svg"); });
+// Lo más caro (y bacano) primero dentro de cada pestaña.
+const ORDEN_RAREZA = { legendario: 0, epico: 1, raro: 2, comun: 3 };
+const porValor = (a, b) => (ORDEN_RAREZA[a.rareza] ?? 4) - (ORDEN_RAREZA[b.rareza] ?? 4) || (b.precio || 0) - (a.precio || 0);
+function pintar() {
+  document.querySelectorAll("#tabs [data-t]").forEach((b) => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("ayudaTab").textContent = AYUDA[tab];
+  let lista;
+  if (tab === "coleccion") lista = [...catalogo.filter((c) => c.tuyo), ...items.filter((i) => i.tipo === "avatar" && i.tuyo)];
+  else if (tab === "potenciador") lista = items.filter((i) => i.tipo === "potenciador" || i.tipo === "cofre");
+  else if (tab === "avatar") lista = items.filter((i) => i.tipo === "avatar");
+  else {
+    const enTienda = items.filter((i) => i.tipo === tab);
+    const exclusivos = catalogo.filter((c) => c.tipo === tab && c.exclusivo).map((c) => ({ ...c, tipo: c.tipo }));
+    lista = [...enTienda, ...exclusivos];
+  }
+  if (tab !== "coleccion") lista.sort(porValor);
+  $("items").innerHTML = lista.length ? lista.map(tarjeta).join("") : '<p class="nota">Aún no tienes cosméticos. ¡Compra el primero o abre un cofre en Recompensas!</p>';
+  $("items").querySelectorAll("[data-prev]").forEach((el) => vistaPrevia(el, el.dataset.prev, el.closest(".producto").dataset.tipo));
 }
 
 async function cargar() {
-  const t = await api("/api/tienda/");
-  saldo = t.minerales;
+  const [t, c] = await Promise.all([api("/api/tienda/"), api("/api/cosmeticos/")]);
+  saldo = t.minerales.diamante;
+  equipados = c.equipados;
+  catalogo = c.catalogo;
+  const tuyos = new Set(catalogo.filter((x) => x.tuyo).map((x) => x.clave));
+  items = t.items.map((i) => ({ ...i, tuyo: i.tuyo || tuyos.has(i.clave) }));
   $("iconoSaldo").innerHTML = iconoSVG("diamante", "icono-moneda");
-  $("saldo-diamante").textContent = t.minerales.diamante;
-  $("items").innerHTML = t.items.map(tarjeta).join("");
+  $("saldo-diamante").textContent = saldo;
+  pintar();
 }
 
 function confeti() {
@@ -44,33 +87,58 @@ function confeti() {
   }
 }
 
-function mostrarCofre(clave, nombre, premio) {
+function mostrarCofre(clave, nombre, premio, cosmetico) {
   const caja = $("cofreCaja");
-  caja.innerHTML = `<div class="cofre-ic">${iconoSVG(clave, "producto-icon")}</div><h2>${esc(nombre)}</h2>
-    ${premio ? `<p class="cofre-prem">${esc(premio)}</p>` : `<p class="cofre-prem">¡Ya es tuyo!</p>`}
-    <button class="btn pri" type="button" id="cofreOk">¡Genial!</button>`;
+  caja.innerHTML = `<div class="cofre-ic">${cosmetico ? `<div class="vista vista-${cosmetico}" id="cofrePrev"></div>` : avatarSVG(items.find((x) => x.clave === clave && x.tipo === "avatar")?.icono, 96) || iconoSVG(clave, "producto-icon")}</div><h2>${esc(nombre)}</h2>
+    <p class="cofre-prem">${premio ? esc(premio) : "¡Ya es tuyo!"}</p>
+    <div class="cofre-btns">${cosmetico ? `<button class="btn pri" type="button" id="cofrePoner">Ponérmelo ya</button>` : ""}<button class="btn" type="button" id="cofreOk">¡Genial!</button></div>`;
+  if (cosmetico) vistaPrevia($("cofrePrev"), clave, cosmetico);
   $("cofreFondo").hidden = false;
   $("cofreOk").focus();
   $("cofreOk").onclick = () => { $("cofreFondo").hidden = true; };
+  if (cosmetico) $("cofrePoner").onclick = async () => { $("cofreFondo").hidden = true; await equipar(clave, cosmetico, true); };
 }
 
-async function comprar(e) {
+async function equipar(clave, tipo, poner) {
+  try {
+    const r = await api("/api/cosmeticos/equipar/", { tipo, clave: poner ? clave : null });
+    equipados = r.equipados;
+    probando = null;
+    aplicarCosmeticos(equipados);
+    aviso(poner ? "¡Listo! Ya lo tienes puesto en todo CódigoCamp." : "Quitado.");
+    pintar();
+  } catch (x) { aviso(x.message, true); }
+}
+
+$("items").onclick = async (e) => {
+  const pr = e.target.closest("[data-probar]");
+  if (pr) {
+    const { probar: clave, tipo } = pr.dataset;
+    if (probando?.clave === clave) { probando = null; aplicarCosmeticos(equipados); }
+    else { probando = { clave, tipo }; aplicarCosmeticos({ ...equipados, [tipo]: clave }); aviso("Vista previa: así se vería. Vuelve a pulsar para dejar de probar."); }
+    pintar();
+    return;
+  }
+  const eq = e.target.closest("[data-equipar]");
+  if (eq) return equipar(eq.dataset.equipar, eq.dataset.tipo, equipados[eq.dataset.tipo] !== eq.dataset.equipar);
   const b = e.target.closest("[data-c]");
   if (!b) return;
   b.disabled = true;
-  const item = [...document.querySelectorAll(".producto")].find((x) => x.contains(b));
-  const nombre = item?.querySelector("h3")?.textContent || "";
+  const card = b.closest(".producto");
+  const nombre = card?.querySelector("h3")?.textContent || "";
   try {
     const r = await api("/api/tienda/comprar/", { clave: b.dataset.c });
     confeti();
-    if (r.premio || COFRES.has(b.dataset.c) || item?.classList.contains("rareza-epico") || item?.classList.contains("rareza-legendario")) {
-      mostrarCofre(b.dataset.c, nombre, r.premio);
-    } else aviso("¡Compra hecha!");
+    const tipo = card?.dataset.tipo;
+    if (COSMETICO.has(tipo)) mostrarCofre(b.dataset.c, nombre, "¡Nuevo cosmético en tu colección!", tipo);
+    else if (r.premio || card?.classList.contains("rareza-epico") || card?.classList.contains("rareza-legendario")) mostrarCofre(b.dataset.c, nombre, r.premio);
+    else aviso("¡Compra hecha!");
     actualizarStats(await api("/api/progreso/"));
   } catch (x) { aviso(x.message, true); }
   try { await cargar(); } catch (x) { aviso(x.message, true); }
-}
-$("items").onclick = comprar;
+};
+$("tabs").onclick = (e) => { const b = e.target.closest("[data-t]"); if (!b) return; tab = b.dataset.t; if (probando) { probando = null; aplicarCosmeticos(equipados); } pintar(); };
 $("cofreFondo").onclick = (e) => { if (e.target.id === "cofreFondo") $("cofreFondo").hidden = true; };
 addEventListener("keydown", (e) => { if (e.key === "Escape") $("cofreFondo").hidden = true; });
+addEventListener("pagehide", () => { if (probando) aplicarCosmeticos(equipados); });
 try { await cargar(); } catch (x) { aviso(x.message, true); }

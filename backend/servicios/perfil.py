@@ -37,7 +37,13 @@ def serialize_user(user, profile):
         "onboarding": profile.onboarding_completo, "tema": profile.tema,
         "alias": profile.alias, "codigo": profile.codigo, "avatar": profile.avatar or "",
         "desde": user.creado_en.date().isoformat(),
+        **_extras(user.id),
     }
+
+
+def _extras(usuario_id):
+    from rutas.cosmeticos import equipados_de, foto_url
+    return {"foto": foto_url(usuario_id), "cosmeticos": equipados_de(usuario_id)}
 
 
 def _user(user):
@@ -142,7 +148,8 @@ def review_challenges(profile, activity):
             usuario_id=profile.usuario_id, clave=challenge["clave"], fecha=activity.fecha,
         ))
         apply_reward(profile, challenge["premio"])
-        new_rewards.append({"titulo": challenge["titulo"], "premio": reward_text(challenge["premio"])})
+        new_rewards.append({"clave": challenge["clave"], "titulo": challenge["titulo"], "premio": reward_text(challenge["premio"]),
+                            "datos": dict(challenge["premio"]), "cofre": "plata" if challenge["premio"].get("diamante", 0) >= 20 else "madera"})
         month = activity.fecha.replace(day=1)
         points = MonthChallenge.query.filter_by(usuario_id=profile.usuario_id, mes=month).first()
         if not points:
@@ -154,7 +161,8 @@ def review_challenges(profile, activity):
             month_reward = dict(PREMIO_MES)
             points.premio_dado = True
             apply_reward(profile, month_reward)
-            new_rewards.append({"titulo": f"Desafío de {MESES[activity.fecha.month - 1]}", "premio": reward_text(month_reward)})
+            new_rewards.append({"clave": "mes", "titulo": f"Desafío de {MESES[activity.fecha.month - 1]}", "premio": reward_text(month_reward),
+                                "datos": dict(month_reward), "cofre": "oro"})
     return new_rewards
 
 

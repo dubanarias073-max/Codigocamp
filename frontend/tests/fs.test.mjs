@@ -6,10 +6,10 @@ const nuevo = () => FS.normalizar({ files: { "index.html": "<h1>", "src/app.js":
 
 test("normalizar completa carpetas padre, descarta rutas inválidas y conflictos", () => {
   const py = FS.normalizar({
-    files: { "a/b/c.txt": "1", "../evil": "x", "ok.js": "2", "mal nombre.js": "3", "a": "choca" , "__proto__": "p" },
+    files: { "a/b/c.txt": "1", "../evil": "x", "ok.js": "2", "mal:nombre.js": "3", "con espacio.js": "4", "a": "choca" , "__proto__": "p" },
     folders: ["z", "z/y", "../fuera"],
   });
-  assert.deepEqual(Object.keys(py.files).sort(), ["a/b/c.txt", "ok.js"]);
+  assert.deepEqual(Object.keys(py.files).sort(), ["a/b/c.txt", "con espacio.js", "ok.js"]);
   assert.deepEqual(py.folders, ["a", "a/b", "z", "z/y"]);
 });
 
@@ -33,7 +33,8 @@ test("resolver maneja ., .., ~, rutas absolutas y rechaza lo que sale del proyec
   assert.equal(FS.resolver("", "/workspace/x/y"), "x/y");
   assert.equal(FS.resolver("", "/workspace"), "");
   assert.equal(FS.resolver("", "/etc/passwd"), null);
-  assert.equal(FS.resolver("", "mal nombre"), null);
+  assert.equal(FS.resolver("", "mal:nombre"), null);
+  assert.equal(FS.resolver("", "Mysql(base de datos)/a.sql"), "Mysql(base de datos)/a.sql");
   assert.equal(FS.resolver("", "__proto__"), null);
 });
 
@@ -105,9 +106,11 @@ test("expandirComodin devuelve coincidencias en el último tramo", () => {
 
 test("errorDeNombre explica el problema", () => {
   assert.equal(FS.errorDeNombre("ok-1.js"), null);
-  assert.match(FS.errorDeNombre("con espacio"), /espacios/);
+  assert.equal(FS.errorDeNombre("con espacio (1).js"), null);
+  assert.equal(FS.errorDeNombre("ñandú"), null);
   assert.match(FS.errorDeNombre("a/b"), /barras/);
-  assert.match(FS.errorDeNombre("ñandú"), /sin tilde/);
+  assert.match(FS.errorDeNombre("a?b"), /caracteres/);
+  assert.match(FS.errorDeNombre("fin "), /espacio/);
   assert.match(FS.errorDeNombre(""), /nombre/);
 });
 

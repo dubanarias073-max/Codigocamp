@@ -15,7 +15,7 @@ test("aplicarCambios crea (con carpetas), modifica y borra lo que hizo el progra
 
 test("aplicarCambios ignora rutas inválidas y no marca cambio si no hubo", () => {
   const py = normalizarProyecto({ files: { "a.txt": "1" } });
-  assert.equal(aplicarCambios(py, { files: { "../x": "mal", "con espacio.txt": "mal" }, folders: [] }), false);
+  assert.equal(aplicarCambios(py, { files: { "../x": "mal", "dos:puntos.txt": "mal" }, folders: [] }), false);
   assert.deepEqual(Object.keys(py.files), ["a.txt"]);
   assert.equal(aplicarCambios(py, { files: {}, folders: [] }), false);
 });
@@ -71,4 +71,36 @@ test("PYTHON: ejecutar varias veces seguidas (vaciar, escribir, leer, vaciar) y 
   }
   borrarEnPyodide(pyo);
   assert.deepEqual(leerDePyodide(pyo), { files: {}, folders: [] });
+});
+
+test("Python: los binarios que escribe (una base sqlite3, una imagen) se guardan; los que no cambiaron no se suben otra vez", async () => {
+  const { consolidarBinarios, comoTexto, escribirEnPyodide, leerDePyodide } = await import("../js/trabajo/ejecucion.js");
+  const { createHash } = await import("node:crypto");
+  const hash = async (b) => createHash("sha256").update(b).digest("hex");
+  const viejo = new Uint8Array([0x53, 0x51, 0x4c, 0, 1, 2]);
+  const marcadorViejo = `ccbin:v1:${await hash(viejo)}:application/octet-stream:${viejo.length}`;
+  // Sistema de archivos falso con la misma forma que el de Pyodide.
+  const archivos = new Map(); const dirs = new Set(["/"]);
+  const sis = {
+    mkdir: (d) => { if (dirs.has(d)) throw new Error("existe"); dirs.add(d); },
+    writeFile: (r, v) => archivos.set(r, typeof v === "string" ? new TextEncoder().encode(v) : v),
+    readFile: (r) => archivos.get(r), readdir: (d) => [".", "..", ...new Set([...archivos.keys(), ...dirs].filter((x) => x.startsWith(d + "/") && x !== d).map((x) => x.slice(d.length + 1).split("/")[0]))],
+    stat: (r) => { if (!archivos.has(r) && !dirs.has(r)) throw new Error("no"); return { mode: dirs.has(r) ? 1 : 0 }; }, isDir: (m) => m === 1,
+  };
+  const py = normalizarProyecto({ files: { "a.py": "print(1)", "datos.db": marcadorViejo, "foto.png": "ccbin:v1:" + "f".repeat(64) + ":image/png:9" } });
+  escribirEnPyodide({ FS: sis }, py, new Map([["datos.db", viejo]]));
+  assert.deepEqual([...archivos.get("/workspace/datos.db")], [...viejo], "la base llega con sus bytes reales");
+  archivos.set("/workspace/nueva.db", new Uint8Array([0, 9, 9]));
+  const despues = leerDePyodide({ FS: sis });
+  assert.ok(despues.binarios.has("datos.db") && despues.binarios.has("nueva.db"));
+  assert.equal(despues.files["a.py"], "print(1)");
+  const subidas = [];
+  await consolidarBinarios({ files: py.files }, despues, { hash, subir: async (b, o) => { subidas.push(o.nombre); return "ccbin:v1:" + "e".repeat(64) + ":application/octet-stream:3"; } });
+  assert.deepEqual(subidas, ["nueva.db"], "datos.db no cambió: no se vuelve a subir");
+  assert.equal(despues.files["datos.db"], marcadorViejo);
+  assert.equal(despues.files["foto.png"], py.files["foto.png"], "lo que no se pasó con bytes vuelve igual (no se borra)");
+  const cambios = diferencias({ files: py.files, folders: py.folders }, despues);
+  assert.deepEqual(Object.keys(cambios.files), ["nueva.db"]);
+  assert.equal(comoTexto(new Uint8Array([104, 105])), "hi");
+  assert.equal(comoTexto(new Uint8Array([0xff, 0xfe])), null);
 });

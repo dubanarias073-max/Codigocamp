@@ -137,7 +137,7 @@ export function diffLineas(a, b) {
   return ops;
 }
 
-function diffUnificado(ruta, antes, despues) {
+export function diffUnificado(ruta, antes, despues) {
   const ops = diffLineas(antes ?? "", despues ?? "");
   if (!ops.some((o) => o.op !== " ")) return "";
   const cab = [color.negrita(`diff --git a/${ruta} b/${ruta}`)];

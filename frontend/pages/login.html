@@ -6,6 +6,14 @@
   <title>Iniciar sesión · CódigoCamp</title>
   <meta name="description" content="Inicia sesión en CódigoCamp y sigue aprendiendo a programar con tu tutor de IA.">
   <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0d1b1a">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CódigoCamp">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="/js/carga.js"></script>
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/portada.css">
   <link rel="stylesheet" href="/css/login.css">
@@ -33,8 +41,6 @@
       <div class="card authbox">
         <h2>Iniciar sesión</h2>
         <p class="note">Usa el correo con el que te registraste.</p>
-        <a class="google-acceso" href="/auth/google/"><span aria-hidden="true">G</span> Continuar con Google</a>
-        <div class="separador-acceso"><span>o con tu correo</span></div>
         <form id="formAcceso" class="authform" data-tipo="login" novalidate>
           <label for="email">Correo
             <input type="email" id="email" name="email" required autocomplete="email" placeholder="tucorreo@ejemplo.com">
@@ -48,14 +54,31 @@
               </button>
             </span>
           </label>
+          <a class="olvide-link" id="olvideLink" href="#olvide">¿Olvidaste tu contraseña?</a>
           <button class="btn pri" type="submit">Entrar</button>
         </form>
+        <div class="separador-acceso"><span>o</span></div>
+        <a class="google-acceso" href="/auth/google/"><span aria-hidden="true">G</span> Iniciar sesión con Google</a>
         <p id="autherr" class="err" role="alert" aria-live="assertive"></p>
         <p class="cambio">¿No tienes cuenta? <a href="/pages/registro.html">Regístrate gratis</a></p>
+      </div>
+
+      <div class="card authbox" id="cajaOlvide" hidden>
+        <h2>¿Olvidaste tu contraseña?</h2>
+        <p class="note">Escribe el correo de tu cuenta y te enviaremos un enlace para crear una nueva. Sirve una sola vez y vence en 30 minutos.</p>
+        <form id="formOlvide" class="authform" novalidate>
+          <label for="emailOlvide">Correo
+            <input type="email" id="emailOlvide" name="email" required autocomplete="email" placeholder="tucorreo@ejemplo.com">
+          </label>
+          <button class="btn pri" type="submit" id="btnOlvide">Enviarme el enlace</button>
+        </form>
+        <p id="olvideMsg" class="err" role="status" aria-live="polite"></p>
+        <p class="cambio"><a href="#" id="volverLogin">← Volver a iniciar sesión</a></p>
       </div>
     </div>
   </main>
 
   <script type="module" src="/js/login.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

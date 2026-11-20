@@ -235,6 +235,8 @@ async function continuar() {
         <div>🔥 Racha: ${r.perfil.racha_actual}</div></div>
       ${r.desafios_completados.map((d) => `<div class="tarjeta" style="margin-bottom:12px">🎁 <b>¡Desafío superado!</b> ${esc(d.titulo)}<br><small>Premio: ${esc(d.premio)}</small></div>`).join("")}
       <a class="bj" href="/pages/inicio.html?curso=${datos.curso.slug}">Continuar</a></div>`;
+    // Como en Duolingo: los cofres de lo que acabas de cumplir se abren aquí mismo.
+    import("/js/cofres.js").then((m) => m.abrirPremiosNuevos(r.desafios_completados || [])).catch(() => {});
   } catch (e) { $("cuerpo").replaceChildren(el("p", e.message, "vacio")); }
 }
 
