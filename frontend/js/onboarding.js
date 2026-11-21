@@ -154,7 +154,7 @@
     var destino = '/pages/inicio.html?curso=' + encodeURIComponent(d.curso);
     sig.disabled = true;
     fetch('/api/perfil/', { method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() }, body: JSON.stringify(d) })
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf(), 'X-Zona-Horaria': (function () { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; } })() }, body: JSON.stringify(d) })
       .then(function (r) {
         if (r.status === 401) { location.href = '/pages/login.html'; return; }
         if (r.ok) { location.href = destino; return; }

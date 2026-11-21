@@ -8,6 +8,7 @@
 // mantienen como modelos aunque no estén abiertos, para que TypeScript entienda los import entre archivos.
 // Si Monaco no carga (navegador muy viejo), trabajo.js usa el editor simple de siempre.
 import { extension } from "./fs.js";
+import { OPCIONES_MONACO } from "./autocompletar.js";
 
 const BASE = "/vendor/monaco/vs";
 let promesa = null;
@@ -152,6 +153,7 @@ export class EditorMonaco {
       bracketPairColorization: { enabled: true }, guides: { bracketPairs: true, indentation: true }, stickyScroll: { enabled: true },
       linkedEditing: true, formatOnPaste: false, scrollBeyondLastLine: false, padding: { top: 8 }, "semanticHighlighting.enabled": true,
       accessibilitySupport: "auto", ariaLabel: `Editor de ${ruta}`,
+      ...OPCIONES_MONACO,
     });
     this.modelo.onDidChangeContent(() => { if (!this.aplicando) this.alCambiar(this.modelo.getValue()); });
     this.editor.onDidChangeCursorSelection(() => this.#cursor());

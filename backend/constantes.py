@@ -33,20 +33,6 @@ ARTICULOS_DIAMANTE = [
      "descripcion": "Ábrelo y descubre un premio sorpresa: XP, vidas o más diamantes."},
     {"clave": "cofre_legendario", "nombre": "Cofre legendario", "icono": "🎁", "precio": 120, "rareza": "legendario", "tipo": "consumible",
      "descripcion": "Premio grande garantizado: 150 XP, 3 vidas y a veces diamantes extra."},
-    {"clave": "gafas_pro", "nombre": "Avatar: Programador con gafas", "icono": "gafas", "precio": 60, "rareza": "comun", "tipo": "permanente",
-     "descripcion": "Avatar ilustrado con gafas de sol y estilo de dev."},
-    {"clave": "marco_dorado", "nombre": "Avatar: Gato dorado", "icono": "dorado", "precio": 120, "rareza": "raro", "tipo": "permanente",
-     "descripcion": "Avatar ilustrado de un gato de oro que brilla."},
-    {"clave": "estela_cohete", "nombre": "Avatar: Astronauta", "icono": "cohete", "precio": 150, "rareza": "raro", "tipo": "permanente",
-     "descripcion": "Avatar ilustrado de astronauta entre estrellas."},
-    {"clave": "aura_neon", "nombre": "Avatar: Espíritu neón", "icono": "aura", "precio": 400, "rareza": "epico", "tipo": "permanente",
-     "descripcion": "Avatar ilustrado que brilla con luces de neón."},
-    {"clave": "corona_campeon", "nombre": "Avatar: Rey del código", "icono": "corona", "precio": 700, "rareza": "epico", "tipo": "permanente",
-     "descripcion": "Avatar ilustrado con corona de campeón."},
-    {"clave": "mascota_dragon", "nombre": "Avatar: Dragón", "icono": "dragon", "precio": 1400, "rareza": "legendario", "tipo": "permanente",
-     "descripcion": "Avatar ilustrado de un dragón que cuida tu código."},
-    {"clave": "titulo_leyenda", "nombre": "Avatar: Leyenda", "icono": "leyenda", "precio": 4000, "rareza": "legendario", "tipo": "permanente",
-     "descripcion": "El avatar más raro de CódigoCamp, con colores de leyenda."},
 ]
 RAREZA = {"vida": "comun", "vidas_llenas": "comun", "salvarracha": "raro", "kit_experto": "raro",
           **{a["clave"]: a["rareza"] for a in ARTICULOS_DIAMANTE}}
@@ -56,6 +42,8 @@ PERMANENTES |= {c["clave"] for c in _COSMETICOS}
 RAREZA.update({c["clave"]: c["rareza"] for c in _COSMETICOS})
 COSMETICOS_TIENDA = _EN_TIENDA
 BASICOS_DIAMANTE = {"vida": 10, "vidas_llenas": 30, "salvarracha": 50, "kit_experto": 45}   # clave -> precio en diamantes
+# Avatares retirados (antes se vendían en la tienda): sus compras se devuelven en diamantes (migración «quitar_avatares»).
+AVATARES_RETIRADOS = {"gafas_pro", "marco_dorado", "estela_cohete", "aura_neon", "corona_campeon", "mascota_dragon", "titulo_leyenda"}
 AVATARES_LIBRES = ["zorro", "gato", "panda", "buho", "robot", "rana", "alien", "unicor", "pulpo", "tigre"]   # dibujos en frontend/js/avatares.js
 # Avatares de antes (emojis) → los nuevos dibujos
 AVATAR_DE_EMOJI = {"🦊": "zorro", "🐱": "gato", "🐼": "panda", "🦉": "buho", "🤖": "robot", "🐸": "rana", "👾": "alien", "🦄": "unicor",

@@ -1,0 +1,58 @@
+# Compila la app de Android de CódigoCamp (apps/android: la plataforma + el widget de racha) y deja el APK listo.
+# GitHub → pestaña Actions → «App de Android» → la última ejecución → Artifacts → CodigoCamp-apk.
+# La dirección del servidor sale de la variable CODIGOCAMP_URL (Settings → Secrets and variables → Actions → Variables);
+# si no existe, se usa la de apps/android/gradle.properties.
+name: App de Android
+
+on:
+  push:
+    paths:
+      - "apps/android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # ubuntu-latest ya trae el SDK de Android (ANDROID_HOME) con las licencias aceptadas.
+      - name: Revisar el SDK de Android
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          test -d "$ANDROID_HOME" || { echo "::error::No hay SDK de Android en el runner"; exit 1; }
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" > /dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.7"
+
+      - name: Compilar el APK
+        env:
+          CODIGOCAMP_URL: ${{ vars.CODIGOCAMP_URL }}
+        run: |
+          if [ -n "$CODIGOCAMP_URL" ]; then EXTRA="-PcodigocampUrl=$CODIGOCAMP_URL"; else EXTRA=""; fi
+          gradle assembleDebug --no-daemon --stacktrace $EXTRA
+
+      - name: Renombrar
+        run: cp app/build/outputs/apk/debug/app-debug.apk CodigoCamp.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: CodigoCamp-apk
+          path: apps/android/CodigoCamp.apk
+          if-no-files-found: error

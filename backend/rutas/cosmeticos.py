@@ -98,7 +98,8 @@ def _premio_publico(premio):
 @login_required
 def cofres():
     m = _medidas(current_user)
-    abiertos = {c.clave: c.abierto_en.isoformat() for c in OpenedChest.query.filter_by(usuario_id=current_user.id).all()}
+    from servicios.zona import iso
+    abiertos = {c.clave: iso(c.abierto_en) for c in OpenedChest.query.filter_by(usuario_id=current_user.id).all()}
     db.session.commit()
     return jsonify(cofres=[{
         "clave": c["clave"], "nombre": c["nombre"], "cofre": c["cofre"], "texto": c["texto"], "meta": c["meta"],
@@ -221,7 +222,8 @@ def calendario_racha():
     import calendar as _cal
     from datetime import date
     from models import DailyActivity
-    hoy = date.today()
+    from servicios.zona import hoy_de
+    hoy = hoy_de(get_profile(current_user))
     try:
         anio, mes = (int(x) for x in str(request.args.get("mes", f"{hoy:%Y-%m}")).split("-", 1))
         inicio = date(anio, mes, 1)
@@ -246,11 +248,13 @@ def calendario_racha():
 
 def _datos_widget(usuario):
     """Racha, semana, meta de hoy y calendario para todos los widgets (Windows 11, iPhone/iPad, Android, escritorio)."""
-    from datetime import date, datetime, timedelta
+    from datetime import timedelta
     from models import DailyActivity
     p = get_profile(usuario)
     db.session.commit()
-    hoy = date.today()
+    from servicios.zona import ahora_de
+    ahora = ahora_de(p)   # la hora del lugar donde está la persona (su dispositivo)
+    hoy = ahora.date()
     practicado = p.ultima_actividad == hoy
     racha_dias = _racha_info(p, hoy)
     racha = p.racha_actual if racha_dias else 0
@@ -267,7 +271,7 @@ def _datos_widget(usuario):
     act = DailyActivity.query.filter_by(usuario_id=usuario.id, fecha=hoy).first()
     xp_hoy = act.xp if act else 0
     meta_xp = max(10, p.meta_minutos * 3)
-    hora = datetime.now().hour
+    hora = ahora.hour
     if practicado:
         estado = "¡Ya practicaste hoy! 💪"
     elif racha:
@@ -283,7 +287,7 @@ def _datos_widget(usuario):
         mes=hoy.strftime("%m/%Y"), titulo=f"🔥 {racha} día{'s' if racha != 1 else ''}",
         # Direcciones absolutas: el panel de widgets de Windows y las apps de widgets no conocen la página de origen.
         url_practicar=f"{base}/pages/inicio.html?app=1", url_cofres=f"{base}/pages/recompensas.html?app=1",
-        url_calendario=f"{base}/pages/perfil.html?app=1#calendario", actualizado=datetime.now().strftime("%H:%M"),
+        url_calendario=f"{base}/pages/perfil.html?app=1#calendario", actualizado=ahora.strftime("%H:%M"), zona=ahora.tzname(),
     )
 
 
@@ -346,6 +350,22 @@ def widget():
     return r
 
 
+def _apk():
+    from constantes import FRONTEND
+    ruta = FRONTEND / "descargas" / "CodigoCamp.apk"
+    return ruta if ruta.is_file() else None
+
+
+@bp.get("/api/app/")
+def app_android():
+    """¿Hay app de Android para descargar? (botón «Descargar la app» de la página de inicio). Público."""
+    ruta = _apk()
+    r = jsonify(android=bool(ruta), url="/descargas/CodigoCamp.apk" if ruta else None,
+                tam=ruta.stat().st_size if ruta else 0, version=int(ruta.stat().st_mtime) if ruta else 0)
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
 @bp.get("/api/widget/conectar/")
 @login_required
 def conectar_widget():
@@ -355,8 +375,7 @@ def conectar_widget():
     fila = db.session.get(UserSession, sesion_id) if sesion_id else None
     if fila is None or fila.revocada:
         return api_error("Vuelve a iniciar sesión para conectar los widgets.", 401)
-    from constantes import FRONTEND
-    r = jsonify(**_enlaces(token_widget(fila)), apk=(FRONTEND / "descargas" / "CodigoCamp-Widget.apk").is_file())
+    r = jsonify(**_enlaces(token_widget(fila)), apk=_apk() is not None)
     r.headers["Cache-Control"] = "no-store"
     return r
 

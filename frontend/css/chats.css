@@ -1,47 +1,118 @@
-/* Estilos de chats.html (lo común de la aplicación está en app.css) */
-.chat{display:flex;flex-direction:column;height:560px;padding:0;overflow:hidden}
-.cm{max-width:82%;padding:8px 12px;border-radius:14px;background:var(--panel2);overflow-wrap:anywhere}
-.cm b{display:block;font-size:12px;color:var(--cy)}
-.cm.yo{align-self:flex-end;background:color-mix(in srgb,var(--acc) 22%,transparent)}
-.cm small{margin-left:6px}
-.chat-form{display:flex;gap:8px;padding:10px;border-top:2px solid var(--borde)}
-.chat-form input{flex:1;padding:10px 12px;border:2px solid var(--borde);border-radius:12px;background:var(--bg)}
-.chats-grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;height:calc(100vh - 170px);min-height:460px}
-.c-lista{display:flex;flex-direction:column;gap:14px;overflow:auto}
-.c-lista h3{font-size:15px;margin:0 0 4px}
-.c-yo{padding-bottom:12px;border-bottom:2px solid var(--borde)}
-.c-yo b{font:800 22px ui-monospace,Consolas,monospace;letter-spacing:.08em;color:var(--acc)}
-.c-add{display:flex;gap:8px}
-.c-add input{flex:1;min-width:0;padding:10px 12px;border:2px solid var(--borde);border-radius:12px;background:var(--bg)}
-.c-add .bj{padding:10px 14px}
-.c-fila{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border:2px solid transparent;border-radius:14px;background:none;text-align:left;cursor:pointer}
-.c-fila:hover,.c-fila.on{background:var(--panel2);border-color:var(--borde)}
-.c-fila>span:nth-child(2){min-width:0;overflow:hidden}
-.c-fila small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.c-av{flex:none;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;font-weight:800;color:#04130d;background:linear-gradient(135deg,var(--cy),var(--acc))}
-.c-badge{margin-left:auto;min-width:22px;padding:0 7px;border-radius:99px;font-size:12px;font-weight:800;text-align:center;color:#fff;background:var(--rojo)}
-.c-acc{margin-left:auto;display:flex;gap:6px}
-.c-conv.chat{height:100%}
-.c-cab{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:2px solid var(--borde)}
-.c-cab b{margin-right:auto}
-.c-vacio{margin:auto}
-.c-volver{display:none}
-@media (max-width:900px){
-  .chats-grid{grid-template-columns:1fr;height:calc(100vh - 230px)}
-  .chats-grid:not(.en-chat) .c-conv{display:none}
-  .chats-grid.en-chat .c-lista{display:none}
-  .c-volver{display:inline-block}
-}
-.c-yo-fila{display:flex;align-items:center;gap:12px}
-.c-yo-btn{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.c-av.emoji{font-size:22px;background:var(--panel2);border:2px solid var(--cy)}
-.c-res{display:grid;gap:4px}
-.c-res:empty{display:none}
-.cm code{padding:1px 6px;border-radius:6px;background:rgba(0,0,0,.25);font-family:ui-monospace,Consolas,monospace;font-size:.92em}
-.c-emojis{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px 0}
-.c-emojis[hidden]{display:none}
-.c-saludo{margin:auto;text-align:center}
+/* Chats con amigos (chats.html), con el orden de una app de mensajería: lista a la izquierda (en el celular, pantalla
+   completa) y la conversación a la derecha (en el celular, al tocar un amigo, a pantalla completa con «volver»).
+   Va después de tema.css para que sus reglas manden. */
 
-.c-av-foto{background:none!important;padding:0;width:auto!important;height:auto!important}
-.cm.solo-adj{background:transparent;padding:0}
-.chat-form{display:flex;gap:8px;align-items:stretch}
+.pag-chats .tope, .pag-chats .titulo-pag { display: none; }
+.pag-chats .app .centro, .pag-chats .app.ancho .centro { max-width: none; margin: 0; width: 100%; height: 100vh; height: 100dvh; padding: 0; animation: none; }
+.pag-chats svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.chats-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: 100%; min-height: 0; }
+.c-ico { flex: none; display: inline-grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--sub); cursor: pointer; transition: background .15s, color .15s; }
+.c-ico:hover { background: var(--panel2); color: var(--txt); }
+.c-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--borde); border-radius: 99px; background: var(--panel); color: var(--txt); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.c-btn:hover { border-color: color-mix(in srgb, var(--acc) 60%, var(--borde)); }
+.c-btn.pri { border-color: transparent; background: var(--acc); color: var(--on-acc, #04130d); }
+.c-btn svg { width: 16px; height: 16px; stroke-width: 2.2; }
+.c-ico:focus-visible, .c-btn:focus-visible, .c-fila:focus-visible, .c-enviar:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+
+/* ---------- lista ---------- */
+.c-lista { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--borde); background: var(--panel); }
+.c-lista-cab { display: flex; align-items: center; min-height: 58px; padding: 8px 18px 0; }
+.c-lista-cab h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+.c-yo { display: flex; align-items: center; gap: 10px; margin: 6px 12px 10px; padding: 10px 10px 10px 12px; border-radius: 16px; background: var(--panel2); }
+.c-yo-txt { flex: 1; min-width: 0; display: grid; line-height: 1.25; }
+.c-yo-txt small { font-size: 11.5px; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-yo-txt b { font: 800 17px ui-monospace, Consolas, monospace; letter-spacing: .1em; color: var(--acc2, var(--acc)); }
+.c-add { display: flex; gap: 8px; padding: 0 12px 8px; }
+.c-buscar { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 99px; background: var(--panel2); color: var(--sub); }
+.c-buscar svg { width: 17px; height: 17px; }
+.c-buscar input { flex: 1; min-width: 0; padding: 10px 0; border: 0; outline: 0; background: none; color: var(--txt); font: inherit; font-size: 15px; }
+.c-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 12px; scrollbar-width: thin; }
+.c-scroll h3 { margin: 14px 10px 4px; font-size: 11.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--sub); }
+.c-scroll > div > small { display: block; margin: 8px 10px; }
+.c-scroll .nota { margin: 14px 10px; font-size: 14px; line-height: 1.5; }
+.c-res { display: grid; gap: 2px; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--borde); }
+.c-res:empty { display: none; }
+.c-fila { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 10px; border: 0; border-radius: 14px; background: none; color: var(--txt); font: inherit; text-align: left; cursor: pointer; }
+button.c-fila:hover { background: var(--panel2); }
+.c-fila.on { background: color-mix(in srgb, var(--acc) 15%, transparent); }
+.c-fila > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; }
+.c-fila b { display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-fila small { display: block; font-size: 13px; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-fila.nuevo b, .c-fila.nuevo small { color: var(--txt); font-weight: 700; }
+.c-acc { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.c-acc .btn { border-radius: 99px; }
+.c-badge { flex: none; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 99px; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; background: var(--acc2, var(--acc)); }
+.c-av { flex: none; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; font-weight: 800; font-size: 18px; color: #04130d; background: linear-gradient(135deg, var(--cy), var(--acc)); overflow: hidden; }
+.c-yo .c-av { width: 42px; height: 42px; }
+.c-av-foto { background: none !important; padding: 0; }
+.c-av-foto img, .c-av-foto svg { width: 100%; height: 100%; }
+
+/* ---------- conversación ---------- */
+.c-conv { position: relative; display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; }
+.c-vacio { margin: auto; display: grid; justify-items: center; gap: 8px; max-width: 320px; padding: 20px; text-align: center; color: var(--sub); }
+.c-vacio svg { width: 52px; height: 52px; stroke-width: 1.3; color: color-mix(in srgb, var(--acc) 70%, var(--sub)); }
+.c-vacio b { font-size: 18px; color: var(--txt); }
+.c-vacio[hidden] { display: none; }
+.c-cab { position: relative; flex: none; display: flex; align-items: center; gap: 10px; min-height: 62px; padding: 8px 12px; border-bottom: 1px solid var(--borde); background: var(--panel); }
+.c-cab[hidden] { display: none; }
+.c-cab .c-av { width: 40px; height: 40px; font-size: 16px; }
+.c-cab-txt { flex: 1; min-width: 0; display: grid; line-height: 1.25; }
+.c-cab-txt b { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-cab-txt small { font-size: 12.5px; color: var(--sub); }
+.c-volver { display: none; }
+.c-menu { position: absolute; z-index: 20; top: calc(100% - 6px); right: 12px; min-width: 190px; padding: 6px; border: 1px solid var(--borde); border-radius: 14px; background: var(--panel); box-shadow: 0 12px 30px rgba(0, 0, 0, .18); }
+.c-menu[hidden] { display: none; }
+.c-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; border-radius: 10px; background: none; color: var(--rojo); font: inherit; font-size: 15px; cursor: pointer; }
+.c-menu button:hover { background: var(--panel2); }
+
+.c-log { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 3px; padding: 14px max(14px, calc((100% - 820px) / 2)) 10px; scrollbar-width: thin; }
+.c-log[hidden] { display: none; }
+.c-dia { align-self: center; margin: 12px 0 8px; padding: 4px 12px; border-radius: 99px; background: var(--panel2); color: var(--sub); font-size: 12px; font-weight: 700; }
+.cm { position: relative; align-self: flex-start; max-width: min(78%, 560px); padding: 7px 12px 7px; border-radius: 18px 18px 18px 6px; background: var(--panel); border: 1px solid color-mix(in srgb, var(--borde) 70%, transparent); color: var(--txt); line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
+.cm.yo { align-self: flex-end; border-color: transparent; border-radius: 18px 18px 6px 18px; background: color-mix(in srgb, var(--acc) 30%, var(--panel)); }
+.cm:not(.seguido) { margin-top: 8px; }
+.cm.seguido:not(.yo) { border-top-left-radius: 6px; }
+.cm.seguido.yo { border-top-right-radius: 6px; }
+.cm-hora { float: right; margin: 6px 0 -2px 10px; font-size: 11px; line-height: 1; color: var(--sub); white-space: nowrap; }
+.cm code { padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--txt) 10%, transparent); font-family: ui-monospace, Consolas, monospace; font-size: .92em; }
+.cm.solo-adj { padding: 4px; background: none; border-color: transparent; }
+.cm .adj-msg { margin-top: 4px; white-space: normal; }
+.c-saludo { margin: auto; padding: 16px; text-align: center; color: var(--sub); }
+
+.c-abajo { flex: none; padding: 6px max(10px, calc((100% - 840px) / 2)) 10px; }
+.c-emojis { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 4px 8px; }
+.c-emojis[hidden] { display: none; }
+.c-emojis button { width: 42px; height: 42px; padding: 0; border: 0; border-radius: 12px; background: var(--panel2); font-size: 22px; cursor: pointer; }
+.c-abajo .adj-bandeja { padding: 4px 4px 8px; }
+.c-form { display: flex; align-items: flex-end; gap: 6px; }
+.c-form[hidden] { display: none; }
+.c-campo { flex: 1; min-width: 0; display: flex; align-items: center; padding: 3px 4px 3px 16px; border: 1px solid var(--borde); border-radius: 24px; background: var(--panel); }
+.c-campo:focus-within { border-color: color-mix(in srgb, var(--acc) 55%, var(--borde)); }
+.c-campo input { flex: 1; min-width: 0; padding: 9px 0; border: 0; outline: 0; background: none; color: var(--txt); font: inherit; font-size: 16px; box-shadow: none; }
+.c-campo .c-ico { width: 36px; height: 36px; }
+.c-form .adj-clip, .c-form .adj-clip:hover { width: 44px; height: 44px; min-width: 0; border: 0; border-radius: 50%; background: none; color: var(--sub); }
+.c-form .adj-clip:hover { background: var(--panel2); color: var(--txt); }
+.c-enviar { flex: none; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: var(--acc); color: var(--on-acc, #04130d); cursor: pointer; transition: opacity .15s, transform .1s; }
+.c-enviar svg { stroke-width: 2.4; }
+.c-enviar:disabled { opacity: .35; cursor: default; }
+.c-enviar:not(:disabled):active { transform: scale(.94); }
+.c-conv.adj-soltar .c-campo { border-style: dashed; border-color: var(--acc); }
+
+/* ---------- tablet y celular ---------- */
+@media (max-width: 1100px) { .chats-grid { grid-template-columns: 320px minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .pag-chats .app .centro, .pag-chats .app.ancho .centro { height: calc(100dvh - var(--alto-inf, 72px)); }
+  .chats-grid { grid-template-columns: 1fr; }
+  .c-lista { border-right: 0; background: none; }
+  .c-lista-cab { padding-top: max(10px, env(safe-area-inset-top)); }
+  .chats-grid:not(.en-chat) .c-conv { display: none; }
+  .chats-grid.en-chat .c-lista { display: none; }
+  .c-volver { display: inline-grid; margin-left: -4px; }
+  .c-cab { padding-top: max(8px, env(safe-area-inset-top)); }
+  .cm { max-width: 84%; }
+  .c-abajo { padding: 6px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  /* Dentro de una conversación la barra de abajo se esconde para dar espacio (como en las apps de mensajes) */
+  body.en-chat .inf { display: none; }
+  body.en-chat.pag-chats .app .centro { height: 100dvh; }
+}

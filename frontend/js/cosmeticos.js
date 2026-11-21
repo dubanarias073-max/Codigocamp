@@ -1,5 +1,4 @@
-import { avatarSVG } from "/js/avatares.js";
-// Cosméticos de la tienda y los cofres: cómo se ve cada fondo, puntero, tema, marco y efecto, y cómo se aplican
+// Cosméticos de la tienda y los cofres: cómo se ve cada fondo, puntero, tema, marco, efecto y estela del dedo, y cómo se aplican
 // en todas las páginas. Todo es original (CSS, SVG y canvas), sin imágenes externas.
 const svg = (cuerpo, w = 32, h = 32) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 32 32">${cuerpo}</svg>`)}`;
 const reducido = () => { try { if (localStorage.getItem("cc_menos_mov") === "1") return true; } catch { /* nada */ } return matchMedia("(prefers-reduced-motion: reduce)").matches; };
@@ -82,6 +81,8 @@ html.cc-con-fondo.cc-fondo-oscuro .tarjeta,html.cc-con-fondo.cc-fondo-oscuro .la
 .cc-marco::before{content:"";position:absolute;inset:0;border-radius:50%;z-index:-1}
 .cc-marco>*{border-radius:50%}
 ${Object.entries(MARCOS).map(([k, v]) => `.cc-marco[data-marco="${k}"]::before{${v}}`).join("\n")}
+.cc-prev-inicial{display:grid;place-items:center;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#0d9488,#4d7c0f);color:#fff;font:800 24px/1 system-ui,sans-serif}
+.cc-particula-txt{border-radius:0;white-space:nowrap}
 .cc-particula{position:fixed;z-index:9999;pointer-events:none;border-radius:50%;will-change:transform,opacity}
 @media (prefers-reduced-motion:reduce){#cc-fondo,#cc-fondo *{animation:none!important}}
 `;
@@ -194,6 +195,83 @@ export const EFECTOS = {
   efecto_fuegos: (x, y) => { const c = ["#f43f5e", "#facc15", "#22d3ee", "#a855f7", "#4ade80", "#fb923c"]; const base = c[(Math.random() * c.length) | 0]; for (let i = 0; i < 28; i++) { const a = (i / 28) * Math.PI * 2, d = 70 + Math.random() * 50; particula(x, y, { color: i % 3 ? base : "#fff", tam: 4 + Math.random() * 3, dx: Math.cos(a) * d, dy: Math.sin(a) * d + 20, dur: 900 + Math.random() * 500, forma: "punto" }); } },
 };
 
+// ---- estelas del dedo (celular): siguen el dedo al tocar y deslizar la pantalla
+const ARCOIRIS = ["#f43f5e", "#f59e0b", "#facc15", "#4ade80", "#22d3ee", "#6366f1", "#d946ef"];
+function texto(x, y, ch, { color, tam, dx, dy, dur }) {
+  const p = document.createElement("span");
+  p.className = "cc-particula cc-particula-txt";
+  p.textContent = ch;
+  p.style.cssText = `left:${x}px;top:${y}px;color:${color};font:800 ${tam}px/1 ui-monospace,Consolas,monospace;text-shadow:0 0 6px ${color}`;
+  document.body.appendChild(p);
+  p.animate([{ transform: "translate(-50%,-50%)", opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`, opacity: 0 }], { duration: dur, easing: "ease-out" }).onfinish = () => p.remove();
+}
+/** Cada estela: mover(x, y, i) se llama mientras el dedo se desliza; tocar(x, y) al apoyar el dedo. */
+export const DEDOS = {
+  dedo_tinta: { mover: (x, y) => particula(x, y, { color: "#3b82f6", tam: 7 + Math.random() * 6, dx: (Math.random() - .5) * 6, dy: 10 + Math.random() * 10, dur: 700, forma: "punto" }) },
+  dedo_burbujas: { mover: (x, y, i) => { if (i % 2) particula(x, y, { color: "#7dd3fc", tam: 8 + Math.random() * 12, dx: (Math.random() - .5) * 30, dy: -40 - Math.random() * 50, dur: 1000, forma: "burbuja" }); } },
+  dedo_neon: { mover: (x, y) => particula(x, y, { color: "#22d3ee", tam: 9, dx: 0, dy: 0, dur: 520, forma: "punto" }) },
+  dedo_codigo: { mover: (x, y, i) => { if (i % 2 === 0) texto(x, y, ["{", "}", "<", "/>", "0", "1", ";", "()", "=>"][(Math.random() * 9) | 0], { color: i % 4 ? "#4ade80" : "#a3e635", tam: 13 + Math.random() * 5, dx: (Math.random() - .5) * 20, dy: 30 + Math.random() * 30, dur: 900 }); } },
+  dedo_arcoiris: { mover: (x, y, i) => particula(x, y, { color: ARCOIRIS[i % ARCOIRIS.length], tam: 12, dx: 0, dy: 4, dur: 650, forma: "punto" }) },
+  dedo_fuego: { mover: (x, y) => { for (let k = 0; k < 2; k++) particula(x + (Math.random() - .5) * 8, y, { color: ["#f97316", "#facc15", "#ef4444"][(Math.random() * 3) | 0], tam: 6 + Math.random() * 7, dx: (Math.random() - .5) * 18, dy: -30 - Math.random() * 40, dur: 600 + Math.random() * 300, forma: "punto" }); } },
+  dedo_galaxia: {
+    mover: (x, y, i) => { particula(x, y, { color: ["#c084fc", "#67e8f9", "#f0abfc", "#fde68a"][i % 4], tam: 4 + Math.random() * 4, dx: (Math.random() - .5) * 26, dy: (Math.random() - .5) * 26, dur: 800, forma: "punto" }); if (i % 3 === 0) particula(x, y, { color: "#fff", tam: 9, dx: (Math.random() - .5) * 30, dy: (Math.random() - .5) * 30, dur: 900, forma: "estrella" }); },
+    tocar: (x, y) => { for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2; particula(x, y, { color: k % 2 ? "#c084fc" : "#67e8f9", tam: 4, dx: Math.cos(a) * 40, dy: Math.sin(a) * 40, dur: 600, forma: "punto" }); } },
+  },
+};
+function onda(x, y, color) {
+  const p = document.createElement("span");
+  p.className = "cc-particula";
+  p.style.cssText = `left:${x}px;top:${y}px;width:18px;height:18px;border:2px solid ${color};background:none`;
+  document.body.appendChild(p);
+  p.animate([{ transform: "translate(-50%,-50%) scale(.4)", opacity: .9 }, { transform: "translate(-50%,-50%) scale(2.6)", opacity: 0 }], { duration: 450, easing: "ease-out" }).onfinish = () => p.remove();
+}
+const COLOR_DEDO = { dedo_tinta: "#3b82f6", dedo_burbujas: "#7dd3fc", dedo_neon: "#22d3ee", dedo_codigo: "#4ade80", dedo_arcoiris: "#f59e0b", dedo_fuego: "#f97316", dedo_galaxia: "#c084fc" };
+
+/**
+ * Hace que una estela siga al dedo dentro de «zona» (window en las páginas, la tarjeta en la tienda).
+ * soloTactil: en las páginas solo con el dedo o el lápiz (con mouse ya están los punteros y efectos).
+ */
+export function seguirDedo(zona, clave, { soloTactil = true } = {}) {
+  const e = DEDOS[clave];
+  if (!e) return () => {};
+  let abajo = false, i = 0, ultimo = 0, ux = 0, uy = 0;
+  const vale = (ev) => !soloTactil || ev.pointerType === "touch" || ev.pointerType === "pen";
+  const bajar = (ev) => { if (!vale(ev)) return; abajo = true; ux = ev.clientX; uy = ev.clientY; onda(ux, uy, COLOR_DEDO[clave]); e.tocar?.(ux, uy); };
+  const mover = (ev) => {
+    if (zona !== window && !zona.isConnected) { quitar(); return; }   // la tarjeta ya no está (la tienda se volvió a pintar)
+    if (!abajo || !vale(ev)) return;
+    const t = performance.now();
+    if (t - ultimo < 16) return;
+    ultimo = t;
+    // Rellena el camino si el dedo va rápido, para que la estela no quede con huecos
+    const pasos = Math.min(4, Math.max(1, Math.round(Math.hypot(ev.clientX - ux, ev.clientY - uy) / 14)));
+    for (let k = 1; k <= pasos; k++) e.mover(ux + (ev.clientX - ux) * k / pasos, uy + (ev.clientY - uy) * k / pasos, i++);
+    ux = ev.clientX; uy = ev.clientY;
+  };
+  const subir = () => { abajo = false; };
+  zona.addEventListener("pointerdown", bajar, { passive: true });
+  addEventListener("pointermove", mover, { passive: true });
+  addEventListener("pointerup", subir, { passive: true });
+  addEventListener("pointercancel", subir, { passive: true });
+  // Al desplazar la página, el navegador manda pointercancel: se sigue con los eventos táctiles
+  const tmover = (ev) => { if (abajo) { const t0 = ev.touches[0]; mover({ clientX: t0.clientX, clientY: t0.clientY, pointerType: "touch" }); } };
+  addEventListener("touchmove", tmover, { passive: true });
+  addEventListener("touchend", subir, { passive: true });
+  const quitar = () => {
+    zona.removeEventListener("pointerdown", bajar);
+    removeEventListener("pointermove", mover); removeEventListener("pointerup", subir); removeEventListener("pointercancel", subir);
+    removeEventListener("touchmove", tmover); removeEventListener("touchend", subir);
+  };
+  return quitar;
+}
+let quitarDedo = null;
+function activarDedo(clave) {
+  quitarDedo?.();
+  quitarDedo = null;
+  if (!clave || reducido()) return;
+  quitarDedo = seguirDedo(window, clave);
+}
+
 function activarEfecto(clave) {
   quitarEfecto?.();
   quitarEfecto = null;
@@ -242,8 +320,9 @@ export function aplicarCosmeticos(eq = {}, { fondo = true } = {}) {
     if (f.canvas) animarCanvas(f.canvas, caja);
     if (reducido()) caja.style.animation = "none";
   }
-  // Efecto
+  // Efecto (clic) y estela del dedo (celular)
   activarEfecto(eq.efecto);
+  activarDedo(eq.dedo);
 }
 
 /** Lo último que se aplicó (para pintarlo al instante mientras carga la página). */
@@ -264,7 +343,12 @@ export function vistaPrevia(el, clave, tipo) {
     el.classList.add("cc-prev-tema");
   } else if (tipo === "marco" && MARCOS[clave]) {
     estilo("cc-cosmeticos-base", CSS_BASE);
-    el.innerHTML = `<span class="cc-marco" data-marco="${clave}"><span class="cc-prev-cara">${avatarSVG("zorro", 52)}</span></span>`;
+    el.innerHTML = `<span class="cc-marco" data-marco="${clave}"><span class="cc-prev-cara cc-prev-inicial">A</span></span>`;
+  } else if (tipo === "dedo" && DEDOS[clave]) {
+    el.innerHTML = '<span class="cc-prev-efecto">Toca y desliza el dedo aquí</span>';
+    el.style.touchAction = "none";   // dentro de la tarjeta, deslizar dibuja (no mueve la página)
+    el.__quitarDedo?.();
+    el.__quitarDedo = seguirDedo(el, clave, { soloTactil: false });
   } else if (tipo === "efecto") {
     el.innerHTML = '<span class="cc-prev-efecto">Haz clic aquí</span>';
     el.onpointerdown = (e) => { const fn = EFECTOS[clave]; if (fn) fn(e.clientX, e.clientY); else for (let i = 0; i < 6; i++) particula(e.clientX, e.clientY, { color: "#facc15", tam: 9, dx: (Math.random() - .5) * 40, dy: 20 + Math.random() * 20, dur: 700, forma: "estrella" }); };

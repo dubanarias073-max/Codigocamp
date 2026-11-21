@@ -6,14 +6,16 @@ from sqlalchemy import or_
 from models import AIConversation, AIMessage, db, utcnow
 from utilidades import api_error, json_body
 
+from servicios.zona import iso  # noqa: E402
+
 bp = Blueprint("conversaciones", __name__)
 MAX_CONVERSACIONES = 500
 
 
 def _dto(c, con_mensajes=False):
-    d = {"id": c.id, "titulo": c.titulo, "fijada": c.fijada, "creada": c.creada.isoformat(), "actualizada": c.actualizada.isoformat()}
+    d = {"id": c.id, "titulo": c.titulo, "fijada": c.fijada, "creada": iso(c.creada), "actualizada": iso(c.actualizada)}
     if con_mensajes:
-        d["mensajes"] = [{"id": m.id, "rol": m.rol, "texto": m.texto, "archivos": m.archivos or [], "creado": m.creado.isoformat()} for m in c.mensajes]
+        d["mensajes"] = [{"id": m.id, "rol": m.rol, "texto": m.texto, "archivos": m.archivos or [], "creado": iso(m.creado)} for m in c.mensajes]
     return d
 
 

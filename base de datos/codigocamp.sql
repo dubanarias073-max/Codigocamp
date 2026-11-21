@@ -60,8 +60,10 @@ CREATE TABLE espacios_trabajo (
   carpetas        LONGTEXT         NOT NULL COMMENT 'JSON',
   git             LONGTEXT         NOT NULL COMMENT 'JSON',
   actualizado_en  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  live_clave      VARCHAR(24)  NULL COMMENT 'Enlace en vivo /live/<clave>/ (como Live Server); NULL = apagado',
   PRIMARY KEY (id),
   UNIQUE KEY uq_espacios_trabajo_usuario (usuario_id),
+  KEY ix_espacios_trabajo_live_clave (live_clave),
   CONSTRAINT fk_espacios_trabajo_usuario FOREIGN KEY (usuario_id)
     REFERENCES usuarios (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -169,6 +171,7 @@ CREATE TABLE perfiles (
   nivel_previo        VARCHAR(10) NOT NULL DEFAULT '',
   curso_actual_id     INT         NULL,
   meta_minutos        SMALLINT    NOT NULL DEFAULT 10,
+  zona_horaria        VARCHAR(64) NULL COMMENT 'Zona horaria del dispositivo (p. ej. America/Bogota)',
   onboarding_completo TINYINT(1)  NOT NULL DEFAULT 0,
   tema                ENUM('auto','claro','oscuro') NOT NULL DEFAULT 'auto'
                       COMMENT 'auto = predeterminado, sigue el tema del dispositivo',
@@ -441,7 +444,7 @@ CREATE TABLE IF NOT EXISTS cosmeticos_propios (
 
 CREATE TABLE IF NOT EXISTS cosmeticos_equipados (
   usuario_id INT PRIMARY KEY,
-  fondo VARCHAR(30) NULL, puntero VARCHAR(30) NULL COMMENT 'Puntero del mouse', tema VARCHAR(30) NULL, marco VARCHAR(30) NULL, efecto VARCHAR(30) NULL,
+  fondo VARCHAR(30) NULL, puntero VARCHAR(30) NULL COMMENT 'Puntero del mouse', tema VARCHAR(30) NULL, marco VARCHAR(30) NULL, efecto VARCHAR(30) NULL, dedo VARCHAR(30) NULL COMMENT 'Estela del dedo (celular)',
   CONSTRAINT fk_equipados_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Cosmeticos que lleva puestos cada usuario';

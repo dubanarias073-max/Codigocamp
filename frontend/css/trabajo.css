@@ -498,7 +498,7 @@ button.estado-item:hover { background: var(--hover); color: var(--cy); }
   .trabajo-app.ide { display: block; height: 100dvh; min-height: 0; }
   .ide-cuerpo, .ide.sin-asistente .ide-cuerpo, .ide.sin-explorador .ide-cuerpo, .ide.sin-explorador.sin-asistente .ide-cuerpo {
     display: flex; flex-direction: column; gap: 6px; height: 100dvh;
-    padding: 6px 6px calc(64px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 6px calc(78px + env(safe-area-inset-bottom, 0px));
   }
   .movil-tabs {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; flex: none;
@@ -548,3 +548,120 @@ button.estado-item:hover { background: var(--hover); color: var(--cy); }
 .gh-login .gh-estado { color: var(--txt); }
 .gh-login .gh-error { margin-top: 10px; color: var(--rojo, #ff6b6b); font-weight: 600; }
 .gh-login code { font-size: 12px; }
+
+/* ===== Botón ⋯ de cada archivo/carpeta (Renombrar, Eliminar…) ===== */
+.fila-mas { display: none; place-items: center; flex: none; width: 28px; height: 26px; margin: 0 2px 0 auto; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--sub); cursor: pointer; }
+.fila-mas svg { width: 16px; height: 16px; }
+.fila .git-d + .fila-mas { margin-left: 0; }
+.fila:hover .fila-mas, .fila.sel .fila-mas, .fila-mas:focus-visible { display: grid; }
+.fila-mas:hover { background: var(--hover); color: var(--txt); }
+
+/* ===== Celular: Trabajo ordenado ===== */
+@media (max-width: 760px) {
+  /* Archivos: filas grandes para el dedo y ⋯ siempre visible */
+  .fila { height: 42px; font-size: 15px; padding-left: calc(var(--n, 0) * 16px + 6px); margin-bottom: 2px; }
+  .fila-mas { display: grid; width: 40px; height: 38px; }
+  .fila-mas svg { width: 18px; height: 18px; }
+  .exp-cab { gap: 6px; }
+  .exp-acciones { gap: 2px; }
+  .exp-acciones .icono-btn { width: 38px; height: 38px; }
+
+  /* Código: pestañas en su propia fila (se deslizan) y las acciones debajo, alineadas a la derecha */
+  .pestanas-barra { flex-wrap: wrap; gap: 6px; padding: 6px 8px; }
+  .pestanas { flex: 1 1 100%; order: 0; gap: 4px; padding-bottom: 2px; scroll-snap-type: x proximity; }
+  .pestana { max-width: 60vw; padding: 6px 4px 6px 10px; scroll-snap-align: start; }
+  .pestana .cerrar { width: 28px; height: 28px; opacity: 1; }
+  .pestanas-acciones { display: flex; flex: 1 1 100%; align-items: center; justify-content: flex-end; gap: 6px; }
+  .pestanas-acciones .icono-btn { width: 40px; height: 40px; }
+  .pestanas-acciones #ejecutar { min-height: 40px; padding: 0 16px; }
+  .migas { padding: 4px 10px; font-size: 12px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+
+  /* Menú de un archivo: hoja que sube desde abajo, con botones grandes */
+  .ide-menu {
+    left: 8px !important; right: 8px !important; top: auto !important;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    min-width: 0; max-height: 70dvh; overflow-y: auto; padding: 8px; border-radius: 18px;
+    animation: hoja-sube .16s ease-out;
+  }
+  .ide-menu button { min-height: 48px; padding: 10px 14px; font-size: 16px; }
+  .ide-menu kbd { display: none; }
+}
+@keyframes hoja-sube { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ide-menu { animation: none !important; } }
+.cambio-nota { margin-left: 6px; font-size: 11px; color: var(--sub); white-space: nowrap; }
+.cambio-aviso { margin-left: 6px; font-size: 11px; font-weight: 700; color: #e5a50a; white-space: nowrap; }
+
+/* ===== Autocompletado del editor simple (Monaco trae el suyo) ===== */
+.ed-sug { position: absolute; z-index: 30; margin: 0; padding: 4px; list-style: none; max-height: 220px; overflow: auto; border: 1px solid var(--borde); border-radius: 8px;
+  background: var(--panel); box-shadow: 0 10px 28px rgba(0, 0, 0, .35); font: 13px/1.2 'Cascadia Code', 'Fira Code', Consolas, monospace; }
+.ed-sug[hidden] { display: none; }
+.ed-sug li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.ed-sug li.on, .ed-sug li:hover { background: color-mix(in srgb, var(--acc) 20%, transparent); }
+.ed-sug i { flex: none; width: 22px; font-style: normal; font-size: 11px; text-align: center; color: var(--cy, #39e7ff); }
+.ed-sug .t-kw i { color: #a855f7; } .ed-sug .t-fn i, .ed-sug .t-metodo i { color: #d08700; } .ed-sug .t-snip i, .ed-sug .t-emmet i { color: #0ea5e9; }
+.ed-sug b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.ed-sug small { margin-left: auto; padding-left: 10px; overflow: hidden; text-overflow: ellipsis; color: var(--sub); font-family: inherit; }
+@media (max-width: 760px) { .ed-sug li { padding: 9px 10px; font-size: 14px; } }
+
+/* ===== Vista previa como Live Server: al lado del código, en vivo, páginas, tamaños y enlace ===== */
+.vista-cab { gap: 6px; padding: 5px 8px; justify-content: flex-start; }
+.vista-nav, .vista-acciones { display: flex; align-items: center; gap: 2px; flex: none; }
+.vista-acciones { margin-left: auto; }
+.vista-cab .icono-btn:disabled { opacity: .35; cursor: default; }
+.vista-cab .icono-btn.activo, .vista-cab .icono-btn[aria-pressed="true"] { color: var(--cy); background: var(--hover); }
+#vistaRuta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 12px var(--mono, ui-monospace, monospace); color: var(--sub); }
+.vista-paginas { display: flex; align-items: center; gap: 6px; flex: 0 1 220px; min-width: 110px; height: 28px; padding: 0 4px 0 10px; border: 1px solid var(--borde); border-radius: 999px; background: var(--campo-bg, var(--panel2)); color: var(--sub); }
+.vista-paginas[hidden], .vista-paginas.oculto { display: none; }
+.vista-paginas svg { width: 13px; height: 13px; flex: none; }
+.vista-paginas select { flex: 1; min-width: 0; height: 26px; border: 0; outline: 0; background: transparent; color: var(--txt); font: 600 12.5px inherit; cursor: pointer; }
+.vista-paginas select option { color: #111; }
+.vista-vivo { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 1px solid var(--borde); border-radius: 999px; background: none; color: var(--sub); font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; }
+.vista-vivo i { width: 8px; height: 8px; border-radius: 50%; background: var(--sub); }
+.vista-vivo.on { color: #16a34a; border-color: color-mix(in srgb, #16a34a 45%, var(--borde)); }
+.vista-vivo.on i { background: #22c55e; box-shadow: 0 0 0 0 rgba(34, 197, 94, .6); animation: vivo-pulso 1.8s infinite; }
+@keyframes vivo-pulso { 70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+
+.vista-marco { position: relative; flex: 1; min-height: 0; display: flex; justify-content: center; overflow: auto; }
+.vista-marco[data-tam="movil"], .vista-marco[data-tam="tablet"] { padding: 14px; background: repeating-linear-gradient(45deg, transparent 0 10px, rgba(127, 127, 127, .06) 10px 20px); }
+.vista-marco[data-tam="movil"] #vista { flex: none; width: 390px; max-width: 100%; border-radius: 18px; box-shadow: 0 8px 30px rgba(0, 0, 0, .25); }
+.vista-marco[data-tam="tablet"] #vista { flex: none; width: 820px; max-width: 100%; border-radius: 12px; box-shadow: 0 8px 30px rgba(0, 0, 0, .25); }
+#vista { height: auto; min-height: 100%; }
+
+/* Al lado del código */
+.area-editor.dividida { --ancho-vista: 50%; }
+.area-editor.dividida .vista-panel { position: relative; inset: auto; flex: 0 0 var(--ancho-vista); max-width: calc(100% - 240px); min-width: 260px; border-left: 1px solid var(--borde); }
+.area-editor.dividida .bienvenida { right: calc(var(--ancho-vista) + 6px); }
+.sash-vista { flex: none; width: 6px; margin: 0 -3px; cursor: col-resize; }
+.sash-vista[hidden] { display: none; }
+.sash-vista::after { top: 0; bottom: 0; left: 1px; width: 4px; }
+.sash-vista:hover::after, .sash-vista.arrastrando::after, .sash-vista:focus-visible::after { background: var(--cy); }
+.area-editor.dividida .vista-paginas { flex-basis: 170px; }
+.area-editor.dividida #vistaRuta { display: none; }
+
+/* Enlace para el navegador */
+.live-pop { position: absolute; z-index: 20; top: 42px; right: 8px; width: min(400px, calc(100% - 16px)); display: grid; gap: 8px; padding: 14px; border: 1px solid var(--borde); border-radius: 14px; background: var(--panel); color: var(--txt); box-shadow: 0 16px 40px rgba(0, 0, 0, .3); font-size: 13px; }
+.live-pop[hidden] { display: none; }
+.live-pop p, .live-pop small { margin: 0; color: var(--sub); line-height: 1.45; }
+.live-pop small { font-size: 11.5px; }
+.live-url { display: flex; gap: 6px; }
+.live-url input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--borde); border-radius: 8px; background: var(--campo-bg, var(--panel2)); color: var(--txt); font: 12.5px var(--mono, ui-monospace, monospace); }
+.live-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.live-btns a { text-decoration: none; }
+
+@media (max-width: 760px) {
+  .vista-cab { flex-wrap: wrap; row-gap: 4px; }
+  #vistaRuta, .vista-vivo span { display: none; }
+  .vista-paginas { flex: 1 1 140px; order: 5; }
+  .vista-acciones { margin-left: auto; }
+  .vista-vivo { padding: 0 8px; }
+  .live-pop { top: 76px; }
+}
+.vista-panel { container-type: inline-size; }
+@container (max-width: 560px) {
+  .vista-vivo span { display: none; }
+  .vista-vivo { padding: 0 8px; }
+  .vista-paginas { flex: 1 1 90px; min-width: 80px; }
+  #vistaRuta { display: none; }
+  .vista-cab .icono-btn { width: 26px; }
+}
+@container (max-width: 380px) { .vista-cab { flex-wrap: wrap; row-gap: 4px; } .vista-paginas { order: 5; flex-basis: 100%; } }

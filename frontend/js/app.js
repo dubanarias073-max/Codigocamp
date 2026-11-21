@@ -1,6 +1,5 @@
 // Estructura común de las páginas con sesión: barra lateral, panel de estadísticas y barra inferior (móvil).
 import { protegerCuenta } from "./privacidad.js";
-import { avatarSVG } from "/js/avatares.js";
 import { api, getUser } from "/js/auth.js";
 import { iconoSVG } from "/js/iconos.js";
 import { aplicarCosmeticos, conMarco, cosmeticosGuardados } from "/js/cosmeticos.js";
@@ -28,12 +27,11 @@ export function aplicarTema(tema) {
   try { localStorage.setItem("cc_tema", t); } catch {}
 }
 
-/** Foto de perfil (o avatar/inicial) con el marco que la persona tenga puesto. */
+/** Foto de perfil (o inicial) con el marco que la persona tenga puesto. */
 export function fotoDe(u, { tam = 40, marco = u?.cosmeticos?.marco } = {}) {
   const inicial = esc((u?.nombre || "?").charAt(0).toUpperCase());
   const dentro = u?.foto
     ? `<img class="foto-perfil" src="${esc(u.foto)}" alt="" width="${tam}" height="${tam}" style="width:${tam}px;height:${tam}px;object-fit:cover;border-radius:50%;display:block">`
-    : avatarSVG(u?.avatar, tam) ? `<span class="foto-perfil foto-avatar" style="width:${tam}px;height:${tam}px">${avatarSVG(u.avatar, tam)}</span>`
     : `<span class="foto-perfil foto-inicial" style="width:${tam}px;height:${tam}px;font-size:${Math.round(tam * .45)}px">${inicial}</span>`;
   return conMarco(dentro, marco);
 }
@@ -62,12 +60,14 @@ export function actualizarStats(pr) {
 
 export async function iniciar(activa) {
   const user = await getUser();
-  if (!user) { location.replace(url("login")); await parar(); }
+  if (!user) { try { window.CodigoCampApp?.desconectarWidget(); } catch { /* fuera de la app */ } location.replace(url("login")); await parar(); }
   await protegerCuenta(user);   // si antes estuvo otra cuenta en este navegador, se borran sus copias locales
   if (!user.onboarding) { location.replace(url("onboarding")); await parar(); }
   aplicarTema(user.tema);
   // Cuentas antiguas o términos actualizados: hay que aceptarlos antes de seguir.
   if (user.terminos === false) await (await import("/js/terminos.js")).pedirTerminos();
+  // Dentro de la app de Android: el widget queda conectado a esta sesión.
+  if (window.CodigoCampApp) import("/js/appnativa.js").then((m) => m.sincronizarWidgetApp(api)).catch(() => {});
   aplicarCosmeticos(user.cosmeticos || {});
   const [prog, mis] = await Promise.all([api("/api/progreso/"), api("/api/desafios/").catch(() => ({ hoy: [] }))]);
   const p = prog.perfil;

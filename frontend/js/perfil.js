@@ -2,18 +2,16 @@
 import { iniciar, api, esc, aviso, fotoDe, aplicarCosmeticos } from "/js/app.js";
 import { FONDOS, vistaPrevia } from "/js/cosmeticos.js";
 import { iconoSVG } from "/js/iconos.js";
-import { AVATARES, avatarSVG } from "/js/avatares.js";
 import { svgCofre } from "/js/cofres.js";
 document.querySelectorAll("[data-ic]").forEach((el) => { el.innerHTML = iconoSVG(el.dataset.ic, "ic-btn"); });
 const { user, prog } = await iniciar("perfil");
 import("/js/calendario.js").then((m) => m.montarCalendario(document.getElementById("calendario"))).catch(() => {});
 const $ = (id) => document.getElementById(id);
 const p = prog.perfil;
-let avatar = user.avatar || "";
 const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || "";
 
 function cabecera() {
-  $("av").innerHTML = fotoDe({ ...user, avatar }, { tam: 112 });
+  $("av").innerHTML = fotoDe(user, { tam: 112 });
   $("nom").textContent = user.nombre;
   $("ident").innerHTML = `@${esc(user.alias)} <span>· ID ${esc(user.codigo)}</span>`;
   const f = FONDOS[user.cosmeticos?.fondo];
@@ -41,7 +39,7 @@ const ins = [
 $("insignias").innerHTML = ins.map(([ic, m, t]) => `<span class="insignia med-${m}" title="Medalla de ${m}: ${esc(t)}"><i class="med-ic">${iconoSVG(ic, "med-svg")}</i>${esc(t)}</span>`).join("");
 
 // Lo que llevas puesto
-const NOMBRE_TIPO = { fondo: "Fondo", cursor: "Puntero", tema: "Tema", marco: "Marco", efecto: "Efecto" };
+const NOMBRE_TIPO = { fondo: "Fondo", cursor: "Puntero", tema: "Tema", marco: "Marco", efecto: "Efecto", dedo: "Estela del dedo" };
 let catalogo = [];
 async function pintarPuesto() {
   const c = await api("/api/cosmeticos/");
@@ -145,19 +143,6 @@ $("fCurso").innerHTML = cursos.map((c) => `<option value="${esc(c.slug)}">${esc(
 let guardado = {};
 try { guardado = (await api("/api/perfil/")).perfil; } catch {}
 
-async function pintarAvatares() {
-  let a = { libres: [], coleccion: [] };
-  try { a = await api("/api/avatares/"); } catch {}
-  const op = (e, extra = "") => `<button type="button" class="av-op${e === avatar ? " on" : ""}${extra}" data-e="${esc(e)}" role="radio" aria-checked="${e === avatar}" aria-label="Avatar ${esc(AVATARES[e]?.nombre || "inicial")}" title="${esc(AVATARES[e]?.nombre || "Tu inicial")}">${avatarSVG(e, 44) || `<span class="av-ini">${esc(user.nombre.charAt(0).toUpperCase())}</span>`}</button>`;
-  $("avatares").innerHTML = op("") + a.libres.map((e) => op(e)).join("") + a.coleccion.map((e) => op(e, " rara")).join("");
-}
-$("avatares").onclick = (e) => {
-  const b = e.target.closest("[data-e]"); if (!b) return;
-  avatar = b.dataset.e;
-  $("avatares").querySelectorAll(".av-op").forEach((x) => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-checked", on); });
-  cabecera();
-};
-
 function abrirForma(abrir) {
   forma.hidden = !abrir;
   $("editar").setAttribute("aria-expanded", String(abrir));
@@ -168,9 +153,8 @@ function abrirForma(abrir) {
     $("fMeta").value = String(p.meta_minutos);
     $("fRol").value = guardado.rol || "estudiante";
     $("fNivel").value = guardado.nivel || "cero";
-    pintarAvatares();
     $("fNombre").focus();
-  } else { avatar = user.avatar || ""; cabecera(); }
+  } else cabecera();
 }
 $("editar").onclick = () => abrirForma(forma.hidden);
 $("cancelar").onclick = () => abrirForma(false);
@@ -179,13 +163,13 @@ forma.onsubmit = async (e) => {
   try {
     const r = await api("/api/ajustes/", {
       nombre: $("fNombre").value, alias: $("fAlias").value, curso: $("fCurso").value, meta: Number($("fMeta").value),
-      rol: $("fRol").value, nivel: $("fNivel").value, avatar,
+      rol: $("fRol").value, nivel: $("fNivel").value,
     });
     Object.assign(user, r.user);
     guardado = { ...guardado, rol: $("fRol").value, nivel: $("fNivel").value, curso: $("fCurso").value };
     forma.hidden = true; $("editar").setAttribute("aria-expanded", "false");
     cabecera();
-    const chip = document.querySelector(".yo-chip");   // la foto/avatar de la barra lateral también cambia
+    const chip = document.querySelector(".yo-chip");   // la foto de la barra lateral también cambia
     if (chip?.firstElementChild) chip.firstElementChild.outerHTML = fotoDe(user, { tam: 34 });
     aviso("Perfil actualizado");
   } catch (x) { aviso(x.message, true); }

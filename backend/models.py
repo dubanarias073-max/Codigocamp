@@ -62,6 +62,8 @@ class UserWorkspace(db.Model):
     carpetas = db.Column(TextoJSON, nullable=False, default=list)
     git = db.Column(TextoJSON, nullable=False, default=dict)
     actualizado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+    # Clave del enlace «en vivo» (/live/<clave>/…), como Live Server: null = apagado. Se puede cambiar para cortar el acceso.
+    live_clave = db.Column(db.String(24), nullable=True, index=True)
 
 
 class WorkspaceFile(db.Model):
@@ -107,6 +109,7 @@ class Profile(db.Model):
     nivel_previo = db.Column(db.String(10), nullable=False, default="")
     curso_actual_id = db.Column(db.Integer, db.ForeignKey("cursos.id", ondelete="SET NULL", onupdate="CASCADE", name="fk_perfiles_curso_actual"), nullable=True)
     meta_minutos = db.Column(db.SmallInteger, nullable=False, default=10)
+    zona_horaria = db.Column(db.String(64), nullable=True)  # la detecta el dispositivo (p. ej. America/Bogota)
     onboarding_completo = db.Column(db.Boolean, nullable=False, default=False)
     tema = db.Column(db.Enum("auto", "claro", "oscuro", name="tema"), nullable=False, default="auto")
     alias = db.Column(db.String(20), unique=True, nullable=True)
@@ -362,6 +365,7 @@ class EquippedCosmetics(db.Model):
     tema = db.Column(db.String(30), nullable=True)
     marco = db.Column(db.String(30), nullable=True)
     efecto = db.Column(db.String(30), nullable=True)
+    dedo = db.Column(db.String(30), nullable=True)  # estela del dedo (celular)
 
 
 class OpenedChest(db.Model):

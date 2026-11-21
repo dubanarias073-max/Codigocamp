@@ -21,7 +21,7 @@ def amigos():
     for friendship in friendships:
         other = friendship.a_usuario if friendship.de_usuario_id == current_user.id else friendship.de_usuario
         item = {"id": friendship.id, "nombre": other.nombre, "alias": other.profile.alias if other.profile else "",
-                "avatar": (other.profile.avatar or "") if other.profile else "", "foto": foto_url(other.id), "marco": equipados_de(other.id)["marco"]}
+                "avatar": "", "foto": foto_url(other.id), "marco": equipados_de(other.id)["marco"]}
         if friendship.estado == "aceptada":
             last = Message.query.filter_by(amistad_id=friendship.id).order_by(Message.id.desc()).first()
             unread = Message.query.filter(
@@ -36,7 +36,7 @@ def amigos():
             sent.append(item)
     friends.sort(key=lambda item: -item["orden"])
     return jsonify(
-        yo={"nombre": current_user.nombre, "alias": profile.alias, "codigo": profile.codigo, "avatar": profile.avatar or "", "foto": foto_url(current_user.id), "marco": equipados_de(current_user.id)["marco"]},
+        yo={"nombre": current_user.nombre, "alias": profile.alias, "codigo": profile.codigo, "avatar": "", "foto": foto_url(current_user.id), "marco": equipados_de(current_user.id)["marco"]},
         amigos=friends, recibidas=received, enviadas=sent,
     )
 
@@ -59,7 +59,7 @@ def usuarios_buscar():
         otro = f.a_usuario_id if f.de_usuario_id == current_user.id else f.de_usuario_id
         relacion[otro] = "amigo" if f.estado == "aceptada" else ("enviada" if f.de_usuario_id == current_user.id else "recibida")
     return jsonify(resultados=[{
-        "nombre": p.user.nombre, "alias": p.alias, "avatar": p.avatar or "", "foto": foto_url(p.usuario_id), "relacion": relacion.get(p.usuario_id),
+        "nombre": p.user.nombre, "alias": p.alias, "avatar": "", "foto": foto_url(p.usuario_id), "relacion": relacion.get(p.usuario_id),
     } for p in filas if p.alias])
 
 

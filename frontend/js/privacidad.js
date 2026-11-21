@@ -76,9 +76,15 @@ async function hayRestosDeOtros(actual) {
   return false;
 }
 
+/** Después de que el servidor revocó la sesión: borra lo local (copias, sesión de GitHub, widget) y va al login. */
+export async function terminarSesionLocal() {
+  try { window.CodigoCampApp?.desconectarWidget(); } catch { /* fuera de la app */ }
+  await borrarDatosLocales();
+  location.replace("/pages/login.html");
+}
+
 /** Cierra la sesión y limpia este navegador. `todas`: también en los demás dispositivos. */
 export async function salir(api, { todas = false } = {}) {
   try { await api(todas ? "/api/sesiones/cerrar-todas/" : "/api/auth/logout/", {}); } catch { /* igual salimos */ }
-  await borrarDatosLocales();
-  location.href = "/pages/login.html";
+  await terminarSesionLocal();
 }

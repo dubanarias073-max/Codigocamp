@@ -527,34 +527,28 @@ sudo docker exec -it codigocamp-mysql mysql -u root -p'12345'             # root
 
 > ⚠️ Comandos que **nunca** debes usar en esta máquina porque afectan a otros proyectos: `sudo docker system prune`, `sudo docker volume prune`, `sudo docker rm -f $(sudo docker ps -aq)`, `sudo tailscale funnel reset`, `sudo tailscale serve reset`.
 
-## 📱 Despliegue del Widget de Android (APK)
+## 📱 App de Android (APK): CódigoCamp + widget
 
-El botón **«App del widget para Android (APK)»** en la sección de Configuración aparece automáticamente cuando el archivo compilado existe en la ruta `frontend/descargas/` del servidor.
+Desde la versión 0.6 hay **una sola app** (`apps/android`): abre CódigoCamp completo con su propia sesión e incluye el widget de racha.
+El widget usa la sesión de la app, así que no se desconecta solo: solo deja de mostrar datos si cierras sesión.
 
 ### 1. Compilar el APK en GitHub Actions
-1. Asegúrate de tener actualizado el archivo `.github/workflows/android-widget.yml` en la rama principal.
-2. Ve a la pestaña **Actions** del repositorio en GitHub y selecciona el flujo **Widget de Android**.
-3. Espera a que la ejecución finalice correctamente (**✅**, tarda entre 3 y 5 minutos).
-4. Entra a la ejecución completada, baja hasta la sección **Artifacts** y descarga **`CodigoCamp-Widget-apk`**.
-5. Descomprime el archivo `.zip` para obtener **`CodigoCamp-Widget.apk`**.
+1. (Una vez) En GitHub: **Settings → Secrets and variables → Actions → Variables → New variable**: `CODIGOCAMP_URL` = `https://codigocamp.taila41f89.ts.net` (la dirección que abre la app).
+2. Sube los cambios (`git push`). El flujo **App de Android** (`.github/workflows/android.yml`) arranca solo; también con **Run workflow**.
+3. Espera el ✅ (3 a 5 minutos), entra a la ejecución y descarga **`CodigoCamp-apk`** en *Artifacts*.
+4. Descomprime el `.zip`: sale **`CodigoCamp.apk`**.
 
 ### 2. Subir el APK al servidor (VM)
-Abre una terminal en la carpeta donde descomprimiste el archivo y transfiérelo a la máquina virtual mediante `scp`:
+```bash
+mkdir -p ~/Codigocamp/frontend/descargas/          # en la VM, si no existe
+scp CodigoCamp.apk sofianieto@10.12.19.82:~/Codigocamp/frontend/descargas/            # red local
+scp CodigoCamp.apk sofianieto@<IP_TAILSCALE_VM>:~/Codigocamp/frontend/descargas/      # por Tailscale
+rm -f ~/Codigocamp/frontend/descargas/CodigoCamp-Widget.apk                            # en la VM: el APK viejo ya no se usa
+```
+No hace falta reiniciar Flask. El botón **«Descargar la app para Android»** aparece en la portada (página de inicio) y en Configuración → App y widgets.
 
-* **Desde la red local:**
-  ```bash
-  scp CodigoCamp-Widget.apk sofianieto@10.12.19.82:~/Codigocamp/frontend/descargas/
-  ```
-
-* **Desde fuera de la red (usando Tailscale):**
-  ```bash
-  scp CodigoCamp-Widget.apk sofianieto@<IP_TAILSCALE_VM>:~/Codigocamp/frontend/descargas/
-  ```
-
-> **Nota:** Si la carpeta destino no existe en la VM, créala previamente ejecutando `mkdir -p ~/Codigocamp/frontend/descargas/`. No es necesario reiniciar Flask después de subir el archivo.
-
-### 3. Instalación y vinculación en Android
-1. En el celular, abre **CódigoCamp → Configuración → App y widgets**.
-2. Toca el botón **«App del widget para Android (APK)»**, descarga e instala la aplicación (autorizando la instalación desde fuentes externas si Android lo solicita).
-3. Regresa a la misma pantalla con tu sesión iniciada y pulsa **🤖 Conectar widget de Android** para enlazar tu cuenta automáticamente.
-4. Mantén presionada la pantalla de inicio del teléfono **→ Widgets → CódigoCamp** y arrástralo al escritorio.
+### 3. Instalar en el celular
+1. Toca **«Descargar la app para Android»** y abre `CodigoCamp.apk` (permite instalar apps de esta fuente si Android lo pide).
+2. Si tenías **«CódigoCamp Widget»** (la app vieja), desinstálala.
+3. Abre **CódigoCamp** e inicia sesión.
+4. Mantén pulsada la pantalla de inicio → **Widgets → CódigoCamp** y arrástralo.

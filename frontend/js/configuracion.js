@@ -1,5 +1,5 @@
 // Lógica de configuracion.html: cuenta, aprendizaje, apariencia, seguridad (contraseña y dispositivos), correos, instalar la app y sesión.
-import { salir } from "./privacidad.js";
+import { salir, terminarSesionLocal } from "./privacidad.js";
 import { iniciar, api, esc, aviso, aplicarTema, aplicarCosmeticos } from "/js/app.js";
 import { vistaPrevia } from "/js/cosmeticos.js";
 import { estadoInstalacion, instalar } from "/js/pwa.js";
@@ -81,7 +81,7 @@ $("movimiento").onchange = () => {
   document.documentElement.classList.toggle("cc-menos-mov", $("movimiento").checked);
   aplicarCosmeticos(user.cosmeticos || {});
 };
-const TIPOS = { fondo: "Fondo", cursor: "Puntero", tema: "Tema de color", marco: "Marco", efecto: "Efecto" };
+const TIPOS = { fondo: "Fondo", cursor: "Puntero", tema: "Tema de color", marco: "Marco", efecto: "Efecto", dedo: "Estela del dedo" };
 async function pintarPuestos() {
   const c = await api("/api/cosmeticos/");
   user.cosmeticos = c.equipados;
@@ -137,7 +137,7 @@ $("sesiones").addEventListener("click", async (e) => {
   if (!confirm(actual ? "¿Cerrar la sesión en este dispositivo?" : "¿Cerrar la sesión en ese dispositivo? Quedará fuera al instante.")) return;
   try {
     const r = await api(`/api/sesiones/${b.dataset.sesion}`, undefined, "DELETE");
-    if (r.era_esta) { location.href = "/pages/login.html"; return; }
+    if (r.era_esta) { await terminarSesionLocal(); return; }
     aviso("Listo: ese dispositivo ya no tiene tu sesión.");
     pintarSesiones();
   } catch (x) { aviso(x.message, true); }
@@ -166,12 +166,13 @@ $("instalar").onclick = async () => { await instalar(); pintarInstalar(); };
 
 // Widgets en cualquier sistema: usan la sesión que ya está abierta (siguen funcionando hasta que se cierre sesión).
 {
-  const esAndroid = /Android/.test(navigator.userAgent);
   let enlaces = null;
   const pedir = async () => (enlaces ??= await api("/api/widget/conectar/"));
+  const enLaApp = !!window.CodigoCampApp;
   pedir().then((e) => {
-    if (esAndroid) { $("wgAndroid").href = e.android; $("wgAndroid").hidden = false; }
-    $("wgApk").hidden = !e.apk;   // el botón del APK solo aparece si el archivo está en frontend/descargas/
+    // El botón de la app solo aparece si el APK está en frontend/descargas/ (y no si ya estás en la app)
+    $("wgApk").hidden = !e.apk || enLaApp;
+    if (enLaApp) $("wgEstado").textContent = "✓ Estás en la app: el widget de Android ya usa esta sesión.";
   }).catch((x) => { $("wgEstado").textContent = x.message; });
   $("wgCopiar").onclick = async () => {
     try { const e = await pedir(); await navigator.clipboard.writeText(e.pagina); aviso("Enlace del widget copiado"); }

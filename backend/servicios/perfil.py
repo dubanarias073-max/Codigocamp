@@ -2,7 +2,7 @@
 import re
 import secrets
 import unicodedata
-from datetime import date, timedelta, timezone
+from datetime import timedelta, timezone
 
 from sqlalchemy import func
 
@@ -35,7 +35,7 @@ def serialize_user(user, profile):
     return {
         "id": user.id, "nombre": user.nombre, "email": user.email,
         "onboarding": profile.onboarding_completo, "tema": profile.tema,
-        "alias": profile.alias, "codigo": profile.codigo, "avatar": profile.avatar or "",
+        "alias": profile.alias, "codigo": profile.codigo, "avatar": "",
         "desde": user.creado_en.date().isoformat(),
         **_extras(user.id),
     }
@@ -106,7 +106,8 @@ def lose_life(profile):
 
 
 def update_streak(profile):
-    today = date.today()
+    from servicios.zona import hoy_de
+    today = hoy_de(profile)   # el día donde está la persona (su dispositivo), no el del servidor
     if profile.ultima_actividad == today:
         return
     days = (today - profile.ultima_actividad).days if profile.ultima_actividad else None
@@ -171,7 +172,8 @@ def award_xp(profile, amount, levels=0, perfect=False):
     update_streak(profile)
     profile.xp += amount
     profile.xp_total += amount
-    today = date.today()
+    from servicios.zona import hoy_de
+    today = hoy_de(profile)
     activity = DailyActivity.query.filter_by(usuario_id=profile.usuario_id, fecha=today).first()
     if not activity:
         activity = DailyActivity(usuario_id=profile.usuario_id, fecha=today, xp=0, niveles=0, perfectos=0)

@@ -1,10 +1,10 @@
-"""Cosméticos (fondos de página, punteros, temas de color, marcos de foto y efectos) y los 10 cofres de recompensas.
+"""Cosméticos (fondos de página, punteros, temas de color, marcos de foto, efectos y estelas del dedo) y los 10 cofres.
 
 El aspecto de cada cosmético vive en frontend/js/cosmeticos.js; aquí solo su clave, tipo, precio y rareza.
 Los «exclusivos» no se venden: solo salen de los cofres.
 """
 
-TIPOS = ("fondo", "cursor", "tema", "marco", "efecto")
+TIPOS = ("fondo", "cursor", "tema", "marco", "efecto", "dedo")
 
 COSMETICOS = [
     # ---- Fondos de página
@@ -56,6 +56,14 @@ COSMETICOS = [
     {"clave": "efecto_monedas", "tipo": "efecto", "nombre": "Lluvia de monedas", "precio": 650, "rareza": "epico", "descripcion": "Cada clic hace saltar monedas de oro."},
     {"clave": "efecto_rayos", "tipo": "efecto", "nombre": "Descarga eléctrica", "precio": 800, "rareza": "epico", "descripcion": "Chispas eléctricas en cada clic."},
     {"clave": "efecto_fuegos", "tipo": "efecto", "nombre": "Fuegos artificiales", "precio": 2000, "rareza": "legendario", "descripcion": "Cada clic es un fuego artificial de colores."},
+    # ---- Estelas del dedo (para el celular: siguen tu dedo al tocar y deslizar la pantalla)
+    {"clave": "dedo_tinta", "tipo": "dedo", "nombre": "Tinta", "precio": 70, "rareza": "comun", "descripcion": "Gotas de tinta azul que siguen tu dedo."},
+    {"clave": "dedo_burbujas", "tipo": "dedo", "nombre": "Burbujas", "precio": 90, "rareza": "comun", "descripcion": "Deslizas y salen burbujas que flotan hacia arriba."},
+    {"clave": "dedo_neon", "tipo": "dedo", "nombre": "Trazo neón", "precio": 220, "rareza": "raro", "descripcion": "Una línea de luz cian que dibuja por donde pasas."},
+    {"clave": "dedo_codigo", "tipo": "dedo", "nombre": "Rastro de código", "precio": 260, "rareza": "raro", "descripcion": "Caen llaves, etiquetas y ceros y unos al deslizar."},
+    {"clave": "dedo_arcoiris", "tipo": "dedo", "nombre": "Arcoíris", "precio": 520, "rareza": "epico", "descripcion": "Tu dedo pinta una cinta con todos los colores."},
+    {"clave": "dedo_fuego", "tipo": "dedo", "nombre": "Dedo de fuego", "precio": 680, "rareza": "epico", "descripcion": "Llamas y brasas que suben por donde tocas."},
+    {"clave": "dedo_galaxia", "tipo": "dedo", "nombre": "Polvo de galaxia", "precio": 1900, "rareza": "legendario", "descripcion": "Estrellas y polvo cósmico de colores con cada toque."},
     # ---- Exclusivos de cofre (no se venden)
     {"clave": "cursor_estrella", "tipo": "cursor", "nombre": "Estrella fugaz", "precio": 0, "rareza": "raro", "exclusivo": True, "descripcion": "Exclusivo del cofre «Racha de 3 días»."},
     {"clave": "fondo_cuadricula", "tipo": "fondo", "nombre": "Cuadrícula neón", "precio": 0, "rareza": "raro", "exclusivo": True, "descripcion": "Exclusivo del cofre «100 XP»."},

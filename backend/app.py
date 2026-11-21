@@ -25,14 +25,14 @@ from seguridad import configurar_seguridad  # noqa: E402
 def _crear_tablas_nuevas(app):
     """Crea las tablas que agregan las versiones nuevas si la base aún no las tiene (no toca las que ya existen).
     Así no hace falta ejecutar a mano migracion_archivos.sql. Si MySQL no está encendido, se intentará al reiniciar."""
-    from models import AIConversation, AIMessage, AppliedMigration, Attachment, UserSession, EmailSettings, EquippedCosmetics, KnownDevice, OpenedChest, OwnedCosmetic, ProfilePhoto, TermsAcceptance, WorkspaceFile
+    from models import AIConversation, AIMessage, AppliedMigration, Attachment, UserSession, EmailSettings, EquippedCosmetics, KnownDevice, OpenedChest, OwnedCosmetic, Profile, ProfilePhoto, TermsAcceptance, UserWorkspace, WorkspaceFile
     try:
         with app.app_context():
             from servicios.workbench import reparar
             cambios = reparar(db.engine)
             if cambios:
                 app.logger.info("Base ajustada para el diagrama de MySQL Workbench: %s", "; ".join(cambios))
-            nuevos = (WorkspaceFile, KnownDevice, EmailSettings, OwnedCosmetic, EquippedCosmetics, OpenedChest, ProfilePhoto, Attachment, AppliedMigration, UserSession, AIConversation, AIMessage, TermsAcceptance)
+            nuevos = (Profile, UserWorkspace, WorkspaceFile, KnownDevice, EmailSettings, OwnedCosmetic, EquippedCosmetics, OpenedChest, ProfilePhoto, Attachment, AppliedMigration, UserSession, AIConversation, AIMessage, TermsAcceptance)
             for modelo in nuevos:
                 modelo.__table__.create(bind=db.engine, checkfirst=True)
             from servicios.workbench import agregar_columnas

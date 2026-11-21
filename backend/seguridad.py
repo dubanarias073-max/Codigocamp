@@ -60,6 +60,22 @@ def configurar_seguridad(app):
                 return api_error("La sesión de seguridad venció. Recarga la página e inténtalo otra vez.", 403)
         return None
 
+    @app.before_request
+    def guardar_zona_horaria():
+        """La zona horaria la detecta el dispositivo (cabecera X-Zona-Horaria): se guarda en el perfil si cambió
+        (la usan los correos de racha y los widgets, que no pasan por el navegador)."""
+        if not request.path.startswith("/api/") or not request.headers.get("X-Zona-Horaria"):
+            return None
+        from flask_login import current_user
+        if not current_user.is_authenticated:
+            return None
+        from models import Profile
+        from servicios.zona import guardar_de_peticion
+        perfil = Profile.query.filter_by(usuario_id=current_user.id).first()
+        if guardar_de_peticion(perfil):
+            db.session.commit()
+        return None
+
     @app.after_request
     def set_csrf_cookie(response):
         token = session.get("_csrf_token")

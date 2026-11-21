@@ -40,3 +40,4 @@
 .abrir-sub{margin:4px 0 0;color:var(--sub);font-size:14px}
 .premio-xp{display:grid;place-items:center;border-radius:50%;background:#fbbf24;color:#3b2500;font-weight:900;font-size:12px}
 .cofre-mini{width:58px;height:52px;flex:none}
+.vista-dedo{background:var(--panel2);touch-action:none;user-select:none}

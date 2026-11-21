@@ -87,13 +87,33 @@
               </div>
               <small>Con un archivo abierto, <kbd>Ctrl + Enter</kbd> lo ejecuta.</small>
             </section>
+            <div class="sash sash-vista" id="sashVista" role="separator" aria-orientation="vertical" aria-label="Cambiar el ancho de la vista previa" tabindex="0" hidden></div>
             <section class="vista-panel" id="panelVista" hidden aria-label="Vista previa del proyecto">
               <div class="vista-cab">
+                <div class="vista-nav">
+                  <button type="button" class="icono-btn" id="vistaAtras" title="Atrás" aria-label="Página anterior" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  <button type="button" class="icono-btn" id="vistaAdelante" title="Adelante" aria-label="Página siguiente" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  <button type="button" class="icono-btn" id="vistaRecargar" title="Recargar la vista previa" aria-label="Recargar la vista previa"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></button>
+                </div>
+                <label class="vista-paginas" id="vistaPaginasCaja" title="Ver otra página de tu proyecto"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 1.5h6l3 3v10h-9z M9.5 1.5v3h3" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><select id="vistaPaginas" aria-label="Página que se muestra"></select></label>
                 <span id="vistaRuta">Vista previa</span>
                 <form class="vista-url" id="vistaUrlForm" hidden><input id="vistaUrl" spellcheck="false" autocomplete="off" aria-label="Dirección del servidor"><button type="submit" class="icono-btn" title="Ir" aria-label="Ir">↵</button></form>
-                <button type="button" class="icono-btn" id="vistaRecargar" title="Recargar la vista previa" aria-label="Recargar la vista previa"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></button>
+                <div class="vista-acciones">
+                  <button type="button" class="vista-vivo on" id="vistaVivo" aria-pressed="true" title="En vivo: la vista se recarga sola cuando cambias tus archivos (como Live Server)"><i></i><span>En vivo</span></button>
+                  <button type="button" class="icono-btn" id="vistaTamano" title="Tamaño: ajustar al panel" aria-label="Cambiar el tamaño de la pantalla"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="8.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 14h5M8 11.5V14" stroke="currentColor" stroke-width="1.2"/></svg></button>
+                  <button type="button" class="icono-btn" id="vistaLado" title="Ver al lado del código" aria-label="Ver al lado del código" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 2.5v11" stroke="currentColor" stroke-width="1.2"/></svg></button>
+                  <button type="button" class="icono-btn" id="vistaExterna" title="Abrir en otra pestaña del navegador (se actualiza en vivo)" aria-label="Abrir en otra pestaña"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5L7.5 8.5M12 9.5v4H2.5V4h4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  <button type="button" class="icono-btn" id="vistaCerrar" title="Cerrar la vista previa" aria-label="Cerrar la vista previa" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+                </div>
               </div>
-              <iframe id="vista" title="Vista previa del proyecto" sandbox="allow-scripts allow-popups allow-forms"></iframe>
+              <div class="live-pop" id="livePop" hidden role="dialog" aria-label="Abrir en el navegador">
+                <b>Abre tu página en cualquier navegador</b>
+                <p>Como Live Server: los enlaces entre tus páginas funcionan y se recarga sola cuando guardas. Sirve en tu celular o para mostrársela a alguien.</p>
+                <div class="live-url"><input id="liveUrl" readonly aria-label="Dirección de tu página"><button type="button" class="btn sm" id="liveCopiar">Copiar</button></div>
+                <div class="live-btns"><a class="btn pri sm" id="liveAbrir" href="#" target="_blank" rel="noopener">Abrir en otra pestaña</a><button type="button" class="btn sm ghost" id="liveCambiar" title="El enlace anterior deja de funcionar">Cambiar enlace</button></div>
+                <small>Cualquiera con el enlace puede ver la página (no tu cuenta). Funciona con HTML, CSS y JavaScript; las apps de React/Vite o con backend de Python se ven aquí en la vista previa.</small>
+              </div>
+              <div class="vista-marco" id="vistaMarco"><iframe id="vista" title="Vista previa del proyecto" sandbox="allow-scripts allow-popups allow-forms"></iframe></div>
             </section>
           </div>
         </section>

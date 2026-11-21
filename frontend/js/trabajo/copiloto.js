@@ -19,6 +19,56 @@ export function extraerCambios(respuesta) {
   return { texto, cambios: lista, resumen: typeof datos?.resumen === "string" ? datos.resumen.slice(0, 300) : "" };
 }
 
+/**
+ * Aplica ediciones precisas {buscar, reemplazar} sobre el texto actual (la IA solo toca lo pedido; el resto queda igual).
+ * «buscar» debe estar UNA vez. Si no aparece idéntico, se prueba ignorando los espacios al inicio/fin de cada línea
+ * (la IA a veces cambia la indentación) y se conserva la indentación original del archivo.
+ * Devuelve { texto } o { error }.
+ */
+export function aplicarEdiciones(original, ediciones) {
+  if (!Array.isArray(ediciones) || !ediciones.length) return { error: "no trae ediciones" };
+  let texto = original;
+  const nl = original.includes("\r\n") ? "\r\n" : "\n";
+  for (const [n, ed] of ediciones.entries()) {
+    const buscar = typeof ed?.buscar === "string" ? ed.buscar.replace(/\r\n/g, "\n") : "";
+    const reemplazar = typeof ed?.reemplazar === "string" ? ed.reemplazar.replace(/\r\n/g, "\n") : null;
+    if (!buscar.trim() || reemplazar === null) return { error: `la edición ${n + 1} está incompleta` };
+    const base = texto.replace(/\r\n/g, "\n");
+    const veces = base.split(buscar).length - 1;
+    if (veces === 1) { texto = base.replace(buscar, () => reemplazar).replace(/\n/g, nl); continue; }
+    if (veces > 1) return { error: `la edición ${n + 1} coincide en ${veces} lugares (no se sabe cuál cambiar)` };
+    // Sin coincidencia exacta: comparar línea por línea sin los espacios de los bordes
+    const lineas = base.split("\n"), buscadas = buscar.split("\n");
+    while (buscadas.length && !buscadas[buscadas.length - 1].trim()) buscadas.pop();
+    while (buscadas.length && !buscadas[0].trim()) buscadas.shift();
+    const limpia = buscadas.map((l) => l.trim());
+    const halladas = [];
+    for (let i = 0; i + limpia.length <= lineas.length; i++) {
+      if (limpia.every((l, k) => lineas[i + k].trim() === l)) halladas.push(i);
+    }
+    if (halladas.length !== 1) return { error: halladas.length ? `la edición ${n + 1} coincide en ${halladas.length} lugares` : `no se encontró en el archivo el texto de la edición ${n + 1} (¿la IA lo copió mal?)` };
+    const i = halladas[0];
+    // Re-indentar: la diferencia de sangría entre lo que la IA escribió y lo que hay en el archivo se aplica al reemplazo
+    const sangria = (l) => l.match(/^[ \t]*/)[0];
+    const real = sangria(lineas[i]), ia = sangria(buscadas[0]);
+    const nuevas = reemplazar.split("\n").map((l) => (l.trim() && l.startsWith(ia) ? real + l.slice(ia.length) : l));
+    lineas.splice(i, limpia.length, ...nuevas);
+    texto = lineas.join(nl);
+  }
+  return { texto };
+}
+
+/** Cuántas líneas cambian entre dos textos (aproximado: líneas que ya no están o que son nuevas), para avisar si la IA reescribió de más. */
+export function lineasCambiadas(a, b) {
+  const x = a.split(/\r?\n/), y = b.split(/\r?\n/);
+  const cuenta = (lista) => { const m = new Map(); for (const l of lista) m.set(l, (m.get(l) || 0) + 1); return m; };
+  const mx = cuenta(x), my = cuenta(y);
+  let quitadas = 0, nuevas = 0;
+  for (const [l, n] of mx) quitadas += Math.max(0, n - (my.get(l) || 0));
+  for (const [l, n] of my) nuevas += Math.max(0, n - (mx.get(l) || 0));
+  return { cambiadas: Math.max(quitadas, nuevas), total: Math.max(x.length, y.length) };
+}
+
 /** Valida los cambios contra el proyecto. Devuelve { validos: [{accion, ruta, contenido, antes, nuevo}], errores: [texto] } */
 export function validarCambios(cambios, py) {
   const validos = [], errores = [];
@@ -33,13 +83,23 @@ export function validarCambios(cambios, py) {
     if (c.accion === "borrar") {
       if (antes === undefined) { errores.push(`${ruta} no existe (no hace falta borrarlo)`); continue; }
       validos.push({ accion: "borrar", ruta, antes, nuevo: false });
+    } else if (c.accion === "editar" || ((c.accion === "modificar" || c.accion === "escribir") && Array.isArray(c.ediciones))) {
+      if (antes === undefined) { errores.push(`${ruta} no existe (para crearlo hay que usar «crear»)`); continue; }
+      if (esMarcador(antes)) { errores.push(`${ruta} es un archivo binario (imagen, video…); la IA no puede editarlo`); continue; }
+      const r = aplicarEdiciones(antes, c.ediciones);
+      if (r.error) { errores.push(`${ruta}: ${r.error}. Pídele a la IA que lo intente otra vez.`); continue; }
+      if (r.texto === antes) continue;
+      validos.push({ accion: "escribir", ruta, contenido: r.texto, antes, nuevo: false, ediciones: c.ediciones.length });
     } else if (c.accion === "escribir" || c.accion === "crear" || c.accion === "modificar") {
       if (typeof c.contenido !== "string") { errores.push(`${ruta}: falta el contenido`); continue; }
       if (c.contenido.length > MAX_CONTENIDO) { errores.push(`${ruta}: el contenido es demasiado grande`); continue; }
       if (esMarcador(antes)) { errores.push(`${ruta} es un archivo binario (imagen, video…); la IA no puede reescribirlo`); continue; }
       if (FS.esCarpeta(py, ruta)) { errores.push(`${ruta} es una carpeta`); continue; }
       if (antes === c.contenido) continue;
-      validos.push({ accion: "escribir", ruta, contenido: c.contenido, antes: antes ?? null, nuevo: antes === undefined });
+      // Reescribir un archivo existente entero: se marca para avisar si cambia mucho más de lo esperable
+      const dif = antes !== undefined ? lineasCambiadas(antes, c.contenido) : null;
+      const reescritura = !!dif && dif.total >= 10 && dif.cambiadas / dif.total > 0.4;
+      validos.push({ accion: "escribir", ruta, contenido: c.contenido, antes: antes ?? null, nuevo: antes === undefined, reescritura });
     } else errores.push(`${ruta}: acción desconocida «${String(c?.accion).slice(0, 20)}»`);
   }
   if ((cambios || []).length > MAX_CAMBIOS) errores.push(`Solo se revisan los primeros ${MAX_CAMBIOS} archivos.`);

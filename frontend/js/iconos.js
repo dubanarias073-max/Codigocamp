@@ -37,6 +37,7 @@ const DIBUJOS = {
   marco: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5.5"/><path d="M12 1.5v3m0 15v3M1.5 12h3m15 0h3"/>',
   efecto: '<path d="M12 3v4m0 10v4M3 12h4m10 0h4M5.6 5.6l2.8 2.8m7.2 7.2 2.8 2.8m0-12.8-2.8 2.8m-7.2 7.2-2.8 2.8"/>',
   potenciador: '<path d="m13 2-9 12h7l-1 8 10-13h-7l1-7Z"/>',
+  dedo: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M10 18h4"/><path d="M9 10c1.5-2 4.5-2 6 0M8 7c2.5-3 5.5-3 8 0"/>',
   avatar: '<circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/><path d="M8.5 14.5c2 2 5 2 7 0M6 5 4 2m14 3 2-3"/>',
   coleccion: '<path d="M4 8h16v12H4z"/><path d="M8 8V5a4 4 0 0 1 8 0v3M4 12h16"/>',
   check: '<path d="m5 12 4 4L19 6"/>',

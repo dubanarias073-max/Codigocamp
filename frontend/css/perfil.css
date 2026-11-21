@@ -94,3 +94,6 @@
 .hero-in .cab-t .titulo-pag{margin:0;line-height:1.1}
 .hero-in .hero-acc{padding-top:64px;align-self:center}
 @media (max-width:640px){.hero-in .cab-t,.hero-in .hero-acc{padding-top:0}}
+
+.vista-dedo{background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--cy) 12%,var(--panel2)),var(--panel2));font-size:12px;user-select:none;-webkit-user-select:none;touch-action:none}
+.vista-dedo{text-align:center;padding:6px}

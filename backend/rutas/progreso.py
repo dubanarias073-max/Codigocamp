@@ -1,6 +1,6 @@
 """Progreso general, lecciones hechas y desafíos del día y del mes."""
 import calendar
-from datetime import date, datetime, timedelta
+from datetime import timedelta
 
 from flask import Blueprint, jsonify
 from flask_login import current_user, login_required
@@ -43,8 +43,9 @@ def leccion_hecha():
 @bp.get("/api/desafios/")
 @login_required
 def desafios():
-    today = date.today()
-    now = datetime.now().astimezone()
+    from servicios.zona import ahora_de
+    now = ahora_de(get_profile(current_user))   # medianoche y «hoy» en la zona horaria de la persona
+    today = now.date()
     activity = DailyActivity.query.filter_by(usuario_id=current_user.id, fecha=today).first()
     completed = {item.clave for item in DailyChallenge.query.filter_by(usuario_id=current_user.id, fecha=today).all()}
     month = MonthChallenge.query.filter_by(usuario_id=current_user.id, mes=today.replace(day=1)).first()

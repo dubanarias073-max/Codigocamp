@@ -3,6 +3,7 @@
 // así el historial de deshacer no se mezcla entre archivos.
 import { extension } from "./fs.js";
 import { infoLenguaje, resaltar } from "./resaltado.js";
+import { fragmentoAPlano, sugerir } from "./autocompletar.js";
 
 const PARES = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'", "`": "`" };
 const CIERRES = new Set([")", "]", "}", '"', "'", "`"]);
@@ -36,8 +37,9 @@ export class Editor {
    * @param {(pos:{linea:number,col:number,seleccion:number})=>void} o.alCursor
    * @param {(accion:string)=>void} o.alAtajo   "guardar" | "ejecutar"
    */
-  constructor({ ruta, texto, alCambiar, alCursor, alAtajo }) {
-    Object.assign(this, { alCambiar, alCursor, alAtajo });
+  constructor({ ruta, texto, alCambiar, alCursor, alAtajo, archivos = () => ({}) }) {
+    Object.assign(this, { alCambiar, alCursor, alAtajo, archivos });
+    this.sug = null;
     this.ruta = ruta;
     this.ext = extension(ruta);
     this.lineas = 0;
@@ -51,6 +53,7 @@ export class Editor {
         <div class="ed-linea-activa"></div>
         <pre class="ed-hl" aria-hidden="true"><code></code></pre>
         <textarea class="ed-ta" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+        <ul class="ed-sug" role="listbox" aria-label="Sugerencias" hidden></ul>
       </div>`;
     this.$ = (s) => this.raiz.querySelector(s);
     this.ta = this.$(".ed-ta");
@@ -61,9 +64,17 @@ export class Editor {
     this.lineaActiva = this.$(".ed-linea-activa");
     this.ta.setAttribute("aria-label", `Editor de ${ruta}`);
     this.ta.value = texto;
-    this.ta.addEventListener("input", () => { this.#pintar(); this.alCambiar(this.ta.value); this.#cursor(); });
-    this.ta.addEventListener("keydown", (e) => this.#tecla(e));
-    this.ta.addEventListener("scroll", () => this.#sincronizar());
+    this.menu = this.$(".ed-sug");
+    this.ta.addEventListener("input", (e) => { this.#pintar(); this.alCambiar(this.ta.value); this.#cursor(); this.#trasEscribir(e); });
+    this.ta.addEventListener("keydown", (e) => { if (!this.#teclaSugerencias(e)) this.#tecla(e); });
+    // Teclados de celular que no mandan la tecla Enter: llega como «insertLineBreak».
+    this.ta.addEventListener("beforeinput", (e) => { if (this.sug && (e.inputType === "insertLineBreak" || e.inputType === "insertParagraph")) { e.preventDefault(); this.#aceptar(this.sug.sel); } });
+    this.ta.addEventListener("scroll", () => { this.#sincronizar(); this.#cerrarSugerencias(); });
+    this.ta.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== this.ta) this.#cerrarSugerencias(); }, 120));
+    this.ta.addEventListener("pointerdown", () => this.#cerrarSugerencias());
+    // Tocar una sugerencia la inserta (sin quitar el foco del editor, para que no se cierre el teclado del celular).
+    this.menu.addEventListener("pointerdown", (e) => e.preventDefault());
+    this.menu.addEventListener("click", (e) => { const li = e.target.closest("[data-i]"); if (li) this.#aceptar(Number(li.dataset.i)); });
     this.ta.addEventListener("focus", () => this.#cursor());
     this.alSeleccion = () => { if (document.activeElement === this.ta) this.#cursor(); };
     document.addEventListener("selectionchange", this.alSeleccion);
@@ -115,6 +126,100 @@ export class Editor {
     for (let i = 1; i < linea; i += 1) { const n = v.indexOf("\n", pos); if (n < 0) break; pos = n + 1; }
     this.ta.setSelectionRange(pos, pos);
     this.enfocar();
+  }
+
+  // ---- sugerencias (autocompletado) ----
+  #trasEscribir(e) {
+    if (this.insertando) return;
+    const escribio = e.inputType === "insertText" || e.inputType === "insertCompositionText";
+    const borro = e.inputType?.startsWith("delete");
+    if ((escribio && /[\w.$!#>*]$/.test(e.data ?? "")) || (borro && this.sug)) this.#sugerir();
+    else this.#cerrarSugerencias();
+  }
+
+  #sugerir() {
+    const { value: v, selectionStart: a, selectionEnd: b } = this.ta;
+    if (a !== b) { this.#cerrarSugerencias(); return; }
+    const inicio = v.lastIndexOf("\n", a - 1) + 1;
+    let archivos = [];
+    try { archivos = Object.entries(this.archivos() ?? {}); } catch { /* sin proyecto */ }
+    const { prefijo, items } = sugerir({ ext: this.ext, linea: v.slice(inicio, a), documento: v.length > 600_000 ? "" : v, ruta: this.ruta, archivos });
+    if (!items.length) { this.#cerrarSugerencias(); return; }
+    this.sug = { items: items.slice(0, 60), sel: 0, prefijo };
+    const ICONO = { kw: "🔑", fn: "ƒ", metodo: "ƒ", var: "𝑥", clase: "◆", mod: "📦", snip: "⧉", emmet: "⧉", prop: "•", palabra: "abc", tabla: "▦", columna: "▤", tipo: "T" };
+    this.menu.innerHTML = this.sug.items.map((x, i) => `<li role="option" data-i="${i}" class="t-${x.tipo}"><i>${ICONO[x.tipo] ?? "•"}</i><b></b><small></small></li>`).join("");
+    this.menu.querySelectorAll("li").forEach((li, i) => {
+      li.querySelector("b").textContent = this.sug.items[i].etiqueta;
+      li.querySelector("small").textContent = this.sug.items[i].detalle ?? "";
+    });
+    this.menu.hidden = false;
+    this.#marcar();
+    this.#ubicarMenu(inicio, a);
+  }
+
+  #ubicarMenu(inicio, a) {
+    const cs = getComputedStyle(this.ta);
+    const alto = parseFloat(getComputedStyle(this.raiz).getPropertyValue("--ed-lh")) || 21;
+    this.ctx ??= document.createElement("canvas").getContext("2d");
+    this.ctx.font = `${cs.fontSize} ${cs.fontFamily}`;
+    const ancho = this.ctx.measureText("M").width || 8.4;
+    const tab = Number(cs.tabSize) || 4;
+    let col = 0;
+    for (const ch of this.ta.value.slice(inicio, a - this.sug.prefijo)) col = ch === "\t" ? col + tab - (col % tab) : col + 1;
+    const linea = this.ta.value.slice(0, a).split("\n").length;
+    const area = this.ta.getBoundingClientRect();
+    let x = parseFloat(cs.paddingLeft) + col * ancho - this.ta.scrollLeft;
+    let y = parseFloat(cs.paddingTop) + linea * alto - this.ta.scrollTop + 2;
+    const w = Math.min(340, area.width - 8);
+    x = Math.max(4, Math.min(x - 26, area.width - w - 4));
+    const h = this.menu.offsetHeight || 200;
+    if (y + h > area.height && y - alto - h > 0) y = y - alto - h - 4;
+    Object.assign(this.menu.style, { left: `${x}px`, top: `${y}px`, width: `${w}px` });
+  }
+
+  #marcar() {
+    this.menu.querySelectorAll("li").forEach((li, i) => { li.classList.toggle("on", i === this.sug.sel); li.setAttribute("aria-selected", String(i === this.sug.sel)); });
+    this.menu.querySelector("li.on")?.scrollIntoView({ block: "nearest" });
+  }
+
+  #cerrarSugerencias() {
+    if (!this.sug) return;
+    this.sug = null;
+    this.menu.hidden = true;
+    this.menu.replaceChildren();
+  }
+
+  /** Teclas con la lista abierta: ↑ ↓ eligen, Enter o Tab insertan, Esc cierra. Devuelve true si la usó. */
+  #teclaSugerencias(e) {
+    if (!this.sug || e.altKey || e.ctrlKey || e.metaKey) return false;
+    const n = this.sug.items.length;
+    if (e.key === "ArrowDown") { this.sug.sel = (this.sug.sel + 1) % n; this.#marcar(); }
+    else if (e.key === "ArrowUp") { this.sug.sel = (this.sug.sel - 1 + n) % n; this.#marcar(); }
+    else if (e.key === "Enter" || e.key === "Tab") this.#aceptar(this.sug.sel);
+    else if (e.key === "Escape") this.#cerrarSugerencias();
+    else return false;
+    e.preventDefault();
+    return true;
+  }
+
+  #aceptar(i) {
+    const it = this.sug?.items[i];
+    if (!it) return;
+    const { prefijo } = this.sug;
+    this.#cerrarSugerencias();
+    const { value: v, selectionStart: a } = this.ta;
+    const inicio = v.lastIndexOf("\n", a - 1) + 1;
+    const sangria = /^[ \t]*/.exec(v.slice(inicio, a))[0];
+    const desde = a - prefijo;
+    this.insertando = true;
+    try {
+      if (it.snippet) {
+        const f = fragmentoAPlano(it.insertar, unidadDeIndentacion(this.ext), sangria);
+        reemplazar(this.ta, desde, a, f.texto);
+        this.ta.setSelectionRange(desde + f.desde, desde + f.hasta);
+      } else reemplazar(this.ta, desde, a, it.insertar);
+    } finally { this.insertando = false; }
+    this.#cursor();
   }
 
   destruir() {

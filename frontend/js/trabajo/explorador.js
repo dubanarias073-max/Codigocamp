@@ -5,6 +5,9 @@ import { chevron, iconoArchivo, iconoCarpeta } from "./iconos.js";
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+// En pantallas táctiles no se arrastra (choca con el toque largo y con el desplazamiento).
+const TACTIL = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+
 export class Explorador {
   /**
    * @param {object} o
@@ -30,6 +33,19 @@ export class Explorador {
     raiz.setAttribute("aria-label", "Archivos del proyecto");
     raiz.addEventListener("click", (e) => this.#clic(e));
     raiz.addEventListener("contextmenu", (e) => this.#menu(e));
+    // Celular: mantener pulsado un archivo o carpeta abre el menú (Renombrar, Eliminar…), como en el explorador del teléfono.
+    let toque = null;
+    const cancelarToque = () => { if (toque) { clearTimeout(toque.t); toque = null; } };
+    raiz.addEventListener("touchstart", (e) => {
+      const fila = e.target.closest(".fila[data-ruta]");
+      if (!fila || this.edicion || e.touches.length > 1 || e.target.closest(".fila-mas")) return;
+      const { clientX: x, clientY: y } = e.touches[0];
+      cancelarToque();
+      toque = { x, y, t: setTimeout(() => { toque = null; this.yaMenu = Date.now(); navigator.vibrate?.(15); this.abrirMenu(fila.dataset.ruta, x, y); }, 550) };
+    }, { passive: true });
+    raiz.addEventListener("touchmove", (e) => { if (toque && Math.hypot(e.touches[0].clientX - toque.x, e.touches[0].clientY - toque.y) > 10) cancelarToque(); }, { passive: true });
+    raiz.addEventListener("touchend", cancelarToque);
+    raiz.addEventListener("touchcancel", cancelarToque);
     raiz.addEventListener("keydown", (e) => this.#tecla(e));
     raiz.addEventListener("dragstart", (e) => { const f = e.target.closest(".fila"); if (!f || this.edicion) return e.preventDefault(); e.dataTransfer.setData("text/plain", f.dataset.ruta); e.dataTransfer.effectAllowed = "move"; });
     raiz.addEventListener("dragover", (e) => this.#arrastrarSobre(e));
@@ -90,7 +106,7 @@ export class Explorador {
       const NOMBRE_GIT = { M: "modificado", U: "sin seguimiento (nuevo)", A: "agregado", C: "en conflicto" };
       const marca = letra ? (f.tipo === "dir" ? `<span class="git-d" aria-label="contiene cambios">●</span>` : `<span class="git-d" title="${NOMBRE_GIT[letra]}">${letra === "C" ? "!" : letra}</span>`) : "";
       const icono = f.tipo === "dir" ? `${chevron}${iconoCarpeta(f.abierta)}` : `<span class="chev-vacio"></span>${iconoArchivo(f.ruta)}`;
-      return `<div class="${clases}" role="treeitem" aria-level="${f.nivel + 1}" ${f.tipo === "dir" ? `aria-expanded="${f.abierta}"` : ""} aria-selected="${f.ruta === this.seleccion}" data-ruta="${esc(f.ruta)}" data-tipo="${f.tipo}" draggable="true" style="--n:${f.nivel}" title="${esc(f.ruta)}${letra ? " · " + (f.tipo === "dir" ? "contiene cambios" : NOMBRE_GIT[letra]) : ""}">${icono}<span class="nom">${esc(f.nombre)}</span>${marca}</div>`;
+      return `<div class="${clases}" role="treeitem" aria-level="${f.nivel + 1}" ${f.tipo === "dir" ? `aria-expanded="${f.abierta}"` : ""} aria-selected="${f.ruta === this.seleccion}" data-ruta="${esc(f.ruta)}" data-tipo="${f.tipo}" draggable="${!TACTIL}" style="--n:${f.nivel}" title="${esc(f.ruta)}${letra ? " · " + (f.tipo === "dir" ? "contiene cambios" : NOMBRE_GIT[letra]) : ""}">${icono}<span class="nom">${esc(f.nombre)}</span>${marca}<button type="button" class="fila-mas" tabindex="-1" aria-label="Acciones de ${esc(f.nombre)}" title="Renombrar, eliminar…"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12.5" cy="8" r="1.3" fill="currentColor"/></svg></button></div>`;
     }).join("");
     this.raiz.innerHTML = html || '<p class="arbol-vacio">No hay archivos.<br>Usa los botones de arriba para crear uno.</p>';
     this.raiz.classList.toggle("vacio", !html);
@@ -136,6 +152,14 @@ export class Explorador {
 
   #clic(e) {
     if (this.edicion) return;
+    const mas = e.target.closest(".fila-mas");
+    if (mas) {
+      e.stopPropagation();
+      const r = mas.getBoundingClientRect();
+      this.abrirMenu(mas.closest(".fila").dataset.ruta, r.left, r.bottom);
+      return;
+    }
+    if (this.yaMenu && Date.now() - this.yaMenu < 800) return;   // soltar el dedo tras el toque largo no abre el archivo
     const fila = e.target.closest(".fila");
     if (!fila) { this.seleccion = null; this.render(); return; }
     const { ruta, tipo } = fila.dataset;
@@ -180,8 +204,13 @@ export class Explorador {
   // ----------------------------------------------------------- menú contextual ----
   #menu(e) {
     e.preventDefault();
+    if (this.yaMenu && Date.now() - this.yaMenu < 800) return;   // el toque largo ya abrió el menú
     const fila = e.target.closest(".fila[data-ruta]");
-    const ruta = fila?.dataset.ruta ?? null;
+    this.abrirMenu(fila?.dataset.ruta ?? null, e.clientX, e.clientY);
+  }
+
+  /** Menú de un archivo o carpeta (o del espacio vacío si ruta es null). Lo usan el clic derecho, el botón ⋯ y el toque largo. */
+  abrirMenu(ruta, x, y) {
     if (ruta) this.seleccionar(ruta, { desplazar: false });
     else { this.seleccion = null; this.render(); }
     const py = this.proyecto();
@@ -200,7 +229,7 @@ export class Explorador {
         { texto: "Renombrar", atajo: "F2", fn: () => this.renombrar(ruta) },
         { texto: "Eliminar", atajo: "Supr", peligro: true, fn: () => this.eliminar(ruta) });
     }
-    menuContextual(e.clientX, e.clientY, items);
+    menuContextual(x, y, items);
   }
 
   // --------------------------------------------------------- crear / renombrar ----

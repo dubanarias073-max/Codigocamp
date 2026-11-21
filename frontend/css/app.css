@@ -366,3 +366,12 @@ img,video,canvas,svg{max-width:100%}
   .inf-i{padding:6px 0}.inf-i .nav-icon{width:20px;height:20px}
 }
 @media(max-height:560px) and (max-width:700px){.inf{padding-top:4px;padding-bottom:calc(4px + env(safe-area-inset-bottom,0px))}}
+
+/* Barra de abajo del celular un poco más grande (íconos y zona para tocar) */
+@media(max-width:900px){
+  .inf{padding:8px 4px calc(8px + env(safe-area-inset-bottom,0px))}
+  .inf-i{max-width:76px;min-height:52px;padding:12px 0;display:grid;place-items:center}
+  .inf-i .nav-icon{width:27px;height:27px}
+}
+@media(max-width:360px){.inf-i .nav-icon{width:24px;height:24px}.inf-i{min-height:48px;padding:10px 0}}
+@media(max-height:560px) and (max-width:700px){.inf-i{min-height:40px;padding:6px 0}.inf-i .nav-icon{width:22px;height:22px}}

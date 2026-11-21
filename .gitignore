@@ -7,8 +7,8 @@ venv/
 staticfiles/
 .DS_Store
 backend/almacen_archivos/
-apps/android-widget/.gradle/
-apps/android-widget/build/
-apps/android-widget/app/build/
-apps/android-widget/local.properties
+apps/android/.gradle/
+apps/android/build/
+apps/android/app/build/
+apps/android/local.properties
 *.apk

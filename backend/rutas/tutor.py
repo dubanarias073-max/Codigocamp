@@ -101,15 +101,33 @@ Cómo respondes:
 
 COPILOTO = """
 MODO COPILOTO ACTIVADO: el alumno te dio permiso para proponer cambios en los archivos de su proyecto de Trabajo.
-Cuando pida crear, modificar, arreglar o borrar archivos, explica brevemente qué vas a cambiar y AL FINAL agrega exactamente un bloque así:
+
+ANTES DE CAMBIAR NADA, analiza el archivo: lee el contenido actual que tienes arriba y ubica EXACTAMENTE las líneas que
+hay que tocar. Tu trabajo es un cambio QUIRÚRGICO:
+- Cambia SOLO lo que el alumno pidió o el error que hay que arreglar. Nada más.
+- NO cambies diseño, estilos, colores, clases, textos, nombres de variables, estructura, orden, comentarios, formato,
+  indentación ni comillas de lo que no tiene que ver con el pedido. NO «mejores», «limpies» ni «modernices» nada que no se pidió.
+- Si el pedido es «arregla la contraseña del login», solo se toca lo de la contraseña: el resto del HTML/CSS queda idéntico.
+- Si hay que tocar varios sitios, haz una edición pequeña por cada sitio.
+
+Explica en 1 a 3 frases qué vas a cambiar y por qué, y AL FINAL agrega exactamente un bloque así:
 ```cc-cambios
 {"resumen": "qué cambia, en una frase", "cambios": [
-  {"accion": "escribir", "ruta": "carpeta/archivo.ext", "contenido": "EL CONTENIDO COMPLETO Y FINAL DEL ARCHIVO"},
+  {"accion": "editar", "ruta": "carpeta/archivo.ext", "ediciones": [
+     {"buscar": "texto EXACTO que hoy está en el archivo (unas pocas líneas completas, copiadas tal cual)", "reemplazar": "cómo deben quedar esas líneas"}
+  ]},
+  {"accion": "crear", "ruta": "carpeta/nuevo.ext", "contenido": "contenido completo del archivo NUEVO"},
   {"accion": "borrar", "ruta": "archivo/que/sobra.ext"}
 ]}
 ```
-Reglas del bloque: JSON válido (escapa comillas y saltos de línea como \\n), rutas relativas al proyecto como aparecen en la lista, siempre el
-contenido COMPLETO de cada archivo que escribas (no fragmentos ni «...»), solo los archivos necesarios. Nada se aplica sin que el alumno lo acepte.
+Reglas del bloque:
+- Para archivos que YA existen usa SIEMPRE «editar». «buscar» debe copiarse carácter por carácter del archivo actual (mismos espacios,
+  tabulaciones y saltos de línea), incluir solo las líneas necesarias más 1 o 2 líneas vecinas para que sea único en el archivo,
+  y no repetirse. Si hay que agregar algo nuevo, usa como «buscar» la línea junto a la que va y ponla también en «reemplazar».
+- «crear» solo para archivos que no existen. Nunca reescribas un archivo existente completo, salvo que el alumno lo pida con esas palabras
+  (en ese caso usa {"accion": "escribir", "ruta": ..., "contenido": ...}).
+- JSON válido (escapa comillas y saltos de línea como \\n). Rutas relativas al proyecto como aparecen en la lista. Nada se aplica sin que
+  el alumno lo acepte.
 Si solo pregunta o no hace falta cambiar archivos, NO incluyas el bloque."""
 
 
@@ -309,7 +327,7 @@ def tutor():
     modelo = current_app.config["GEMINI_MODEL"]
     payload = json.dumps({
         "systemInstruction": {"parts": [{"text": sistema}]}, "contents": contents,
-        "generationConfig": {"temperature": 0.4 if copiloto else 0.6, "maxOutputTokens": 16384 if copiloto else 8192},
+        "generationConfig": {"temperature": 0.15 if copiloto else 0.6, "maxOutputTokens": 16384 if copiloto else 8192},
     }).encode()
     try:
         result, modelo = generar(payload, api_key, modelo)

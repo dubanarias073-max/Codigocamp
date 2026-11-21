@@ -5,9 +5,19 @@ from flask_login import current_user, login_required
 from models import Attachment, Message, db
 from rutas.adjuntos import publico, tomar
 from servicios.amistades import my_friendships
-from utilidades import api_error, json_body, local_time, parse_integer, too_many
+from utilidades import api_error, json_body, parse_integer, too_many
+from servicios.zona import hora_local, iso
 
 bp = Blueprint("chat", __name__)
+
+
+def _perfil_zona():
+    """Perfil de quien pide (para la hora de los mensajes en su zona horaria)."""
+    from flask import g
+    from models import Profile
+    if "cc_perfil_zona" not in g:
+        g.cc_perfil_zona = Profile.query.filter_by(usuario_id=current_user.id).first() if current_user.is_authenticated else None
+    return g.cc_perfil_zona
 
 
 @bp.route("/api/chat/<int:friendship_id>/", methods=["GET", "POST"])
@@ -48,5 +58,5 @@ def chat(friendship_id):
             adj.setdefault(a.mensaje_id, []).append(publico(a))
     return jsonify(mensajes=[{
         "id": message.id, "texto": message.texto, "yo": message.autor_id == current_user.id,
-        "hora": local_time(message.creado_en), "adjuntos": adj.get(message.id, []),
+        "hora": hora_local(message.creado_en, _perfil_zona()), "fecha": iso(message.creado_en), "adjuntos": adj.get(message.id, []),
     } for message in messages])

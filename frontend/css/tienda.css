@@ -88,3 +88,6 @@
 .producto.rareza-legendario::after{content:"";position:absolute;inset:-60% -30%;background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.35) 50%,transparent 60%);transform:translateX(-60%);animation:brillo-leg 4.5s ease-in-out infinite;pointer-events:none}
 @keyframes brillo-leg{0%,70%{transform:translateX(-60%)}100%{transform:translateX(60%)}}
 @media (prefers-reduced-motion:reduce){.producto.rareza-legendario::after{animation:none}}
+
+/* Estelas del dedo: la tarjeta es una zona para tocar y deslizar */
+.vista-dedo{background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--cy) 12%,var(--panel2)),var(--panel2));font-size:12px;cursor:crosshair;user-select:none;-webkit-user-select:none;touch-action:none}

@@ -175,7 +175,8 @@ Compress-Archive backend\almacen_archivos $HOME\almacen_archivos-respaldo.zip -F
 | `SMTP_USERNAME`, `SMTP_APP_PASSWORD`, `SMTP_FROM` | — | Cuenta Gmail y contraseña de aplicación para envío de correos. |
 | `SMTP_PORT`, `SMTP_SERVER` | `587`, automático | Configuración SMTP (`587` TLS o `465` con `SMTP_SSL=1`). |
 | `APP_URL` | `http://localhost:5000` | Dirección base usada en los enlaces de correos (recuperar contraseña, avisos de racha). |
-| `RECORDATORIOS_AUTO` | `1` | Envía avisos automáticos de racha a las 18:00 y 21:00 (`0` los desactiva). |
+| `RECORDATORIOS_AUTO` | `1` | Envía avisos automáticos de racha a las 18:00 y 21:00 **en la hora de cada persona** (`0` los desactiva). |
+| `ZONA_HORARIA` | `America/Bogota` | Zona usada solo si un dispositivo todavía no mandó la suya. Cada persona usa la zona que detecta su propio celular o computador. |
 | `ALMACEN_ARCHIVOS` | `backend/almacen_archivos` | Carpeta local de fotos de perfil, adjuntos y proyectos de Trabajo. |
 | `CUOTA_ARCHIVOS_GB`, `MAX_ARCHIVO_MB` | `10`, `1024` | Cuota máxima por cuenta y tamaño límite por archivo subido. |
 | `BD_EXTERNAS` | igual a `DEBUG` | En local (`1`) permite que tus apps en **Trabajo** se conecten a tu MySQL de XAMPP. |
@@ -224,7 +225,9 @@ Ejecútalos dentro de `backend` con el entorno virtual activado (`venv\Scripts\a
 
 ### Cuenta, gamificación e IA
 - **Seguridad:** Inicio de sesión con correo o Google, recuperación de clave con tokens de 30 minutos y cierre remoto de sesiones activas en **Configuración → Seguridad**.
-- **Motivación:** Rachas diarias, escudos salvarrachas (máx. 2), encargos diarios, cofres de sección y de logro, tienda de cosméticos (temas, marcos, punteros, fondos animados) y perfil personalizable.
+- **Motivación:** Rachas diarias, escudos salvarrachas (máx. 2), encargos diarios, cofres de sección y de logro, tienda de cosméticos (temas, marcos, punteros, fondos animados, efectos y **estelas del dedo para el celular**) y perfil personalizable.
+- **Zona horaria:** «Hoy», la racha, las metas, los avisos de racha y las horas de los chats usan la zona horaria que detecta el dispositivo de cada persona (Bogotá, Madrid…), no la del servidor.
+- **Cerrar sesión de verdad:** cerrar sesión revoca la sesión en el servidor (la cookie y el token del widget dejan de servir). Con «Cerrar aquí» o «Cerrar en todos los dispositivos» además se olvidan esos dispositivos: al volver a entrar llega el correo «Nuevo inicio de sesión».
 - **Social e IA:** Chat entre amigos con envío de archivos (hasta 1 GB) y tutor virtual con Gemini con historial persistente.
 
 ---
@@ -236,10 +239,13 @@ Ejecútalos dentro de `backend` con el entorno virtual activado (`venv\Scripts\a
 | Función | Descripción |
 |---|---|
 | **Editor Monaco** | Mismo motor de VS Code con múltiples pestañas, búsqueda global (`Ctrl+Shift+F`) y paleta de comandos (`Ctrl+Shift+P`). |
+| **Vista previa (como Live Server)** | Se abre **al lado del código** (o como pestaña) y se **recarga sola** mientras escribes, sin perder dónde ibas. Tiene selector de páginas, atrás/adelante, tamaño celular/tableta y el botón ↗ **Abrir en el navegador**: una dirección real `https://<tu-servidor>/live/<clave>/index.html` que funciona en cualquier navegador o celular, con los enlaces entre páginas, el CSS, el JS y las imágenes, y que también se recarga sola al guardar. La página corre aislada (no puede usar la cuenta de quien la abre) y con «Cambiar enlace» el anterior deja de funcionar. |
+| **Autocompletado** | Como en VS Code: mientras escribes aparece la lista de sugerencias y **Enter** (o Tab) inserta la elegida. Python, Java, C/C++, C#, PHP, SQL (con las tablas y columnas de tus `CREATE TABLE`), Go, Rust, Ruby, Kotlin, Swift y Bash, además del IntelliSense de JS/TS/HTML/CSS. Incluye fragmentos (`def`, `for`, `main`, `sout`, `log`, `mysql`…), Emmet en HTML (`!`, `ul>li*3`, `div.caja`) y los nombres de tu proyecto. Funciona también en el celular. |
 | **Terminal y Git** | Terminal Bash simulada (`ls`, `cd`, `cat`, `python`, `npm`, `pip`, `git`), clonación, ramas, commits, merges y `git push` directo a GitHub. |
 | **Entornos y servidores** | Soporte para entornos virtuales (`.venv`), vistas previas de FastAPI/Flask/Django y aplicaciones React + Vite. |
 | **Bases de datos** | En local (`DEBUG=1`) se conecta directamente a tu MySQL de XAMPP; si MySQL está apagado, crea automáticamente una base SQLite funcional en `.codigocamp/bd/`. |
-| **Asistente IA** | Propone cambios sobre tus archivos de código con vista previa para aceptar o rechazar cada modificación. |
+| **Asistente IA** | Propone cambios sobre tus archivos con vista previa para aceptar o rechazar cada uno. Primero analiza el archivo y hace **ediciones puntuales** (solo las líneas del error o de lo que pediste: no toca el diseño ni lo demás). Si una propuesta reescribe casi todo un archivo, la marca con ⚠️. |
+| **Celular** | Pestañas Archivos · Código · Terminal · IA. Para renombrar o **eliminar** un archivo o carpeta: botón **⋯** de la fila o mantener pulsado. |
 
 ### 6.1 Iniciar sesión con GitHub (`git push`)
 
@@ -260,11 +266,15 @@ Ejecútalos dentro de `backend` con el entorno virtual activado (`venv\Scripts\a
 
 ---
 
-## 8. Instalar como app y widgets
+## 8. App de Android, instalar como app y widgets
 
-- **Escritorio (Windows / macOS / Linux):** Abre `http://localhost:5000` en Chrome o Edge y haz clic en el ícono de instalar (`⊕`) en la barra de direcciones.
-- **Widgets en Windows 11:** Tras instalar la app con Edge, presiona **Windows + W → `+` → CódigoCamp** para añadir los widgets de racha y meta diaria.
-- **Widget flotante / iOS / Android:** Disponible desde **Configuración → App y widgets** usando la misma sesión activa.
+- **App de Android (una sola app):** `apps/android` es CódigoCamp completo (con su propia sesión) **más** el widget de racha. El widget usa la sesión de la app: se conecta solo al iniciar sesión y se desconecta al cerrarla.
+  1. En GitHub: **Actions → App de Android** → la última ejecución con ✅ → *Artifacts* → `CodigoCamp-apk`. (La dirección del servidor sale de la variable `CODIGOCAMP_URL` del repositorio: *Settings → Secrets and variables → Actions → Variables*; si no existe, la de `apps/android/gradle.properties`.)
+  2. Copia `CodigoCamp.apk` en `frontend/descargas/`. Aparece el botón **«Descargar la app para Android»** en la portada (página de inicio) y en Configuración.
+  3. Si tenías la app vieja «CódigoCamp Widget», desinstálala.
+- **Escritorio (Windows / macOS / Linux):** abre CódigoCamp en Chrome o Edge y haz clic en instalar (`⊕`) en la barra de direcciones.
+- **Widgets en Windows 11:** tras instalar con Edge, **Windows + W → `+` → CódigoCamp**.
+- **Widget flotante / iPhone (Scriptable):** en **Configuración → App y widgets**, con la sesión iniciada.
 
 ---
 

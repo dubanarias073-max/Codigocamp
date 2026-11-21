@@ -17,7 +17,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 async function cargar() {
   $("recargar").disabled = true;
   try {
-    const r = await fetch(`/api/widget/${token ? `?t=${encodeURIComponent(token)}` : ""}`, { credentials: token ? "omit" : "same-origin", cache: "no-store" });
+    const r = await fetch(`/api/widget/${token ? `?t=${encodeURIComponent(token)}` : ""}`, { credentials: token ? "omit" : "same-origin", cache: "no-store", headers: { "X-Zona-Horaria": Intl.DateTimeFormat().resolvedOptions().timeZone || "" } });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(d.error || `Error ${r.status}`), { estado: r.status });
     datos = d;

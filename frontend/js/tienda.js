@@ -2,18 +2,18 @@
 import { iniciar, api, esc, aviso, actualizarStats, aplicarCosmeticos } from "/js/app.js";
 import { iconoSVG } from "/js/iconos.js";
 import { vistaPrevia } from "/js/cosmeticos.js";
-import { avatarSVG } from "/js/avatares.js";
 const { user } = await iniciar("tienda");
 const $ = (id) => document.getElementById(id);
 const RAREZA = { comun: "Común", raro: "Raro", epico: "Épico", legendario: "Legendario" };
-const COSMETICO = new Set(["fondo", "cursor", "tema", "marco", "efecto"]);
+const COSMETICO = new Set(["fondo", "cursor", "tema", "marco", "efecto", "dedo"]);
+const TACTIL = matchMedia("(pointer: coarse)").matches;
 const AYUDA = {
   fondo: "El fondo se ve detrás de todas las páginas. Prueba cómo queda con «Probar».",
-  cursor: "Pasa el mouse sobre la tarjeta para probar el puntero.",
+  cursor: TACTIL ? "Los punteros se ven cuando usas mouse (en el computador). En el celular prueba «Para el celular»." : "Pasa el mouse sobre la tarjeta para probar el puntero.",
   tema: "Cambia el color de botones, barras y enlaces en todo CódigoCamp.",
   marco: "Un aro alrededor de tu foto de perfil: se ve en tu perfil, en los chats y en la barra lateral.",
   efecto: "Haz clic en la vista previa para ver el efecto.",
-  avatar: "Avatares ilustrados para tu perfil, los chats y la barra lateral. Se usan cuando no tienes foto (elígelo en Perfil → Editar).",
+  dedo: "Estelas para el celular: siguen tu dedo cuando tocas y deslizas la pantalla. Pruébalas tocando y deslizando sobre cada tarjeta.",
   potenciador: "Vidas, salvarrachas, XP y cofres sorpresa.",
   coleccion: "Todo lo que tienes. Ponte o quítate cada cosmético cuando quieras. Los exclusivos salen de los cofres de Recompensas.",
 };
@@ -26,7 +26,7 @@ function boton(i) {
     const puesto = equipados[i.tipo] === i.clave;
     return `<button class="bj${puesto ? " puesto" : ""}" type="button" data-equipar="${esc(i.clave)}" data-tipo="${i.tipo}">${puesto ? `${iconoSVG("check", "btn-ic")} Puesto · quitar` : "Ponérmelo"}</button>`;
   }
-  if (i.tuyo) return `<button class="bj" type="button" disabled>${iconoSVG("check", "btn-ic")} ${i.tipo === "avatar" ? "Tuyo · elígelo en Perfil" : "En tu colección"}</button>`;
+  if (i.tuyo) return `<button class="bj" type="button" disabled>${iconoSVG("check", "btn-ic")} En tu colección</button>`;
   if (i.exclusivo) return `<button class="bj" type="button" disabled>${iconoSVG("cofre", "btn-ic")} Solo en cofres</button>`;
   const falta = i.precio - saldo;
   if (falta > 0) return `<button class="bj" type="button" disabled>${iconoMoneda} ${i.precio} · te faltan ${falta}</button>`;
@@ -37,9 +37,9 @@ function tarjeta(i) {
   const cos = COSMETICO.has(i.tipo);
   return `<div class="tarjeta producto rareza-${esc(i.rareza)}${i.tuyo ? " tuyo" : ""}${cos ? " cosmetico" : ""}" data-clave="${esc(i.clave)}" data-tipo="${esc(i.tipo)}">
     <span class="producto-rango">${esc(RAREZA[i.rareza] || "Común")}</span>
-    ${cos ? `<div class="vista vista-${i.tipo}" data-prev="${esc(i.clave)}"></div>` : i.tipo === "avatar" && avatarSVG(i.icono) ? `<div class="vista vista-avatar">${avatarSVG(i.icono, 76)}</div>` : `<span class="ic ic-${esc(i.rareza)}">${iconoSVG(i.clave, "producto-icon")}</span>`}
+    ${cos ? `<div class="vista vista-${i.tipo}" data-prev="${esc(i.clave)}"></div>` : `<span class="ic ic-${esc(i.rareza)}">${iconoSVG(i.clave, "producto-icon")}</span>`}
     <h3>${esc(i.nombre)}</h3><small>${esc(i.descripcion)}</small>
-    ${cos && i.tipo !== "cursor" && i.tipo !== "efecto" ? `<button type="button" class="probar" data-probar="${esc(i.clave)}" data-tipo="${i.tipo}">${probando?.clave === i.clave ? "Dejar de probar" : "Probar"}</button>` : ""}
+    ${cos && !["cursor", "efecto", "dedo"].includes(i.tipo) ? `<button type="button" class="probar" data-probar="${esc(i.clave)}" data-tipo="${i.tipo}">${probando?.clave === i.clave ? "Dejar de probar" : "Probar"}</button>` : ""}
     ${boton(i)}</div>`;
 }
 
@@ -51,9 +51,8 @@ function pintar() {
   document.querySelectorAll("#tabs [data-t]").forEach((b) => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
   $("ayudaTab").textContent = AYUDA[tab];
   let lista;
-  if (tab === "coleccion") lista = [...catalogo.filter((c) => c.tuyo), ...items.filter((i) => i.tipo === "avatar" && i.tuyo)];
+  if (tab === "coleccion") lista = catalogo.filter((c) => c.tuyo);
   else if (tab === "potenciador") lista = items.filter((i) => i.tipo === "potenciador" || i.tipo === "cofre");
-  else if (tab === "avatar") lista = items.filter((i) => i.tipo === "avatar");
   else {
     const enTienda = items.filter((i) => i.tipo === tab);
     const exclusivos = catalogo.filter((c) => c.tipo === tab && c.exclusivo).map((c) => ({ ...c, tipo: c.tipo }));
@@ -89,7 +88,7 @@ function confeti() {
 
 function mostrarCofre(clave, nombre, premio, cosmetico) {
   const caja = $("cofreCaja");
-  caja.innerHTML = `<div class="cofre-ic">${cosmetico ? `<div class="vista vista-${cosmetico}" id="cofrePrev"></div>` : avatarSVG(items.find((x) => x.clave === clave && x.tipo === "avatar")?.icono, 96) || iconoSVG(clave, "producto-icon")}</div><h2>${esc(nombre)}</h2>
+  caja.innerHTML = `<div class="cofre-ic">${cosmetico ? `<div class="vista vista-${cosmetico}" id="cofrePrev"></div>` : iconoSVG(clave, "producto-icon")}</div><h2>${esc(nombre)}</h2>
     <p class="cofre-prem">${premio ? esc(premio) : "¡Ya es tuyo!"}</p>
     <div class="cofre-btns">${cosmetico ? `<button class="btn pri" type="button" id="cofrePoner">Ponérmelo ya</button>` : ""}<button class="btn" type="button" id="cofreOk">¡Genial!</button></div>`;
   if (cosmetico) vistaPrevia($("cofrePrev"), clave, cosmetico);

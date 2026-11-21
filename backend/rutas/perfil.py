@@ -1,9 +1,9 @@
-"""Perfil del usuario, ajustes y avatares."""
+"""Perfil del usuario y ajustes."""
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from models import Course, Profile, Purchase, db
-from constantes import ALIAS_OK, AVATARES_LIBRES, PERMANENTES
+from models import Course, Profile, db
+from constantes import ALIAS_OK
 from servicios.perfil import _user, get_profile, progress
 from utilidades import api_error, json_body, parse_integer
 
@@ -86,13 +86,8 @@ def ajustes():
         if data["nivel"] not in Profile.NIVELES:
             return api_error("Ese nivel no es válido.")
         profile.nivel_previo = data["nivel"]
-    if "avatar" in data:
-        emoji = str(data["avatar"]).strip()
-        if emoji:
-            propios = {c.articulo.icono for c in Purchase.query.filter_by(usuario_id=current_user.id).all() if c.articulo.clave in PERMANENTES}
-            if emoji not in set(AVATARES_LIBRES) | propios:
-                return api_error("Ese avatar no está disponible. Los de colección se consiguen en la tienda.")
-        profile.avatar = emoji or None
+    if "avatar" in data:   # los avatares se retiraron: se queda la foto o la inicial
+        profile.avatar = None
     db.session.commit()
     return jsonify(user=_user(current_user), **progress(current_user))
 
@@ -100,8 +95,8 @@ def ajustes():
 @bp.get("/api/avatares/")
 @login_required
 def avatares():
-    propios = [c.articulo.icono for c in Purchase.query.filter_by(usuario_id=current_user.id).all() if c.articulo.clave in PERMANENTES]
-    return jsonify(libres=AVATARES_LIBRES, coleccion=list(dict.fromkeys(propios)))
+    """Los avatares se retiraron (se devolvieron los diamantes). Se deja la ruta para versiones viejas de la app."""
+    return jsonify(libres=[], coleccion=[])
 
 
 @bp.get("/api/terminos/")

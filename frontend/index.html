@@ -16,11 +16,13 @@
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/portada.css">
   <link rel="stylesheet" href="/css/index.css">
+  <link rel="stylesheet" href="/css/descargarapp.css">
 </head>
 <body>
   <header class="bar">
     <a class="logo" href="/"><img src="/img/logo-icon.png" alt="" width="38" height="38"><span class="logo-txt">codigocamp</span></a>
     <div class="userbar">
+      <span data-descargar-app="cabecera" hidden></span>
       <a class="btn ghost sm" href="/pages/login.html">Iniciar sesión</a>
       <a class="btn pri sm" href="/pages/registro.html">Crear cuenta</a>
     </div>
@@ -40,6 +42,7 @@
             <a class="btn grad" href="/pages/registro.html">Empezar a aprender</a>
             <a class="btn out" href="/pages/login.html">Ya tengo cuenta</a>
           </div>
+          <div id="app" data-descargar-app hidden></div>
           <ul class="chips-tec" aria-label="Qué vas a aprender">
             <li>HTML</li><li>CSS</li><li>JavaScript</li><li>Python</li><li>Java</li><li>SQL</li>
           </ul>
@@ -73,5 +76,6 @@
 
   <script src="/js/index.js"></script>
   <script type="module" src="/js/pwa.js"></script>
+  <script type="module" src="/js/descargarapp.js"></script>
 </body>
 </html>

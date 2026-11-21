@@ -14,7 +14,8 @@ import { ClienteArchivos, esMarcador } from "/js/trabajo/archivos.js";
 import { importarEn } from "/js/trabajo/importar.js";
 import { Entradas } from "/js/trabajo/entradas.js";
 import { VisorArchivo } from "/js/trabajo/visor.js";
-import { EditorMonaco, alCambiarProblemas, cargarMonaco, crearDiff, problemas, sincronizarModelos } from "/js/trabajo/monaco.js";
+import { registrarEnMonaco } from "/js/trabajo/autocompletar.js";
+import { EditorMonaco, alCambiarProblemas, cargarMonaco, crearDiff, monaco as monacoVivo, problemas, sincronizarModelos } from "/js/trabajo/monaco.js";
 import { abrirPaleta } from "/js/trabajo/paleta.js";
 import { abrirBuscador } from "/js/trabajo/buscar.js";
 import { PanelGit } from "/js/trabajo/gitpanel.js";
@@ -199,6 +200,8 @@ $("ide").style.setProperty("--alto-panel", `${ui.altoPanel}px`);
 // -------------------------------------------------------------------------------- editores ----
 const editores = new Map();
 const usarMonaco = await monacoListo;
+// Sugerencias mientras escribes (Python, Java, SQL, PHP, C…, fragmentos y Emmet), con lo que hay en tu proyecto.
+if (usarMonaco) registrarEnMonaco(monacoVivo, () => proyecto().files);
 
 function editorPara(ruta) {
   let ed = editores.get(ruta);
@@ -219,6 +222,7 @@ function editorPara(ruta) {
     },
     alCursor: (pos) => { if (ui.activo === ruta) pintarCursor(pos); },
     alAtajo: (accion) => manejarAtajo(accion),
+    archivos: () => proyecto().files,
   });
   editores.set(ruta, ed);
   $("editores").appendChild(ed.raiz);
@@ -268,7 +272,7 @@ let paginaVista = null;
 function activar(ruta, { enfocar = true } = {}) {
   for (const ed of editores.values()) if (!ed.raiz.hidden) ed.ocultar();
   ui.activo = ruta;
-  $("panelVista").hidden = ruta !== VISTA;
+  $("panelVista").hidden = ruta !== VISTA && !ladoActivo();
   $("bienvenida").hidden = ruta !== null;
   if (ruta === VISTA) renderVista();
   else if (ruta) {
@@ -348,13 +352,13 @@ async function mostrarServidor(url, peticion = {}) {
   } catch (e) {
     if (turno !== turnoServidor) return;
     const u = new URL(url);
-    $("vista").srcdoc = `<p style="font:14px system-ui;padding:24px;color:#555"><b>No se puede acceder a ${u.host}</b><br><br>${e.message.replace(/</g, "&lt;")}.<br>Enciende tu API en la terminal: <code>fastapi dev main.py</code>, <code>uvicorn main:app --reload</code> o <code>flask --app app run</code>.</p>`;
+    ponerVista(`<p style="font:14px system-ui;padding:24px;color:#555"><b>No se puede acceder a ${u.host}</b><br><br>${e.message.replace(/</g, "&lt;")}.<br>Enciende tu API en la terminal: <code>fastapi dev main.py</code>, <code>uvicorn main:app --reload</code> o <code>flask --app app run</code>.</p>`);
     return;
   }
   if (turno !== turnoServidor) return;
   urlServidor = actual;
   $("vistaUrl").value = actual;
-  $("vista").srcdoc = vistaDeRespuesta({ url: actual, ...r });
+  ponerVista(vistaDeRespuesta({ url: actual, ...r }));
 }
 $("vistaUrlForm").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -400,7 +404,8 @@ function guardarAlmacen(raiz, tipo, datos) {
   tGuardarVista = setTimeout(() => { try { localStorage.setItem(ALMACEN_VISTA, JSON.stringify(almacenVista)); } catch { /* lleno */ } }, 300);
 }
 function mostrarDireccion(url) {
-  try { const u = new URL(url); $("vistaRuta").textContent = `Vista previa · ${u.pathname}${u.search}${u.hash}`; $("vistaRuta").title = url; } catch { /* nada */ }
+  try { const u = new URL(url); $("vistaRuta").textContent = `${u.pathname}${u.search}${u.hash}`; $("vistaRuta").title = url; } catch { /* nada */ }
+  anotarHistorial(url);
 }
 /** Lo que pide la página (un script, una hoja de estilos, una imagen) a una dirección virtual. */
 async function obtenerVirtual(py, raiz, proxy, url) {
@@ -462,13 +467,14 @@ async function navegarVista(url) {
   mostrarDireccion(url);
   try {
     const html = await htmlDeDireccion(url);
-    if (turno === turnoVista) $("vista").srcdoc = html;
+    if (turno === turnoVista) ponerVista(html);
   } catch (e) {
-    if (turno === turnoVista) $("vista").srcdoc = `<p style="font:14px system-ui;padding:24px;color:#555"><b>No se pudo abrir ${new URL(url).pathname}</b><br><br>${String(e.message).replace(/</g, "&lt;")}.<br>¿Está encendido tu backend en otra terminal? (por ejemplo: cd backend && fastapi dev app.py)</p>`;
+    if (turno === turnoVista) ponerVista(`<p style="font:14px system-ui;padding:24px;color:#555"><b>No se pudo abrir ${new URL(url).pathname}</b><br><br>${String(e.message).replace(/</g, "&lt;")}.<br>¿Está encendido tu backend en otra terminal? (por ejemplo: cd backend && fastapi dev app.py)</p>`);
   }
 }
 
 function renderVista() {
+  modoServidor(Boolean(urlServidor));
   if (urlServidor) { mostrarServidor(urlServidor); return; }
   if (remotoVista && urlVirtual) { navegarVista(urlVirtual); return; }
   $("vistaRuta").hidden = false;
@@ -477,12 +483,13 @@ function renderVista() {
   const py = proyecto();
   paginaVista = paginaPrincipal(py, paginaVista);
   if (!paginaVista) {
-    $("vista").srcdoc = '<p style="font:14px system-ui;padding:24px;color:#555">Crea un archivo <b>.html</b> (por ejemplo index.html) para ver aquí tu página.</p>';
+    ponerVista('<p style="font:14px system-ui;padding:24px;color:#555">Crea un archivo <b>.html</b> (por ejemplo index.html) para ver aquí tu página.</p>');
     $("vistaRuta").textContent = "Vista previa";
     return;
   }
-  panel.limpiarConsola();
-  $("vistaRuta").textContent = `Vista previa · ${paginaVista}`;
+  if (!enVivo.recargando) panel.limpiarConsola();
+  $("vistaRuta").textContent = paginaVista;
+  pintarPaginas();
   const turno = ++turnoVista;
   const pagina = paginaVista;
   const hayImagenes = Object.values(py.files).some(esMarcador);
@@ -490,7 +497,7 @@ function renderVista() {
     const mapa = hayImagenes ? await archivos.enlaces(py) : new Map();
     let modulos = null;
     if (usaModulos(py, pagina)) {
-      if (turno === turnoVista) $("vista").srcdoc = '<p style="font:14px system-ui;padding:24px;color:#555">Preparando los módulos (JSX, TypeScript y paquetes)…</p>';
+      if (turno === turnoVista && !enVivo.recargando) ponerVista('<p style="font:14px system-ui;padding:24px;color:#555">Preparando los módulos (JSX, TypeScript y paquetes)…</p>');
       try {
         modulos = await modulosDePagina(py, pagina, { transpilar: transpilarModulo, enlaces: mapa });
         for (const e of modulos.errores) panel.escribirConsola("error", e);
@@ -512,11 +519,11 @@ function pintarVista(py, pagina, mapa, modulos = null) {
     if (!url || resolverDestino(py, raiz, url, proxyDeVite(py, raiz)).ruta !== pagina) url = urlDeArchivo(raiz, pagina);
     urlVirtual = url;
     mostrarDireccion(url);
-    $("vista").srcdoc = construirVistaPrevia(py, pagina, { imagenes: mapa, modulos, proxy: proxyDeVite(py, raiz), virtual: { url, almacen: almacenDe(raiz) } });
+    ponerVista(construirVistaPrevia(py, pagina, { imagenes: mapa, modulos, proxy: proxyDeVite(py, raiz), virtual: { url, almacen: almacenDe(raiz) } }));
   } catch (error) {
     // Nunca una página en blanco sin explicación.
     const msg = String(error?.message || error).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-    $("vista").srcdoc = `<p style="font:14px system-ui;padding:24px;color:#b91c1c">No se pudo construir la vista previa: ${msg}</p>`;
+    ponerVista(`<p style="font:14px system-ui;padding:24px;color:#b91c1c">No se pudo construir la vista previa: ${msg}</p>`);
     panel.escribirConsola("error", `No se pudo construir la vista previa: ${error?.message || error}`);
   }
 }
@@ -529,14 +536,208 @@ function abrirVista(preferida = null) {
   paginaVista = pagina;
   remotoVista = null;
   urlVirtual = urlDeArchivo(raizVista(py, pagina), pagina);
+  // Como Live Server: en el computador la página se abre al lado del código (o como pestaña, si lo prefieres).
+  if (ui.modoVista !== "pestana" && !MOVIL.matches) { ui.vistaAbierta = true; aplicarLado(); renderVista(); guardarUI(); return; }
   if (!ui.abiertos.includes(VISTA)) ui.abiertos.push(VISTA);
   activar(VISTA);
 }
+
+// ------------------------------------------------------- vista previa como Live Server ----
+// · Al lado del código (pantalla dividida, con un divisor para cambiar el ancho) o como pestaña.
+// · En vivo: se recarga sola cuando cambias tus archivos, sin perder dónde ibas (scroll).
+// · Selector de páginas, atrás / adelante, tamaño de pantalla (celular, tableta) y un enlace para abrirla en
+//   cualquier navegador (/live/<clave>/…, ver backend/rutas/live.py).
+const enVivo = { t: 0, recargando: false, scroll: { pagina: null, y: 0 } };
+const vistaVisible = () => !$("panelVista").hidden;
+function ladoActivo() { return ui.modoVista !== "pestana" && Boolean(ui.vistaAbierta) && !MOVIL.matches; }
+function aplicarLado() {
+  const on = ladoActivo();
+  $("areaEditor").classList.toggle("dividida", on);
+  $("areaEditor").style.setProperty("--ancho-vista", ui.anchoVista ? `${ui.anchoVista}px` : "50%");
+  $("sashVista").hidden = !on;
+  $("vistaCerrar").hidden = !on;
+  $("panelVista").hidden = !(on || ui.activo === VISTA);
+  $("vistaLado").setAttribute("aria-pressed", String(on));
+  $("vistaLado").title = on ? "Ver como pestaña" : "Ver al lado del código";
+  $("vistaLado").hidden = MOVIL.matches;
+}
+function cambiarModoVista() {
+  if (ladoActivo()) {
+    ui.modoVista = "pestana"; ui.vistaAbierta = false;
+    if (!ui.abiertos.includes(VISTA)) ui.abiertos.push(VISTA);
+    aplicarLado();
+    activar(VISTA);
+  } else {
+    ui.modoVista = "lado"; ui.vistaAbierta = true;
+    const i = ui.abiertos.indexOf(VISTA);
+    if (i >= 0) ui.abiertos.splice(i, 1);
+    if (ui.activo === VISTA) ui.activo = ui.abiertos.filter(esArchivoAbierto).at(-1) ?? null;
+    aplicarLado();
+    activar(ui.activo, { enfocar: false });
+    renderVista();
+  }
+  guardarUI();
+}
+function cerrarVistaLado() { ui.vistaAbierta = false; aplicarLado(); guardarUI(); }
+
+/** Pone el HTML en la vista. En una recarga en vivo vuelve a la misma altura y no le quita el foco al editor. */
+function ponerVista(html) {
+  const marco = $("vista");
+  if (enVivo.recargando && enVivo.scroll.pagina === paginaVista && enVivo.scroll.y > 0) {
+    const y = enVivo.scroll.y;
+    marco.addEventListener("load", () => { try { marco.contentWindow.postMessage({ cc: "irscroll", y }, "*"); } catch { /* cambió */ } }, { once: true });
+  }
+  const conFoco = document.activeElement && document.activeElement !== marco && $("editores").contains(document.activeElement) ? document.activeElement : null;
+  marco.srcdoc = html;
+  if (conFoco) marco.addEventListener("load", () => setTimeout(() => { if (document.activeElement === marco) conFoco.focus({ preventScroll: true }); }, 60), { once: true });
+}
+
+/** Un archivo cambió: si la vista está a la vista y «En vivo» está encendido, se recarga (agrupando las teclas). */
+function programarVivo() {
+  if (ui.vivo === false || !vistaVisible() || urlServidor) return;
+  clearTimeout(enVivo.t);
+  enVivo.t = setTimeout(() => {
+    if (!vistaVisible()) return;
+    enVivo.recargando = true;
+    try { renderVista(); } finally { setTimeout(() => { enVivo.recargando = false; }, 1500); }
+  }, 450);
+}
+function pintarVivo() {
+  const on = ui.vivo !== false;
+  $("vistaVivo").classList.toggle("on", on);
+  $("vistaVivo").setAttribute("aria-pressed", String(on));
+  $("vistaVivo").title = on ? "En vivo: la vista se recarga sola cuando cambias tus archivos (clic para pausar)" : "En pausa: recarga a mano con ⟳ (clic para volver a «En vivo»)";
+}
+
+// Páginas del proyecto
+function pintarPaginas() {
+  const py = proyecto();
+  const paginas = Object.keys(py.files).filter((r) => /\.html?$/i.test(r) && !esMarcador(py.files[r]))
+    .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b));
+  const sel = $("vistaPaginas");
+  const firma = paginas.join("\n");
+  if (sel.dataset.firma !== firma) {
+    sel.replaceChildren(...paginas.map((r) => { const o = document.createElement("option"); o.value = r; o.textContent = r; return o; }));
+    sel.dataset.firma = firma;
+  }
+  sel.value = paginaVista ?? "";
+  $("vistaPaginasCaja").hidden = paginas.length < 1;
+}
+$("vistaPaginas").addEventListener("change", () => irAPagina($("vistaPaginas").value));
+function irAPagina(ruta) {
+  const py = proyecto();
+  if (!FS.tieneArchivo(py, ruta)) return;
+  urlServidor = null; remotoVista = null; paginaVista = ruta;
+  urlVirtual = urlDeArchivo(raizVista(py, ruta), ruta);
+  renderVista();
+}
+
+// Atrás / adelante
+const historialVista = { lista: [], i: -1, saltando: null };
+function anotarHistorial(url) {
+  const h = historialVista;
+  if (h.saltando === url) { h.saltando = null; pintarHistorialVista(); return; }
+  if (h.lista[h.i] === url) return;
+  h.lista = h.lista.slice(0, h.i + 1);
+  h.lista.push(url);
+  if (h.lista.length > 50) h.lista.shift();
+  h.i = h.lista.length - 1;
+  pintarHistorialVista();
+}
+function pintarHistorialVista() {
+  $("vistaAtras").disabled = Boolean(urlServidor) || historialVista.i <= 0;
+  $("vistaAdelante").disabled = Boolean(urlServidor) || historialVista.i >= historialVista.lista.length - 1;
+}
+function saltarHistorial(paso) {
+  const h = historialVista;
+  const j = h.i + paso;
+  if (j < 0 || j >= h.lista.length) return;
+  h.i = j;
+  h.saltando = h.lista[j];
+  navegarVista(h.lista[j]);
+  pintarHistorialVista();
+}
+$("vistaAtras").onclick = () => saltarHistorial(-1);
+$("vistaAdelante").onclick = () => saltarHistorial(1);
+function modoServidor(si) {
+  $("vistaPaginasCaja").classList.toggle("oculto", si);
+  pintarHistorialVista();
+}
+
+// Tamaño de pantalla (para ver cómo queda en un celular o una tableta)
+const TAMANOS = [["auto", "ajustar al panel"], ["movil", "celular (390 px)"], ["tablet", "tableta (820 px)"]];
+function pintarTamano() {
+  const t = TAMANOS.find(([k]) => k === ui.tamVista) ?? TAMANOS[0];
+  $("vistaMarco").dataset.tam = t[0];
+  $("vistaTamano").title = `Tamaño: ${t[1]}`;
+  $("vistaTamano").classList.toggle("activo", t[0] !== "auto");
+}
+$("vistaTamano").onclick = () => {
+  const i = Math.max(0, TAMANOS.findIndex(([k]) => k === ui.tamVista));
+  ui.tamVista = TAMANOS[(i + 1) % TAMANOS.length][0];
+  pintarTamano(); guardarUI();
+  aviso(`Vista previa: ${TAMANOS.find(([k]) => k === ui.tamVista)[1]}`, { tipo: "info", ms: 1800 });
+};
+$("vistaVivo").onclick = () => { ui.vivo = ui.vivo === false; pintarVivo(); guardarUI(); if (ui.vivo) renderVista(); };
+$("vistaLado").onclick = cambiarModoVista;
+$("vistaCerrar").onclick = cerrarVistaLado;
+arrastre($("sashVista"), (e) => {
+  const r = $("areaEditor").getBoundingClientRect();
+  ui.anchoVista = limitarAncho(r.right - e.clientX, r.width);
+  $("areaEditor").style.setProperty("--ancho-vista", `${ui.anchoVista}px`);
+}, guardarUI);
+function limitarAncho(w, total) { return Math.round(Math.max(260, Math.min(total - 240, w))); }
+$("sashVista").addEventListener("dblclick", () => { ui.anchoVista = null; aplicarLado(); guardarUI(); });
+$("sashVista").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  e.preventDefault();
+  const total = $("areaEditor").getBoundingClientRect().width;
+  ui.anchoVista = limitarAncho((ui.anchoVista || total / 2) + (e.key === "ArrowLeft" ? 24 : -24), total);
+  aplicarLado(); guardarUI();
+});
+MOVIL.addEventListener?.("change", () => { aplicarLado(); if (ladoActivo()) renderVista(); });
+
+// Abrir en el navegador con una dirección de verdad (como la de Live Server)
+let enlaceLive = null;
+const rutaEnUrl = (r) => r.split("/").map(encodeURIComponent).join("/");
+function urlLive() {
+  if (!enlaceLive) return null;
+  return enlaceLive + (paginaVista && paginaVista !== "index.html" ? rutaEnUrl(paginaVista) : "");
+}
+async function pedirEnlaceLive(cambiar = false) {
+  const r = cambiar ? await api("/api/trabajo/live/cambiar/", {}) : await api("/api/trabajo/live/");
+  enlaceLive = r.url;
+  return enlaceLive;
+}
+function pintarPopLive() {
+  const url = urlLive();
+  $("liveUrl").value = url ?? "Creando tu enlace…";
+  $("liveAbrir").href = url ?? "#";
+}
+$("vistaExterna").onclick = async (e) => {
+  e.stopPropagation();
+  const pop = $("livePop");
+  if (!pop.hidden) { pop.hidden = true; return; }
+  pop.hidden = false;
+  pintarPopLive();
+  void guardarAhora();   // así lo que ves en el navegador es lo último que escribiste
+  try { await pedirEnlaceLive(); pintarPopLive(); $("liveUrl").select(); }
+  catch (x) { $("liveUrl").value = x.message || "No se pudo crear el enlace."; }
+};
+$("liveCopiar").onclick = () => { const u = urlLive(); if (u) navigator.clipboard?.writeText(u).then(() => aviso("Enlace copiado", { tipo: "info" })).catch(() => $("liveUrl").select()); };
+$("liveAbrir").onclick = (e) => { const u = urlLive(); if (!u) { e.preventDefault(); return; } void guardarAhora(); };
+$("liveCambiar").onclick = async () => {
+  if (!confirm("¿Crear un enlace nuevo? El anterior dejará de funcionar (también para quien lo tenga).")) return;
+  try { await pedirEnlaceLive(true); pintarPopLive(); aviso("Listo: el enlace anterior ya no funciona.", { tipo: "info" }); } catch (x) { aviso(x.message, { tipo: "error" }); }
+};
+addEventListener("click", (e) => { if (!$("livePop").hidden && !e.target.closest("#livePop, #vistaExterna")) $("livePop").hidden = true; });
+addEventListener("keydown", (e) => { if (e.key === "Escape") $("livePop").hidden = true; });
 
 window.addEventListener("message", (e) => {
   const m = e.data;
   if (!m || e.source !== $("vista").contentWindow) return;
   if (m.cc === "consola") panel.escribirConsola(m.nivel, String(m.texto).slice(0, 4000));
+  else if (m.cc === "scroll") enVivo.scroll = { pagina: paginaVista, y: Number(m.y) || 0 };
   else if (m.cc === "vnav") navegarVista(String(m.url));
   else if (m.cc === "vurl") { urlVirtual = String(m.url); mostrarDireccion(urlVirtual); }
   else if (m.cc === "ls") guardarAlmacen(raizVista(proyecto()), String(m.tipo), m.datos);
@@ -568,7 +769,7 @@ window.addEventListener("message", (e) => {
   else if (m.cc === "nav" && urlServidor) { if (/^https?:/i.test(m.href)) window.open(m.href, "_blank", "noopener"); else mostrarServidor(new URL(String(m.href), urlServidor).href); }
   else if (m.cc === "nav") {
     const destino = resolverEnlace(proyecto(), paginaVista || "", m.href);
-    if (destino) { paginaVista = destino; renderVista(); } else panel.escribirConsola("warn", `El enlace «${m.href}» no apunta a ninguna página de tu proyecto.`);
+    if (destino) { paginaVista = destino; enVivo.scroll = { pagina: null, y: 0 }; renderVista(); } else panel.escribirConsola("warn", `El enlace «${m.href}» no apunta a ninguna página de tu proyecto.`);
   }
 });
 
@@ -652,6 +853,7 @@ function proyectoCambio(info = {}) {
   if (vistaExt && origen !== "editor") panelExt?.render();
   if (info.origen === "importar" && info.rutas?.length === 1 && FS.tieneArchivo(proyecto(), info.rutas[0])) abrir(info.rutas[0], { enfocar: false });
   entradas?.alCambiarProyecto(info);
+  programarVivo();
   guardarUI();
 }
 
@@ -747,7 +949,7 @@ $("ejecutar").onclick = () => { if (panel.hayProgramaCorriendo) panel.detener();
 $("autoGuardado").onclick = alternarAutoguardado;
 $("estadoGuardado").onclick = guardarAhora;
 $("vistaPrevia").onclick = () => abrirVista(ui.activo && /\.html?$/i.test(ui.activo) ? ui.activo : paginaVista);
-$("vistaRecargar").onclick = renderVista;
+$("vistaRecargar").onclick = () => { enVivo.recargando = true; renderVista(); setTimeout(() => { enVivo.recargando = false; }, 1500); };
 $("guardar").onclick = guardarAhora;
 $("estRama").onclick = () => panel.correr("git status");
 $("terminalToggle").onclick = () => panel.alternar();
@@ -872,7 +1074,7 @@ function tarjetaCambios(cambios, resumen, errores) {
     const pend = [...estado.values()].filter((x) => x === "pendiente").length;
     caja.innerHTML = `<b>✨ La IA propone ${cambios.length} cambio${cambios.length === 1 ? "" : "s"}</b>${resumen ? `<p>${resumen.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]))}</p>` : ""}
       <ul>${cambios.map((c, i) => { const e = estado.get(c.ruta); const tipo = c.accion === "borrar" ? "borrar" : c.nuevo ? "nuevo" : "modificar";
-        return `<li class="cambio-${e}"><span class="cambio-tipo t-${tipo}">${tipo === "borrar" ? "D" : tipo === "nuevo" ? "A" : "M"}</span><code title="${c.ruta.replace(/"/g, "&quot;")}">${c.ruta.replace(/</g, "&lt;")}</code>
+        return `<li class="cambio-${e}"><span class="cambio-tipo t-${tipo}">${tipo === "borrar" ? "D" : tipo === "nuevo" ? "A" : "M"}</span><code title="${c.ruta.replace(/"/g, "&quot;")}">${c.ruta.replace(/</g, "&lt;")}</code>${c.ediciones ? `<small class="cambio-nota">${c.ediciones} edición${c.ediciones === 1 ? "" : "es"} puntual${c.ediciones === 1 ? "" : "es"}</small>` : ""}${c.reescritura ? '<small class="cambio-aviso" title="Revisa las diferencias antes de aceptar">⚠️ reescribe casi todo el archivo</small>' : ""}
         ${e === "pendiente" ? `<button type="button" data-i="${i}" data-a="ver" title="Ver diferencias">Ver</button><button type="button" data-i="${i}" data-a="si" class="ok" title="Aceptar">✓</button><button type="button" data-i="${i}" data-a="no" title="Rechazar">✕</button>` : `<em>${e === "aceptado" ? "aplicado" : "rechazado"}</em>`}</li>`; }).join("")}</ul>
       ${errores.length ? `<small class="cambio-errores">${errores.map((x) => x.replace(/</g, "&lt;")).join("<br>")}</small>` : ""}
       <div class="cambios-acc">${pend ? `<button type="button" data-a="todo" class="btn pri sm">Aceptar todo (${pend})</button><button type="button" data-a="nada" class="btn sm">Rechazar todo</button>` : ""}${deshacer.length ? '<button type="button" data-a="deshacer" class="btn sm">↶ Deshacer cambios aplicados</button>' : ""}</div>`;
@@ -1142,7 +1344,9 @@ if (primeraVisita && !ui.abiertos.length) {
   if (inicial) { ui.abiertos = [inicial]; ui.activo = inicial; }
 }
 if (ui.abiertos.includes(VISTA)) paginaVista = paginaPrincipal(py0);
+aplicarLado(); pintarVivo(); pintarTamano();
 activar(ui.activo, { enfocar: false });
+if (ladoActivo()) renderVista();
 programarDecoracionGit(900);
 if (ui.panel) panel.abrir({ enfocar: false });
 void entradas.iniciar();

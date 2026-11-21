@@ -119,6 +119,22 @@ def migraciones_de_datos(db):
             p.avatar = AVATAR_DE_EMOJI.get(p.avatar)
         db.session.add(AppliedMigration(clave="avatares_svg"))
         hechas.append("avatares_svg")
+    if db.session.get(AppliedMigration, "quitar_avatares") is None:
+        # Los avatares ya no existen: se devuelven los diamantes de cada avatar comprado y nadie queda con avatar.
+        from constantes import AVATARES_RETIRADOS
+        from models import Purchase, StoreItem
+        items = StoreItem.query.filter(StoreItem.clave.in_(list(AVATARES_RETIRADOS))).all()
+        ids = {i.id for i in items}
+        if ids:
+            for compra in Purchase.query.filter(Purchase.articulo_id.in_(list(ids))).all():
+                perfil = Profile.query.filter_by(usuario_id=compra.usuario_id).first()
+                if perfil and compra.moneda == "diamante":
+                    perfil.diamante += compra.precio
+            for i in items:
+                i.activo = False
+        Profile.query.filter(Profile.avatar.isnot(None)).update({Profile.avatar: None}, synchronize_session=False)
+        db.session.add(AppliedMigration(clave="quitar_avatares"))
+        hechas.append("quitar_avatares")
     if hechas:
         db.session.commit()
     return hechas

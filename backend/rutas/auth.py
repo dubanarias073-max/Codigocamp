@@ -18,6 +18,8 @@ from seguridad import cerrar_sesiones, iniciar_sesion
 from servicios.perfil import _user, ensure_identity, serialize_user
 from utilidades import api_error, client_ip, direccion_actual, direcciones, json_body, too_many, valid_password
 
+from servicios.zona import iso  # noqa: E402
+
 bp = Blueprint("auth", __name__)
 oauth = OAuth()
 
@@ -302,7 +304,7 @@ def ver_correos():
     from models import KnownDevice
     dispositivos = KnownDevice.query.filter_by(usuario_id=current_user.id).order_by(KnownDevice.ultimo.desc()).limit(20).all()
     return jsonify(seguridad=a.seguridad, racha=a.racha, novedades=a.novedades,
-                   dispositivos=[{"nombre": d.nombre, "ultimo": d.ultimo.isoformat(), "primero": d.primero.isoformat()} for d in dispositivos])
+                   dispositivos=[{"nombre": d.nombre, "ultimo": iso(d.ultimo), "primero": iso(d.primero)} for d in dispositivos])
 
 
 @bp.post("/api/ajustes/correos/")
@@ -344,7 +346,7 @@ def ver_sesiones():
              .order_by(UserSession.ultima.desc()).limit(50).all())
     return jsonify(sesiones=[{
         "id": f.id, "dispositivo": f.dispositivo or "Dispositivo", "ip": f.ip, "metodo": f.metodo,
-        "creada": f.creada.isoformat(), "ultima": f.ultima.isoformat(), "actual": f.id == actual,
+        "creada": iso(f.creada), "ultima": iso(f.ultima), "actual": f.id == actual,
     } for f in filas])
 
 
@@ -358,6 +360,8 @@ def cerrar_sesion_dispositivo(sesion_id):
         return api_error("Esa sesión no existe.", 404)
     fila.revocada = True
     db.session.commit()
+    from servicios.correo import olvidar_dispositivos
+    olvidar_dispositivos(current_user.id, sesiones=[fila])   # al volver a entrar ahí, llega el correo de nuevo inicio
     era_esta = fila.id == getattr(current_user, "_sesion_id", None)
     if era_esta:
         logout_user()
@@ -372,7 +376,12 @@ def cerrar_todas():
     if isinstance(data, tuple):
         return data
     excepto = getattr(current_user, "_sesion_id", None) if data.get("excepto_este") else None
+    from models import UserSession
+    from servicios.correo import olvidar_dispositivos
+    abiertas = UserSession.query.filter_by(usuario_id=current_user.id, revocada=False).all()
     n = cerrar_sesiones(current_user.id, excepto=excepto)
+    # Los dispositivos que se cerraron dejan de ser conocidos (también este, si se cerró): al volver a entrar llega el correo.
+    olvidar_dispositivos(current_user.id, sesiones=[x for x in abiertas if x.id != excepto] if excepto else None)
     if not excepto:
         logout_user()
     return jsonify(ok=True, cerradas=n, sigues_dentro=bool(excepto))
