@@ -33,19 +33,71 @@ export class Explorador {
     raiz.setAttribute("aria-label", "Archivos del proyecto");
     raiz.addEventListener("click", (e) => this.#clic(e));
     raiz.addEventListener("contextmenu", (e) => this.#menu(e));
-    // Celular: mantener pulsado un archivo o carpeta abre el menú (Renombrar, Eliminar…), como en el explorador del teléfono.
+    // Celular: mantener pulsado un archivo o carpeta (vibra) y luego:
+    //   · soltar sin mover  -> menú (Renombrar, Mover a…, Eliminar…)
+    //   · sin soltar, arrastrar el dedo -> se mueve a la carpeta donde lo sueltes (como arrastrar con el mouse)
     let toque = null;
-    const cancelarToque = () => { if (toque) { clearTimeout(toque.t); toque = null; } };
+    const terminar = () => {
+      if (!toque) return;
+      clearTimeout(toque.t); clearTimeout(toque.abrir); cancelAnimationFrame(toque.raf);
+      toque.fila?.classList.remove("levantada");
+      toque.fantasma?.remove();
+      this.#limpiarDestino();
+      toque = null;
+    };
     raiz.addEventListener("touchstart", (e) => {
       const fila = e.target.closest(".fila[data-ruta]");
       if (!fila || this.edicion || e.touches.length > 1 || e.target.closest(".fila-mas")) return;
       const { clientX: x, clientY: y } = e.touches[0];
-      cancelarToque();
-      toque = { x, y, t: setTimeout(() => { toque = null; this.yaMenu = Date.now(); navigator.vibrate?.(15); this.abrirMenu(fila.dataset.ruta, x, y); }, 550) };
+      terminar();
+      toque = { x, y, fila, ruta: fila.dataset.ruta, listo: false, arrastrando: false };
+      toque.t = setTimeout(() => { if (!toque) return; toque.listo = true; this.yaMenu = Date.now(); navigator.vibrate?.(15); fila.classList.add("levantada"); }, 450);
     }, { passive: true });
-    raiz.addEventListener("touchmove", (e) => { if (toque && Math.hypot(e.touches[0].clientX - toque.x, e.touches[0].clientY - toque.y) > 10) cancelarToque(); }, { passive: true });
-    raiz.addEventListener("touchend", cancelarToque);
-    raiz.addEventListener("touchcancel", cancelarToque);
+    raiz.addEventListener("touchmove", (e) => {
+      if (!toque) return;
+      const { clientX: x, clientY: y } = e.touches[0];
+      const lejos = Math.hypot(x - toque.x, y - toque.y) > 10;
+      if (!toque.listo) { if (lejos) terminar(); return; }           // movió antes de tiempo: es un scroll normal
+      if (!toque.arrastrando && !lejos) return;
+      e.preventDefault();                                             // arrastrando: la lista no se desplaza
+      if (!toque.arrastrando) {
+        toque.arrastrando = true;
+        const g = document.createElement("div");
+        g.className = "arrastre-fantasma";
+        g.textContent = `${toque.fila.dataset.tipo === "dir" ? "📁" : "📄"} ${FS.nombreBase(toque.ruta)}`;
+        document.body.append(g);
+        toque.fantasma = g;
+      }
+      toque.fantasma.style.transform = `translate(${x + 14}px, ${y - 22}px)`;
+      toque.ultimo = { x, y };
+      // Carpeta bajo el dedo
+      const bajo = document.elementFromPoint(x, y);
+      const f = bajo?.closest?.(".fila[data-ruta]");
+      this.#limpiarDestino();
+      toque.destino = !raiz.contains(bajo) ? null : f ? (f.dataset.tipo === "dir" ? f.dataset.ruta : FS.carpetaDe(f.dataset.ruta)) : "";
+      if (toque.destino === "") raiz.classList.add("destino-raiz");
+      else if (toque.destino) (f.dataset.tipo === "dir" ? f : raiz.querySelector(`.fila[data-ruta="${CSS.escape(toque.destino)}"]`))?.classList.add("destino");
+      // Una carpeta cerrada se abre si te quedas encima un momento
+      if (f && f.dataset.tipo === "dir" && f.getAttribute("aria-expanded") === "false" && toque.sobre !== f.dataset.ruta) {
+        clearTimeout(toque.abrir);
+        toque.sobre = f.dataset.ruta;
+        const r = f.dataset.ruta;
+        toque.abrir = setTimeout(() => { if (toque?.arrastrando && toque.sobre === r) { this.expandidas.add(r); this.render(); } }, 700);
+      }
+      // Cerca del borde de la lista, se desplaza sola
+      const caja = raiz.getBoundingClientRect();
+      cancelAnimationFrame(toque.raf);
+      const borde = y < caja.top + 40 ? -8 : y > caja.bottom - 40 ? 8 : 0;
+      if (borde) { const paso = () => { if (!toque?.arrastrando) return; raiz.scrollTop += borde; toque.raf = requestAnimationFrame(paso); }; toque.raf = requestAnimationFrame(paso); }
+    }, { passive: false });
+    raiz.addEventListener("touchend", () => {
+      if (!toque) return;
+      const { listo, arrastrando, ruta, destino, x, y } = toque;
+      terminar();
+      if (arrastrando) { if (destino !== null && destino !== undefined) this.moverA(ruta, destino); this.yaMenu = Date.now(); }
+      else if (listo) { this.yaMenu = Date.now(); this.abrirMenu(ruta, x, y); }
+    });
+    raiz.addEventListener("touchcancel", terminar);
     raiz.addEventListener("keydown", (e) => this.#tecla(e));
     raiz.addEventListener("dragstart", (e) => { const f = e.target.closest(".fila"); if (!f || this.edicion) return e.preventDefault(); e.dataTransfer.setData("text/plain", f.dataset.ruta); e.dataTransfer.effectAllowed = "move"; });
     raiz.addEventListener("dragover", (e) => this.#arrastrarSobre(e));
@@ -227,9 +279,39 @@ export class Explorador {
         ...(this.alDescargar && FS.tieneArchivo(py, ruta) ? [{ texto: "Descargar", fn: () => this.alDescargar(ruta) }] : []),
         "-",
         { texto: "Renombrar", atajo: "F2", fn: () => this.renombrar(ruta) },
+        { texto: "Mover a…", fn: () => this.elegirDestino(ruta, x, y) },
         { texto: "Eliminar", atajo: "Supr", peligro: true, fn: () => this.eliminar(ruta) });
     }
     menuContextual(x, y, items);
+  }
+
+  /** Lista de carpetas a donde se puede mover (sirve en el celular, donde no se puede arrastrar). */
+  elegirDestino(ruta, x, y) {
+    const py = this.proyecto();
+    const actual = FS.carpetaDe(ruta);
+    const esDir = FS.esCarpeta(py, ruta);
+    const posibles = ["", ...py.folders].filter((c) => c !== actual && !(esDir && (c === ruta || c.startsWith(`${ruta}/`))));
+    if (!posibles.length) { this.alCambiar({ origen: "aviso", error: "No hay otra carpeta a donde moverlo. Crea una con «Nueva carpeta»." }); return; }
+    const nombre = (c) => (c === "" ? "📁 (raíz del proyecto)" : `${"\u2003".repeat(c.split("/").length - 1)}📁 ${FS.nombreBase(c)}`);
+    menuContextual(x, y, [
+      { texto: `Mover «${FS.nombreBase(ruta)}» a:`, deshabilitado: true, fn: () => {} },
+      "-",
+      ...posibles.map((c) => ({ texto: nombre(c), fn: () => this.moverA(ruta, c) })),
+    ]);
+  }
+
+  /** Mueve un archivo o carpeta a otra carpeta (la usan arrastrar y soltar y «Mover a…»). */
+  moverA(origen, dir) {
+    const py = this.proyecto();
+    if (!origen || !FS.existe(py, origen) || FS.carpetaDe(origen) === dir) return false;
+    const destino = FS.unir(dir, FS.nombreBase(origen));
+    const r = FS.mover(py, origen, destino);
+    if (!r.ok) { this.alCambiar({ origen: "aviso", error: r.error }); return false; }
+    for (let c = dir; c; c = FS.carpetaDe(c)) this.expandidas.add(c);
+    this.seleccion = destino;
+    this.alCambiar({ origen: "explorador", movido: [origen, destino] });
+    this.render();
+    return true;
   }
 
   // --------------------------------------------------------- crear / renombrar ----
@@ -357,16 +439,6 @@ export class Explorador {
       this.alSoltarArchivos({ entradas, archivos: [...e.dataTransfer.files], destino: this.#destinoDe(e) });
       return;
     }
-    const py = this.proyecto();
-    if (!origen || !FS.existe(py, origen)) return;
-    const dir = this.#destinoDe(e);
-    if (FS.carpetaDe(origen) === dir) return;
-    const destino = FS.unir(dir, FS.nombreBase(origen));
-    const r = FS.mover(py, origen, destino);
-    if (!r.ok) { this.alCambiar({ origen: "aviso", error: r.error }); return; }
-    if (dir) this.expandidas.add(dir);
-    this.seleccion = destino;
-    this.alCambiar({ origen: "explorador", movido: [origen, destino] });
-    this.render();
+    this.moverA(origen, this.#destinoDe(e));
   }
 }

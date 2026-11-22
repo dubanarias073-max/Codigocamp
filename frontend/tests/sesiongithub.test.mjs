@@ -80,3 +80,28 @@ test("un 403 (sin permiso en ese repositorio) NO cierra la sesión de GitHub", a
   assert.equal(c.token, "gho_valido");
   assert.match(m.mensaje({ code: "HttpError", data: { statusCode: 403 } }), /@cristian no puede escribir/);
 });
+
+test("varias cuentas de GitHub: agregar, cambiar, cerrar una y cerrar todas", async () => {
+  const mem = () => { const d = new Map(); return { getItem: (k) => d.get(k) ?? null, setItem: (k, v) => d.set(k, String(v)), removeItem: (k) => d.delete(k), d }; };
+  globalThis.localStorage = mem(); globalThis.sessionStorage = mem();
+  const { SesionGitHub } = await import("../js/trabajo/sesiongithub.js");
+  const usuarios = { t1: { login: "ana", name: "Ana", id: 1 }, t2: { login: "ana-trabajo", name: "Ana (trabajo)", id: 2 } };
+  const fetchFn = async (_u, o) => { const t = o.headers.Authorization.split(" ")[1]; return { ok: true, status: 200, json: async () => usuarios[t] }; };
+  const s = new SesionGitHub({ cuenta: "1", api: async () => ({}), fetchFn });
+  await s.aceptar("t1", { recordar: true });
+  await s.aceptar("t2", { recordar: false });
+  assert.deepEqual(s.cuentas.map((c) => [c.login, c.activa]), [["ana", false], ["ana-trabajo", true]]);
+  assert.equal(s.token, "t2");
+  assert.ok(!JSON.stringify(s.cuentas).includes("t1"), "la lista para mostrar no lleva tokens");
+  assert.ok(s.usar("ana")); assert.equal(s.token, "t1");
+  // se lee igual desde el almacenamiento (otra instancia en la misma pestaña)
+  const otra = new SesionGitHub({ cuenta: "1", api: async () => ({}), fetchFn });
+  assert.equal(otra.usuario, "ana"); assert.equal(otra.cuentas.length, 2);
+  // la recordada queda en localStorage, la otra solo en la pestaña
+  assert.ok(localStorage.getItem("cc-github-1").includes("t1") && !localStorage.getItem("cc-github-1").includes("t2"));
+  s.cerrarSesion("ana"); assert.equal(s.usuario, "ana-trabajo");
+  s.cerrarTodas(); assert.equal(s.token, null); assert.equal(s.cuentas.length, 0);
+  // formato viejo (una sola cuenta) se sigue leyendo
+  localStorage.setItem("cc-github-2", JSON.stringify({ token: "t9", login: "vieja" }));
+  assert.equal(new SesionGitHub({ cuenta: "2", api: async () => ({}), fetchFn }).usuario, "vieja");
+});

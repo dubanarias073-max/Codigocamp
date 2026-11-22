@@ -42,7 +42,7 @@ def perfil():
     return jsonify(perfil={
         "rol": profile.rol, "intereses": profile.intereses, "nivel": profile.nivel_previo,
         "meta": profile.meta_minutos, "curso": profile.curso_actual.slug if profile.curso_actual else None,
-        "onboarding": profile.onboarding_completo, "tema": profile.tema,
+        "onboarding": profile.onboarding_completo, "tema": profile.tema, "idioma": profile.idioma or "es", "buscable_correo": profile.buscable_correo is not False,
     })
 
 
@@ -69,6 +69,12 @@ def ajustes():
         if data["tema"] not in Profile.TEMAS:
             return api_error("Tema no válido.")
         profile.tema = data["tema"]
+    if "buscable_correo" in data:
+        profile.buscable_correo = bool(data["buscable_correo"])
+    if "idioma" in data:
+        if data["idioma"] not in Profile.IDIOMAS:
+            return api_error("Idioma no válido.")
+        profile.idioma = data["idioma"]
     if "meta" in data:
         if data["meta"] not in {5, 10, 15, 30}:
             return api_error("Meta no válida.")

@@ -721,31 +721,45 @@ const COMANDOS = {
     const s = this.credencialGitHub;
     const [grupo, orden] = a;
     if (grupo === "auth" && s) {
+      const opcion = (n) => { const i = a.findIndex((x) => x === n || x.startsWith(`${n}=`)); if (i < 0) return null; return a[i].includes("=") ? a[i].split("=")[1] : a[i + 1] ?? ""; };
+      const metodo = (d) => ({ web: "ventana de GitHub", dispositivo: "código de dispositivo", token: "token personal" }[d.metodo] || d.metodo);
       if (orden === "login") {
-        if (s.token && !a.includes("--force")) { io.out(`Ya iniciaste sesión en github.com como ${color.azul("@" + s.usuario)}. (gh auth login --force para cambiar de cuenta)\n`); return 0; }
-        if (a.includes("--force")) s.cerrarSesion();
-        io.out(color.gris("Abriendo «Iniciar sesión con GitHub»…\n"));
-        const t = await s.obtener({ motivo: "Inicia sesión para usar git push, pull y clone con tus repositorios de GitHub." });
+        // Como gh: si ya hay una cuenta, login agrega OTRA (y la deja activa).
+        io.out(color.gris(s.token ? `Ya tienes la cuenta @${s.usuario}. Abriendo «Agregar otra cuenta de GitHub»…\n` : "Abriendo «Iniciar sesión con GitHub»…\n"));
+        const t = s.token ? await s.agregarCuenta() : await s.obtener({ motivo: "Inicia sesión para usar git push, pull y clone con tus repositorios de GitHub." });
         if (!t) { io.err("Inicio de sesión cancelado.\n"); return 1; }
-        io.out(`${color.verde("✔")} Sesión iniciada en github.com como ${color.azul("@" + s.usuario)}\n`);
+        io.out(`${color.verde("✔")} Sesión iniciada en github.com como ${color.azul("@" + s.usuario)} (cuenta activa)\n`);
+        return 0;
+      }
+      if (orden === "switch") {
+        const cuentas = s.cuentas;
+        if (cuentas.length < 2) { io.err(cuentas.length ? `Solo tienes la cuenta @${s.usuario}. Agrega otra con: gh auth login\n` : "No has iniciado sesión. Usa: gh auth login\n"); return 1; }
+        const quien = opcion("-u") ?? opcion("--user") ?? cuentas[(cuentas.findIndex((c) => c.activa) + 1) % cuentas.length].login;
+        if (!s.usar(quien.replace(/^@/, ""))) { io.err(`No tienes la cuenta @${quien}. Tus cuentas: ${cuentas.map((c) => "@" + c.login).join(", ")}\n`); return 1; }
+        this.tokenGitHub = null;
+        io.out(`${color.verde("✔")} Cuenta activa de github.com: ${color.azul("@" + s.usuario)}\n`);
         return 0;
       }
       if (orden === "logout") {
         if (!s.token) { io.err("No hay ninguna sesión de GitHub iniciada.\n"); return 1; }
-        const quien = s.usuario; s.cerrarSesion(); this.tokenGitHub = null;
-        io.out(`${color.verde("✔")} Sesión de github.com cerrada (@${quien}).\n`);
+        if (a.includes("--all")) { const n = s.cuentas.length; s.cerrarTodas(); this.tokenGitHub = null; io.out(`${color.verde("✔")} Se cerraron las ${n} sesiones de github.com.\n`); return 0; }
+        const quien = (opcion("-u") ?? opcion("--user") ?? s.usuario).replace(/^@/, "");
+        if (!s.cuentas.some((c) => c.login.toLowerCase() === quien.toLowerCase())) { io.err(`No tienes la cuenta @${quien}.\n`); return 1; }
+        s.cerrarSesion(quien); this.tokenGitHub = null;
+        io.out(`${color.verde("✔")} Sesión de github.com cerrada (@${quien}).${s.usuario ? ` Cuenta activa ahora: @${s.usuario}.` : ""}\n`);
         return 0;
       }
       if (orden === "status" || orden === undefined) {
-        if (!s.token) { io.out("No has iniciado sesión en GitHub. Usa: gh auth login  (o haz git push y se abrirá solo)\n"); return 1; }
-        const d = s.datos;
-        io.out(`github.com\n  ${color.verde("✓")} Sesión iniciada como ${color.azul("@" + d.login)}${d.nombre && d.nombre !== d.login ? ` (${d.nombre})` : ""}\n  - Método: ${{ web: "ventana de GitHub", dispositivo: "código de dispositivo", token: "token personal" }[d.metodo] || d.metodo}\n${d.alcance ? `  - Permisos: ${d.alcance}\n` : ""}`);
+        const cuentas = s.cuentas;
+        if (!cuentas.length) { io.out("No has iniciado sesión en GitHub. Usa: gh auth login  (o haz git push y se abrirá solo)\n"); return 1; }
+        io.out("github.com\n" + cuentas.map((d) => `  ${color.verde("✓")} ${color.azul("@" + d.login)}${d.nombre && d.nombre !== d.login ? ` (${d.nombre})` : ""}${d.activa ? color.verde("  ← activa") : ""}\n    - Método: ${metodo(d)}${d.recordar ? " · recordada en este navegador" : " · solo esta pestaña"}\n${d.alcance ? `    - Permisos: ${d.alcance}\n` : ""}`).join("")
+          + color.gris("  gh auth switch -u <cuenta> · gh auth login (agregar otra) · gh auth logout [-u <cuenta> | --all]\n"));
         return 0;
       }
       if (orden === "token") { if (!s.token) { io.err("No has iniciado sesión.\n"); return 1; } io.out(color.gris("(Por seguridad, CódigoCamp no muestra el token.)\n")); return 0; }
     }
     if (grupo === "auth") { io.err("gh auth no está disponible aquí.\n"); return 1; }
-    io.err(`gh ${a.join(" ")}: en CódigoCamp solo está «gh auth login | status | logout». Para el resto usa git (push, pull, clone) o gh en tu computadora.\n`);
+    io.err(`gh ${a.join(" ")}: en CódigoCamp está «gh auth login | switch | status | logout». Para el resto usa git (push, pull, clone) o gh en tu computadora.\n`);
     return 1;
   },
   async git(a, io) {

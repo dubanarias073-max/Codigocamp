@@ -46,7 +46,7 @@ class CosmeticosTest(unittest.TestCase):
 
     def test_cofres(self):
         j = self.c.get("/api/cofres/").get_json()
-        self.assertEqual(len(j["cofres"]), 10)
+        self.assertGreaterEqual(len(j["cofres"]), 10)
         self.assertFalse(j["cofres"][0]["listo"])
         self.assertEqual(self.c.post("/api/cofres/abrir/", json={"clave": "c01_primer_paso"}, headers=self.h).status_code, 403)
         curso = Course(slug="html", nombre="HTML", tipo="web", sigla="HTML"); db.session.add(curso); db.session.flush()

@@ -104,7 +104,7 @@ function crear({ d, viejo, error }) {
     texto(w, `${d.progreso_hoy}% completado · 🔥 ${d.racha}`, 12, C.sub);
   } else {
     const fila = w.addStack(); fila.centerAlignContent();
-    texto(fila, "🔥", chico ? 26 : 30);
+    texto(fila, ({ fuego: "🔥", feliz: "😄", preocupado: "😟", alarma: "😱", dormido: "😴" })[d.animo] || "🔥", chico ? 26 : 30);   // ánimo de Codi
     fila.addSpacer(6);
     const col = fila.addStack(); col.layoutVertically();
     texto(col, d.racha, chico ? 26 : 30, C.fuego, true);

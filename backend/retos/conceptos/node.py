@@ -1,5 +1,6 @@
 """Node.js: JavaScript fuera del navegador, npm, módulos, servidores y APIs. 3 etapas."""
 from ..generador import K
+from .node_e678 import E6, E7, E8
 from .node_e45 import E4, E5
 
 E1 = [
@@ -204,4 +205,7 @@ ETAPAS_CONCEPTOS = [
     ("Node profesional", "Configuración, errores, pruebas, despliegue y frameworks", E3),
     ("Node a fondo", "Eventos, streams, buffers, procesos, crypto, hilos y fetch", E4),
     ("Ecosistema profesional", "TypeScript, JWT, bcrypt, WebSockets, Prisma, zod, logs y npm", E5),
+    ("Express a fondo", "Routers, parámetros, archivos, cookies, sesiones, seguridad y documentación", E6),
+    ("Datos y seguridad", "MySQL, ORMs, Redis, tokens, OAuth, roles, XSS, CSRF y tiempo real", E7),
+    ("Calidad y producción", "Pruebas, depuración, rendimiento, colas, GraphQL, Docker y CI", E8),
 ]

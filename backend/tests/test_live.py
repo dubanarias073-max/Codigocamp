@@ -62,20 +62,25 @@ class LiveTest(unittest.TestCase):
         anonimo = self.app.test_client()   # otro navegador, sin sesión
         r = anonimo.get(base)
         self.assertEqual(r.status_code, 200)
+        self.assertIn("/js/live.js", r.get_data(as_text=True))          # se arma con el motor de la vista previa
+        proyecto = anonimo.get(base + "__cc_proyecto").get_json()
+        self.assertIn("contacto.html", proyecto["files"])
+        self.assertTrue(proyecto["v"])
+        r = anonimo.get(base + "?crudo=1")                              # el HTML tal cual
         html = r.get_data(as_text=True)
         self.assertIn('href="contacto.html"', html)
         self.assertIn(f'href="{base}css/estilos.css"', html)          # la ruta absoluta apunta a tu proyecto
         self.assertIn("__cc_version", html)                             # recarga en vivo
         self.assertIn("sandbox allow-scripts", r.headers["Content-Security-Policy"])   # aislada de la cuenta
         self.assertNotIn("allow-same-origin", r.headers["Content-Security-Policy"])
-        self.assertIn("<h1>Contacto</h1>", anonimo.get(base + "contacto.html").get_data(as_text=True))
+        self.assertIn("<h1>Contacto</h1>", anonimo.get(base + "contacto.html?crudo=1").get_data(as_text=True))
         css = anonimo.get(base + "css/estilos.css")
         self.assertTrue(css.content_type.startswith("text/css"))
         self.assertIn(f"url({base}img/fondo.png)", css.get_data(as_text=True))
         self.assertTrue(anonimo.get(base + "js/app.js").content_type.startswith("text/javascript"))
         self.assertEqual(anonimo.get(base + "js/app.js").headers["Access-Control-Allow-Origin"], "*")   # sirve para type="module"
         self.assertEqual(anonimo.get(base + "blog").status_code, 302)
-        self.assertIn("Blog", anonimo.get(base + "blog/").get_data(as_text=True))
+        self.assertIn("Blog", anonimo.get(base + "blog/?crudo=1").get_data(as_text=True))
         no = anonimo.get(base + "no-existe.html")
         self.assertEqual(no.status_code, 404)
         self.assertIn("contacto.html", no.get_data(as_text=True))       # lista las páginas que sí hay
@@ -88,7 +93,7 @@ class LiveTest(unittest.TestCase):
         import time; time.sleep(0.01)
         self.guardar(c, nuevo)
         self.assertNotEqual(self.app.test_client().get(base + "__cc_version").get_json()["v"], v1)
-        self.assertIn("Cambié", self.app.test_client().get(base).get_data(as_text=True))
+        self.assertIn("Cambié", self.app.test_client().get(base + "__cc_proyecto").get_json()["files"]["index.html"])
 
     def test_cambiar_enlace_corta_el_anterior_y_cada_cuenta_tiene_el_suyo(self):
         c = self.cliente(); self.guardar(c); base = self.enlace(c)
@@ -108,3 +113,18 @@ class LiveTest(unittest.TestCase):
         for mala in ("abc", "../../etc", "x" * 40):
             self.assertEqual(anonimo.get(f"/live/{mala}/").status_code, 404)
         self.assertEqual(anonimo.get("/api/trabajo/live/").status_code, 401)
+
+
+    def test_desde_localhost_el_enlace_usa_la_direccion_publica(self):
+        import os
+        c = self.cliente(); self.guardar(c)
+        os.environ["APP_URL"] = "http://localhost:5000,https://codigocamp.ejemplo.ts.net"
+        try:
+            g.pop("_login_user", None)
+            r = c.get("/api/trabajo/live/", base_url="http://localhost:5000").get_json()
+            self.assertTrue(r["url"].startswith("https://codigocamp.ejemplo.ts.net/live/"))
+            self.assertFalse(r["solo_local"])
+        finally:
+            os.environ.pop("APP_URL", None)
+        g.pop("_login_user", None)
+        self.assertTrue(c.get("/api/trabajo/live/", base_url="http://localhost:5000").get_json()["solo_local"])

@@ -8,7 +8,7 @@
 
   var CURSOS = { html: 'HTML', css: 'CSS', bd: 'Bases de datos', javascript: 'JavaScript', python: 'Python', typescript: 'TypeScript',
     java: 'Java', csharp: 'C#', kotlin: 'Kotlin', swift: 'Swift', php: 'PHP', ruby: 'Ruby', go: 'Go', rust: 'Rust', c: 'C', cpp: 'C++',
-    terminal: 'Terminales', git: 'Git', github: 'GitHub', docker: 'Docker', node: 'Node.js', nosql: 'NoSQL' };
+    terminal: 'Terminales', git: 'Git', github: 'GitHub', docker: 'Docker', node: 'Node.js', nosql: 'NoSQL', react: 'React' };
   // Qué curso recomendar según lo que quiere crear
   var RECOMIENDA = { web: 'html', movil: 'kotlin', juegos: 'csharp', datos: 'python', auto: 'terminal', bd: 'bd' };
 

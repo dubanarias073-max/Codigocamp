@@ -13,14 +13,38 @@ MINUTOS_VIDA = 30
 META_MES = 60
 PUNTOS_POR_DESAFIO = 5
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
-DAILY_CHALLENGES = [
+# Encargos de hoy: cada día salen 5 distintos de esta lista (cambian cada día y para cada persona; ver encargos_del_dia).
+ENCARGOS = [
+    {"clave": "xp20", "icono": "⭐", "titulo": "Gana 20 XP", "campo": "xp", "meta": 20, "premio": {"diamante": 8}},
     {"clave": "xp30", "icono": "⭐", "titulo": "Gana 30 XP", "campo": "xp", "meta": 30, "premio": {"diamante": 10}},
-    {"clave": "niveles2", "icono": "🎯", "titulo": "Completa 2 niveles", "campo": "niveles", "meta": 2, "premio": {"diamante": 20}},
-    {"clave": "perfecto", "icono": "💎", "titulo": "Termina un nivel sin fallos", "campo": "perfectos", "meta": 1, "premio": {"diamante": 15}},
-    {"clave": "xp60", "icono": "⭐", "titulo": "Gana 60 XP", "campo": "xp", "meta": 60, "premio": {"diamante": 15}},
-    {"clave": "niveles4", "icono": "🎯", "titulo": "Completa 4 niveles", "campo": "niveles", "meta": 4, "premio": {"diamante": 20}},
-    {"clave": "perfectos3", "icono": "💎", "titulo": "Termina 3 niveles sin fallos", "campo": "perfectos", "meta": 3, "premio": {"diamante": 20}},
+    {"clave": "xp50", "icono": "⭐", "titulo": "Gana 50 XP", "campo": "xp", "meta": 50, "premio": {"diamante": 15}},
+    {"clave": "xp80", "icono": "🌟", "titulo": "Gana 80 XP", "campo": "xp", "meta": 80, "premio": {"diamante": 20}},
+    {"clave": "xp120", "icono": "🌟", "titulo": "Gana 120 XP", "campo": "xp", "meta": 120, "premio": {"diamante": 30}},
+    {"clave": "niveles1", "icono": "🎯", "titulo": "Completa 1 nivel de retos", "campo": "niveles", "meta": 1, "premio": {"diamante": 8}},
+    {"clave": "niveles2", "icono": "🎯", "titulo": "Completa 2 niveles", "campo": "niveles", "meta": 2, "premio": {"diamante": 15}},
+    {"clave": "niveles3", "icono": "🎯", "titulo": "Completa 3 niveles", "campo": "niveles", "meta": 3, "premio": {"diamante": 20}},
+    {"clave": "niveles5", "icono": "🏹", "titulo": "Completa 5 niveles", "campo": "niveles", "meta": 5, "premio": {"diamante": 30}},
+    {"clave": "perfecto", "icono": "💎", "titulo": "Termina un nivel sin fallos", "campo": "perfectos", "meta": 1, "premio": {"diamante": 12}},
+    {"clave": "perfectos2", "icono": "💎", "titulo": "Termina 2 niveles sin fallos", "campo": "perfectos", "meta": 2, "premio": {"diamante": 18}},
+    {"clave": "perfectos3", "icono": "💎", "titulo": "Termina 3 niveles sin fallos", "campo": "perfectos", "meta": 3, "premio": {"diamante": 25}},
+    {"clave": "lecciones1", "icono": "📘", "titulo": "Completa 1 lección en Aprende", "campo": "lecciones", "meta": 1, "premio": {"diamante": 10}},
+    {"clave": "lecciones2", "icono": "📘", "titulo": "Completa 2 lecciones en Aprende", "campo": "lecciones", "meta": 2, "premio": {"diamante": 15}},
+    {"clave": "lecciones3", "icono": "📚", "titulo": "Completa 3 lecciones en Aprende", "campo": "lecciones", "meta": 3, "premio": {"diamante": 20}},
+    {"clave": "lecciones5", "icono": "📚", "titulo": "Completa 5 lecciones en Aprende", "campo": "lecciones", "meta": 5, "premio": {"diamante": 30}},
+    {"clave": "mensajes1", "icono": "💬", "titulo": "Escríbele a un amigo en Chats", "campo": "mensajes", "meta": 1, "premio": {"diamante": 8}},
+    {"clave": "mensajes5", "icono": "💬", "titulo": "Envía 5 mensajes en Chats", "campo": "mensajes", "meta": 5, "premio": {"diamante": 12}},
+    {"clave": "ia1", "icono": "🤖", "titulo": "Pregúntale algo al tutor de IA", "campo": "ia", "meta": 1, "premio": {"diamante": 8}},
+    {"clave": "ia3", "icono": "🤖", "titulo": "Hazle 3 preguntas al tutor de IA", "campo": "ia", "meta": 3, "premio": {"diamante": 12}},
+    {"clave": "codigo1", "icono": "▶️", "titulo": "Ejecuta tu código en Trabajo", "campo": "ejecuciones", "meta": 1, "premio": {"diamante": 8}},
+    {"clave": "codigo5", "icono": "▶️", "titulo": "Ejecuta tu código 5 veces en Trabajo", "campo": "ejecuciones", "meta": 5, "premio": {"diamante": 15}},
+    {"clave": "combo", "icono": "⚡", "titulo": "Gana 40 XP y completa 2 niveles", "campo": "xp", "meta": 40, "y": {"campo": "niveles", "meta": 2}, "premio": {"diamante": 25}},
+    {"clave": "estudioso", "icono": "🧠", "titulo": "Haz 1 lección en Aprende y 1 nivel de retos", "campo": "lecciones", "meta": 1, "y": {"campo": "niveles", "meta": 1}, "premio": {"diamante": 18}},
+    {"clave": "maraton", "icono": "🔥", "titulo": "Maratón: completa 8 niveles", "campo": "niveles", "meta": 8, "premio": {"diamante": 45}},
 ]
+ENCARGOS_POR_CLAVE = {e["clave"]: e for e in ENCARGOS}
+ENCARGOS_POR_DIA = 5
+# Compatibilidad (código y pruebas viejas): la lista de antes
+DAILY_CHALLENGES = [ENCARGOS_POR_CLAVE[k] for k in ("xp30", "niveles2", "perfecto", "xp50", "niveles3", "perfectos3")]
 PREMIO_MES = {"diamante": 150}
 # Artículos que se pagan con diamantes. Se crean solos en la base la primera vez que se abre la tienda.
 # tipo: "consumible" (se puede comprar muchas veces) o "permanente" (se compra una vez y queda en tu colección)

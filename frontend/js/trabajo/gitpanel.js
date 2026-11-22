@@ -1,7 +1,7 @@
 // Panel «Control de código fuente» (Ctrl+Shift+G), como el de VS Code: repositorios, rama, cambios, preparar,
 // descartar, commit, sincronizar (pull + push), ramas e historial. Usa el mismo Git real que la terminal.
 import { esMarcador, formatoBytes, leerMarcador } from "./archivos.js";
-import { dialogo } from "./dialogos.js";
+import { dialogo, menuContextual } from "./dialogos.js";
 import * as FS from "./fs.js";
 import { iconoArchivo } from "./iconos.js";
 
@@ -20,6 +20,33 @@ export class PanelGit {
     this.raiz.addEventListener("click", (e) => this.#clic(e));
     this.raiz.addEventListener("change", (e) => { if (e.target.name === "repo") { this.repo = e.target.value; this.render(); } });
     this.raiz.addEventListener("keydown", (e) => { if (e.target.name === "mensaje" && (e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); this.#commit(); } });
+    this.github?.alCambiar(() => { const c = this.raiz.querySelector(".gh-cuentas"); if (c) c.outerHTML = this.#barraCuentas(); });
+  }
+
+  /** Cuentas de GitHub (como «Cuentas» de VS Code): la activa, cambiar, agregar otra o cerrar sesión. */
+  #barraCuentas() {
+    const g = this.github;
+    if (!g) return "";
+    const cuentas = g.cuentas;
+    const activa = cuentas.find((c) => c.activa);
+    const icono = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>';
+    if (!activa) return `<div class="gh-cuentas"><button type="button" class="gh-cuenta-btn" data-accion="gh-entrar">${icono}<span>Iniciar sesión en GitHub</span></button></div>`;
+    const foto = activa.avatar ? `<img src="${esc(activa.avatar)}" alt="" width="20" height="20" referrerpolicy="no-referrer">` : icono;
+    return `<div class="gh-cuentas"><button type="button" class="gh-cuenta-btn" data-accion="gh-cuentas" aria-haspopup="menu" title="Cuentas de GitHub (git push / pull / clone usan la activa)">${foto}<span>@${esc(activa.login)}</span>${cuentas.length > 1 ? `<small>+${cuentas.length - 1}</small>` : ""}<i aria-hidden="true">▾</i></button></div>`;
+  }
+
+  #menuCuentas(boton) {
+    const g = this.github;
+    const r = boton.getBoundingClientRect();
+    const cuentas = g.cuentas;
+    menuContextual(r.left, r.bottom + 4, [
+      { texto: "Cuentas de GitHub", deshabilitado: true, fn: () => {} },
+      ...cuentas.map((c) => ({ texto: `${c.activa ? "✓ " : "\u2003 "}@${c.login}${c.nombre && c.nombre !== c.login ? ` · ${c.nombre}` : ""}`, fn: () => { if (!c.activa) { g.usar(c.login); this.aviso(`Ahora git push / pull usan @${c.login}.`, { tipo: "info" }); } } })),
+      "-",
+      { texto: "＋ Agregar otra cuenta de GitHub…", fn: async () => { const t = await g.agregarCuenta(); if (t) this.aviso(`Cuenta @${g.usuario} agregada y activa.`, { tipo: "info" }); } },
+      { texto: `Cerrar sesión de @${g.usuario}`, fn: () => { const q = g.usuario; g.cerrarSesion(); this.aviso(`Sesión de @${q} cerrada.${g.usuario ? ` Activa ahora: @${g.usuario}.` : ""}`, { tipo: "info" }); } },
+      ...(cuentas.length > 1 ? [{ texto: "Cerrar sesión de todas las cuentas", fn: () => { g.cerrarTodas(); this.aviso("Se cerraron todas las sesiones de GitHub.", { tipo: "info" }); } }] : []),
+    ]);
   }
 
   async #git(args, { silencio = false } = {}) {
@@ -42,7 +69,7 @@ export class PanelGit {
     const mensaje = this.raiz.querySelector("[name=mensaje]")?.value ?? "";
     const repos = motor ? Object.keys(motor.repos(py)) : [];
     if (!motor || (!repos.length && !py.git.initialized)) {
-      this.raiz.innerHTML = `<div class="git-vacio"><p>Este proyecto todavía no usa Git.</p>
+      this.raiz.innerHTML = `${this.#barraCuentas()}<div class="git-vacio"><p>Este proyecto todavía no usa Git.</p>
         <button type="button" class="btn pri sm" data-accion="init">Inicializar repositorio</button>
         <button type="button" class="btn sm" data-accion="clonar">Clonar repositorio…</button>
         <p class="git-nota">Equivale a <code>git init</code> y <code>git clone</code> en la terminal. Es Git real: historial completo, ramas, commits y GitHub.</p></div>`;
@@ -77,7 +104,7 @@ export class PanelGit {
     };
     const cambios = [...sinPreparar.map((c) => [c.ruta, c.tipo]), ...sinSeguimiento.map((r) => [r, "sin"])].filter(([r]) => !conflictos.includes(r));
     const origen = remotos.find((x) => x.remote === "origin");
-    this.raiz.innerHTML = `
+    this.raiz.innerHTML = `${this.#barraCuentas()}
       ${repos.length > 1 ? `<label class="git-repo">Repositorio <select name="repo">${repos.map((r) => `<option value="${esc(r)}" ${r === dir ? "selected" : ""}>${esc(r || "(raíz del proyecto)")}</option>`).join("")}</select></label>` : ""}
       <div class="git-cab"><span>⎇ <b>${esc(rama || "HEAD desacoplado")}</b>${origen ? ` · <span title="${esc(origen.url)}">origin</span>` : ""}${delante ? ` · ↑${delante}` : ""}${detras ? ` · ↓${detras}` : ""}</span>
         <span><button type="button" class="icono-btn" data-accion="ramas" title="Cambiar de rama / crear rama" aria-label="Ramas">⎇</button><button type="button" class="icono-btn" data-accion="actualizar" title="Actualizar" aria-label="Actualizar">⟳</button></span></div>
@@ -124,6 +151,8 @@ export class PanelGit {
     const accion = b?.dataset.accion;
     const r = b?.dataset.ruta;
     const enCwd = (x) => x; // las rutas del panel ya son relativas al repositorio (cwd = carpeta del repositorio)
+    if (accion === "gh-cuentas") return this.#menuCuentas(b);
+    if (accion === "gh-entrar") { const t = await this.github?.obtener({ motivo: "Inicia sesión para usar git push, pull y clone con tus repositorios de GitHub." }); if (t) this.aviso(`Sesión iniciada como @${this.github.usuario}.`, { tipo: "info" }); return; }
     if (accion === "init") return this.#accion(() => this.#git(["init"]));
     if (accion === "clonar") {
       const url = await this.pedir?.("URL del repositorio (GitHub, GitLab…)", "https://github.com/usuario/repositorio.git");

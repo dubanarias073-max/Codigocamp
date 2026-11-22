@@ -64,6 +64,14 @@ export async function iniciar(activa) {
   await protegerCuenta(user);   // si antes estuvo otra cuenta en este navegador, se borran sus copias locales
   if (!user.onboarding) { location.replace(url("onboarding")); await parar(); }
   aplicarTema(user.tema);
+  // Idioma de la interfaz: el de la cuenta manda (así se ve igual en todos tus dispositivos)
+  let pendiente = false;
+  try { pendiente = localStorage.getItem("cc_idioma_pendiente") === "1"; localStorage.removeItem("cc_idioma_pendiente"); } catch { /* nada */ }
+  if (pendiente && user.idioma !== window.CC_IDIOMA) { user.idioma = window.CC_IDIOMA; api("/api/ajustes/", { idioma: window.CC_IDIOMA }).catch(() => {}); }
+  if (user.idioma && user.idioma !== (window.CC_IDIOMA || "es")) {
+    window.ccIdioma?.(user.idioma);
+    if (!sessionStorage.getItem("cc_idioma_recarga")) { sessionStorage.setItem("cc_idioma_recarga", "1"); location.reload(); await parar(); }
+  } else { try { sessionStorage.removeItem("cc_idioma_recarga"); } catch { /* nada */ } }
   // Cuentas antiguas o términos actualizados: hay que aceptarlos antes de seguir.
   if (user.terminos === false) await (await import("/js/terminos.js")).pedirTerminos();
   // Dentro de la app de Android: el widget queda conectado a esta sesión.
@@ -81,7 +89,7 @@ export async function iniciar(activa) {
   const der = $("der");
   if (der) der.innerHTML = `<div class="tarjeta stats-der">${chips(prog)}</div>
     <div class="tarjeta"><h3>Nivel ${p.nivel}</h3><div class="barra"><i style="width:${p.xp_nivel}%"></i></div><small>${p.xp_nivel}/100 XP para el siguiente nivel</small></div>
-    <div class="tarjeta"><h3>Tu curso</h3><p>${prog.curso_actual ? esc(prog.curso_actual.nombre) : "Elige un curso en Configuración"}</p>
+    <div class="tarjeta" data-tarjeta="curso"><h3>Tu curso</h3><p>${prog.curso_actual ? esc(prog.curso_actual.nombre) : "Elige un curso en Configuración"}</p>
       <a class="bj" href="${url("inicio")}">Practicar</a></div>
     ${m ? `<div class="tarjeta"><h3>${iconoSVG(m.clave, "mini-mission-icon")} ${esc(m.titulo)}</h3><div class="barra"><i style="width:${m.progreso / m.meta * 100}%"></i></div>
       <small>${m.progreso}/${m.meta} · Premio: ${esc(m.premio)}</small><p><a href="${url("recompensas")}">Ver desafíos</a></p></div>` : ""}`;
@@ -90,7 +98,7 @@ export async function iniciar(activa) {
   if (der) api("/api/widget/").then((w) => {
     der.insertAdjacentHTML("afterbegin", `<a class="tarjeta widget-racha${w.practicado_hoy ? " hecho" : w.racha ? " peligro" : ""}" href="${url("perfil")}#calendario" title="Calendario de racha">
       <div class="wr-cab"><span class="wr-fuego" aria-hidden="true">${iconoSVG("racha", "wr-svg")}</span><div><b>${w.racha}</b><small>día${w.racha === 1 ? "" : "s"} de racha</small></div><span class="wr-hielo" title="Salvarrachas: protegen tu racha si un día no practicas">${iconoSVG("salvarrachas", "wr-mini")} ${w.salvarrachas ?? 0}/2</span></div>
-      <div class="wr-semana">${w.semana.map((d) => `<span class="${d.icono === "🔥" ? "si" : ""}${d.hoy ? " hoy" : ""}"><small>${d.letra}</small><i>${d.icono === "🔥" ? iconoSVG("racha", "wr-dia") : ""}</i></span>`).join("")}</div>
+      <div class="wr-semana">${w.semana.map((d, i) => `<span class="${d.icono === "🔥" ? "si" : ""}${d.hoy ? " hoy" : ""}"><small>${window.CC_IDIOMA === "en" ? "MTWTFSS"[i] : d.letra}</small><i>${d.icono === "🔥" ? iconoSVG("racha", "wr-dia") : ""}</i></span>`).join("")}</div>
       <small class="wr-estado">${esc(w.estado)}</small></a>`);
   }).catch(() => {});
 

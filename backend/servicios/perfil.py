@@ -7,7 +7,7 @@ from datetime import timedelta, timezone
 from sqlalchemy import func
 
 from models import CompletedLevel, Course, DailyActivity, DailyChallenge, LessonDone, MonthChallenge, Profile, db, utcnow
-from constantes import DAILY_CHALLENGES, MAX_VIDAS, MAX_VIDAS_REGEN, MESES, META_MES, MINUTOS_VIDA, PREMIO_MES, PUNTOS_POR_DESAFIO
+from constantes import DAILY_CHALLENGES, ENCARGOS, ENCARGOS_POR_DIA, MAX_VIDAS, MAX_VIDAS_REGEN, MESES, META_MES, MINUTOS_VIDA, PREMIO_MES, PUNTOS_POR_DESAFIO
 
 
 def ensure_identity(profile, name):
@@ -34,7 +34,7 @@ def get_profile(user):
 def serialize_user(user, profile):
     return {
         "id": user.id, "nombre": user.nombre, "email": user.email,
-        "onboarding": profile.onboarding_completo, "tema": profile.tema,
+        "onboarding": profile.onboarding_completo, "tema": profile.tema, "idioma": profile.idioma or "es", "buscable_correo": profile.buscable_correo is not False,
         "alias": profile.alias, "codigo": profile.codigo, "avatar": "",
         "desde": user.creado_en.date().isoformat(),
         **_extras(user.id),
@@ -136,10 +136,46 @@ def apply_reward(profile, reward):
     profile.vidas = min(MAX_VIDAS, profile.vidas + reward.get("vidas", 0))
 
 
+def encargos_del_dia(usuario_id, fecha):
+    """Los 5 encargos de hoy para esta persona: cambian cada día (y no son los mismos para todos), siempre con uno de XP,
+    uno de retos y el resto variados (Aprende, Chats, IA, Trabajo, combos)."""
+    import random
+    r = random.Random(f"cc-encargos-{usuario_id}-{fecha.isoformat()}")
+    por_campo = {}
+    for e in ENCARGOS:
+        por_campo.setdefault(e["campo"], []).append(e)
+    elegidos = [r.choice(por_campo["xp"]), r.choice(por_campo["niveles"] + por_campo["perfectos"])]
+    resto = [e for e in ENCARGOS if e not in elegidos]
+    r.shuffle(resto)
+    campos = {e["campo"] for e in elegidos}
+    for e in resto:                       # primero de campos que aún no salieron, para que sean variados
+        if len(elegidos) >= ENCARGOS_POR_DIA:
+            break
+        if e["campo"] not in campos:
+            elegidos.append(e); campos.add(e["campo"])
+    for e in resto:
+        if len(elegidos) >= ENCARGOS_POR_DIA:
+            break
+        if e not in elegidos:
+            elegidos.append(e)
+    return sorted(elegidos, key=lambda e: (e["premio"].get("diamante", 0), e["clave"]))
+
+
+def progreso_encargo(encargo, activity):
+    """Progreso (0..meta) de un encargo; los combinados («y») cuentan solo cuando se cumplen las dos partes."""
+    if not activity:
+        return 0
+    actual = min(encargo["meta"], getattr(activity, encargo["campo"], 0) or 0)
+    extra = encargo.get("y")
+    if extra and (getattr(activity, extra["campo"], 0) or 0) < extra["meta"]:
+        return min(actual, encargo["meta"] - 1)
+    return actual
+
+
 def review_challenges(profile, activity):
     new_rewards = []
-    for challenge in DAILY_CHALLENGES:
-        if getattr(activity, challenge["campo"]) < challenge["meta"]:
+    for challenge in encargos_del_dia(profile.usuario_id, activity.fecha):
+        if progreso_encargo(challenge, activity) < challenge["meta"]:
             continue
         record = DailyChallenge.query.filter_by(
             usuario_id=profile.usuario_id, clave=challenge["clave"], fecha=activity.fecha,
@@ -174,12 +210,28 @@ def award_xp(profile, amount, levels=0, perfect=False):
     profile.xp_total += amount
     from servicios.zona import hoy_de
     today = hoy_de(profile)
-    activity = DailyActivity.query.filter_by(usuario_id=profile.usuario_id, fecha=today).first()
-    if not activity:
-        activity = DailyActivity(usuario_id=profile.usuario_id, fecha=today, xp=0, niveles=0, perfectos=0)
-        db.session.add(activity)
+    activity = actividad_de_hoy(profile)
     activity.xp += amount
     activity.niveles += levels
     activity.perfectos += int(perfect)
+    db.session.flush()
+    return review_challenges(profile, activity)
+
+
+def actividad_de_hoy(profile):
+    from servicios.zona import hoy_de
+    today = hoy_de(profile)
+    activity = DailyActivity.query.filter_by(usuario_id=profile.usuario_id, fecha=today).first()
+    if not activity:
+        activity = DailyActivity(usuario_id=profile.usuario_id, fecha=today, xp=0, niveles=0, perfectos=0, lecciones=0, mensajes=0, ia=0, ejecuciones=0)
+        db.session.add(activity)
+        db.session.flush()
+    return activity
+
+
+def contar_actividad(profile, campo, cantidad=1):
+    """Suma una acción del día (lecciones, mensajes, ia, ejecuciones) y revisa los encargos. Devuelve los premios nuevos."""
+    activity = actividad_de_hoy(profile)
+    setattr(activity, campo, (getattr(activity, campo) or 0) + cantidad)
     db.session.flush()
     return review_challenges(profile, activity)

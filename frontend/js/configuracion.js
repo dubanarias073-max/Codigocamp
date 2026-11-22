@@ -68,6 +68,18 @@ $("fAprender").onsubmit = async (e) => {
 };
 
 // Apariencia
+$("buscable").checked = user.buscable_correo !== false;
+$("buscable").onchange = async () => {
+  try { await api("/api/ajustes/", { buscable_correo: $("buscable").checked }); aviso("Guardado"); } catch (x) { aviso(x.message, true); $("buscable").checked = !$("buscable").checked; }
+};
+document.querySelectorAll("[name=idioma]").forEach((r) => {
+  r.checked = r.value === (window.CC_IDIOMA || "es");
+  r.onchange = async () => {
+    window.ccIdioma?.(r.value);
+    try { await api("/api/ajustes/", { idioma: r.value }); } catch { /* queda guardado en este navegador */ }
+    location.reload();
+  };
+});
 document.querySelectorAll("[name=tema]").forEach((r) => {
   r.checked = r.value === (user.tema || "auto");
   r.onchange = async () => { aplicarTema(r.value); try { await api("/api/ajustes/", { tema: r.value }); } catch (x) { aviso(x.message, true); } };
@@ -81,7 +93,7 @@ $("movimiento").onchange = () => {
   document.documentElement.classList.toggle("cc-menos-mov", $("movimiento").checked);
   aplicarCosmeticos(user.cosmeticos || {});
 };
-const TIPOS = { fondo: "Fondo", cursor: "Puntero", tema: "Tema de color", marco: "Marco", efecto: "Efecto", dedo: "Estela del dedo" };
+const TIPOS = { fondo: "Fondo", cursor: "Puntero", tema: "Tema de color", marco: "Marco", efecto: "Efecto", dedo: "Rastro" };
 async function pintarPuestos() {
   const c = await api("/api/cosmeticos/");
   user.cosmeticos = c.equipados;

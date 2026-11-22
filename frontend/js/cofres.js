@@ -1,4 +1,5 @@
-// Los 10 cofres de Recompensas y la animación al abrirlos (temblor, tapa que se abre, rayos de luz y premios que saltan).
+// Los cofres de logro de Recompensas y la animación al abrirlos (temblor, tapa que se abre, rayos de luz y premios que saltan).
+import { prepararSonido, sonar, vibrar } from "/js/sonidos.js";
 import { api, esc, aviso, actualizarStats, aplicarCosmeticos } from "/js/app.js";
 import { iconoSVG } from "/js/iconos.js";
 import { vistaPrevia } from "/js/cosmeticos.js";
@@ -41,7 +42,7 @@ export async function cargarCofres() {
   const listos = cofres.filter((c) => c.listo && !c.abierto).length;
   const r = document.getElementById("rsListos"); if (r) r.textContent = String(listos);
   const b = document.getElementById("badgeLogros"); if (b) { b.hidden = !listos; b.textContent = String(listos); }
-  document.getElementById("cofresCuenta").textContent = `${cofres.filter((c) => c.abierto).length}/10`;
+  document.getElementById("cofresCuenta").textContent = `${cofres.filter((c) => c.abierto).length}/${cofres.length}`;
   return cofres;
 }
 
@@ -89,6 +90,7 @@ export function mostrarCofre({ tipo = "madera", titulo, subtitulo = "", obtener 
     const iniciar = async () => {
       if (tocado) return;
       tocado = true;
+      prepararSonido();
       caja.querySelector(".abrir-pista").textContent = "…";
       let r;
       const pedido = Promise.resolve().then(obtener).then((x) => { r = x; }, (e) => { r = { error: e.message }; });
@@ -97,6 +99,7 @@ export function mostrarCofre({ tipo = "madera", titulo, subtitulo = "", obtener 
       if (r?.error) { cerrar(null); aviso(r.error, true); return; }
       escena.classList.remove("temblar");
       escena.classList.add("abrir");
+      sonar("cofre"); vibrar([15, 30, 50]);
       caja.querySelector(".cofre-svg").classList.add("abierto");
       confeti();
       caja.querySelector(".abrir-pista").textContent = "¡Conseguiste!";
@@ -113,6 +116,7 @@ export function mostrarCofre({ tipo = "madera", titulo, subtitulo = "", obtener 
         await espera(reducido ? 0 : 280);
         cont.insertAdjacentHTML("beforeend", h);
         const el = cont.lastElementChild;
+        sonar(/rareza-(legendario|epico)/.test(h) ? "legendario" : "premio");
         el.style.animationDelay = `${i * 40}ms`;
         const prev = el.querySelector("[data-prev]");
         if (prev) vistaPrevia(prev, prev.dataset.prev, prev.dataset.tipo);

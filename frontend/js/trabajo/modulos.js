@@ -3,6 +3,7 @@
 //  · <script type="module" src="/src/main.jsx"> y los import de tus archivos (./App.jsx, ../utils.ts, ./estilos.css,
 //    ./datos.json, ./logo.png, /vite.svg) se resuelven dentro del proyecto. .jsx, .tsx y .ts se transpilan con el
 //    compilador de TypeScript (JSX automático: react/jsx-runtime, o preact si el proyecto usa Preact).
+//  · .vue y .svelte se compilan con el compilador oficial de su versión (compiladores.js), como los plugins de Vite.
 //  · import React from "react" (o cualquier paquete) usa la versión de tu package.json desde esm.sh. Todos los paquetes
 //    declarados se marcan «external», así hay UNA sola copia de React aunque react-dom también lo importe.
 //  · import "bootstrap/dist/css/bootstrap.min.css" carga el CSS del paquete desde jsDelivr.
@@ -241,6 +242,18 @@ export async function prepararModulos(py, rutaHtml, { transpilar, enlaces = new 
       try { return dataJs(`export default ${JSON.stringify(JSON.parse(texto))};`); } catch (e) { return moduloError(`${ruta} no es un JSON válido: ${e.message}`); }
     }
     if (ext === "svg") return dataJs(`export default ${JSON.stringify(`data:image/svg+xml;base64,${b64(texto)}`)};`);
+    if (ext === "vue" || ext === "svelte") {   // componentes de Vue y Svelte: se compilan con su compilador oficial
+      try {
+        const C = await import("./compiladores.js");
+        let codigo = ext === "vue" ? await C.compilarVue(texto, ruta, deps, transpilar) : await C.compilarSvelte(texto, ruta, deps);
+        codigo = reescribirUbicacion(codigo.replace(/\bimport\.meta\.env\b/g, "__ccEnv"));
+        return dataJs((codigo.includes("__ccEnv") ? prologo : "") + reescribirDesde(codigo, ruta) + `\n//# sourceURL=${ruta}`);
+      } catch (e) {
+        const msg = /Failed to fetch|import/i.test(e.message) && !/\n/.test(e.message) ? `No se pudo descargar el compilador de ${ext === "vue" ? "Vue" : "Svelte"} (¿sin conexión?)` : e.message;
+        errores.push(`${ruta}: ${msg}`);
+        return moduloError(`Error en ${ruta}: ${msg}`);
+      }
+    }
     if (!CODIGO.has(ext)) return dataJs(`export default ${JSON.stringify(texto)};`);
     let codigo = texto;
     if (["jsx", "tsx", "ts", "mts"].includes(ext) || pareceJsx(texto)) {

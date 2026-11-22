@@ -665,3 +665,33 @@ button.estado-item:hover { background: var(--hover); color: var(--cy); }
   .vista-cab .icono-btn { width: 26px; }
 }
 @container (max-width: 380px) { .vista-cab { flex-wrap: wrap; row-gap: 4px; } .vista-paginas { order: 5; flex-basis: 100%; } }
+.ide-menu { max-height: min(70vh, 520px); overflow-y: auto; }
+.ide-menu .titulo { padding: 6px 12px 2px; font-size: 12.5px; font-weight: 800; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Varias vistas previas (pestañas dentro del panel) */
+.vista-pestanas { display: flex; align-items: stretch; gap: 2px; min-height: 32px; padding: 4px 6px 0; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--borde); background: var(--panel2); }
+.vista-pestanas::-webkit-scrollbar { display: none; }
+.vista-pest { display: flex; align-items: center; gap: 4px; max-width: 200px; padding: 0 6px 0 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--sub); font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.vista-pest span { overflow: hidden; text-overflow: ellipsis; }
+.vista-pest:hover { color: var(--txt); }
+.vista-pest.on { background: var(--panel); border-color: var(--borde); color: var(--txt); margin-bottom: -1px; }
+.vista-pest:focus-visible { outline: 2px solid var(--cy); outline-offset: -2px; }
+.vista-pest-x { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: none; color: inherit; font-size: 15px; line-height: 1; cursor: pointer; opacity: .6; }
+.vista-pest-x:hover { background: var(--hover); opacity: 1; }
+.vista-pest-mas { flex: none; width: 28px; margin-left: 2px; border: 0; border-radius: 8px 8px 0 0; background: none; color: var(--sub); font-size: 18px; cursor: pointer; }
+.vista-pest-mas:hover { background: var(--hover); color: var(--cy); }
+.live-local { padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, #f59e0b 16%, transparent); color: var(--txt) !important; font-size: 12px; }
+.live-local[hidden] { display: none; }
+
+/* Arrastrar archivos con el dedo (celular) */
+.fila.levantada { background: color-mix(in srgb, var(--cy) 18%, transparent); box-shadow: inset 3px 0 0 var(--cy); }
+.arrastre-fantasma { position: fixed; z-index: 1000; left: 0; top: 0; padding: 8px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--cy); color: var(--txt); font: 600 14px system-ui; box-shadow: 0 10px 28px rgba(0, 0, 0, .3); pointer-events: none; white-space: nowrap; }
+
+/* Cuentas de GitHub en el panel de Git */
+.gh-cuentas { display: flex; margin: 0 0 8px; }
+.gh-cuenta-btn { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 5px 10px 5px 6px; border: 1px solid var(--borde); border-radius: 999px; background: var(--panel2); color: var(--txt); font: 600 12.5px inherit; cursor: pointer; }
+.gh-cuenta-btn:hover { border-color: var(--cy); }
+.gh-cuenta-btn img { border-radius: 50%; }
+.gh-cuenta-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-cuenta-btn small { padding: 0 6px; border-radius: 99px; background: var(--hover); color: var(--sub); font-size: 11px; }
+.gh-cuenta-btn i { font-style: normal; color: var(--sub); font-size: 10px; }

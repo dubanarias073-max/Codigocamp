@@ -8,7 +8,7 @@ from sqlalchemy import func
 
 from models import Challenge, CompletedLevel, Course, Level, Profile, Section, Stage, db
 from servicios.perfil import award_xp, get_profile, lose_life, progress, refresh_lives
-from servicios.retos import allowed_level, challenge_item, level_challenges
+from servicios.retos import allowed_level, challenge_item, estados_niveles, level_challenges
 from utilidades import api_error, json_body, normalize, parse_integer
 
 bp = Blueprint("retos", __name__)
@@ -45,19 +45,14 @@ def ruta():
             CompletedLevel.usuario_id == current_user.id, Stage.curso_id == course.id
         ).all()
     }
-    marked = False
+    estados = estados_niveles(current_user, course)
     stages = []
     for stage in course.etapas:
         sections = []
         for section in stage.secciones:
             levels = []
             for level in section.niveles:
-                if level.id in completed:
-                    state = "hecho"
-                elif not marked:
-                    state, marked = "actual", True
-                else:
-                    state = "bloqueado"
+                state = estados.get(level.id, "bloqueado")
                 levels.append({
                     "id": level.id, "titulo": level.titulo, "tipo": level.tipo, "estado": state,
                     "estrellas": completed.get(level.id, 0), "xp": level.xp,
@@ -181,7 +176,10 @@ def nivel_completar(level_id):
         completed.estrellas = max(completed.estrellas, stars)
         completed.veces += 1
     xp = level.xp if new else (0 if chest else 5)
+    racha_antes, actividad_antes = profile.racha_actual, profile.ultima_actividad
     rewards = award_xp(profile, xp, levels=0 if chest else 1, perfect=(failures == 0 and not chest))
+    # ¿Esta lección hizo la racha de hoy? (para el sonido y la animación de la racha, como en Duolingo)
+    racha_hoy = profile.ultima_actividad != actividad_antes and profile.racha_actual >= 1
     minerals = {"diamante": 0}
     premios = []
     if new and chest:
@@ -197,5 +195,6 @@ def nivel_completar(level_id):
     db.session.commit()
     return jsonify(
         xp_ganado=xp, minerales_ganados=minerals, estrellas=completed.estrellas, nueva=new, premios=premios,
+        racha_hoy=bool(racha_hoy), racha_antes=racha_antes,
         desafios_completados=rewards, **progress(current_user),
     )

@@ -100,6 +100,7 @@ class Profile(db.Model):
     __tablename__ = "perfiles"
     ROLES = {"estudiante", "cambio", "programador", "curioso"}
     NIVELES = {"cero", "probado", "basico", "avanzado"}
+    IDIOMAS = {"es", "en"}
     TEMAS = {"auto", "claro", "oscuro"}  # auto = predeterminado (sigue el tema del dispositivo)
 
     id = db.Column(db.Integer, primary_key=True)
@@ -112,6 +113,8 @@ class Profile(db.Model):
     zona_horaria = db.Column(db.String(64), nullable=True)  # la detecta el dispositivo (p. ej. America/Bogota)
     onboarding_completo = db.Column(db.Boolean, nullable=False, default=False)
     tema = db.Column(db.Enum("auto", "claro", "oscuro", name="tema"), nullable=False, default="auto")
+    idioma = db.Column(db.String(2), nullable=False, default="es", server_default="es")   # idioma de la interfaz: es / en
+    buscable_correo = db.Column(db.Boolean, nullable=False, default=True, server_default="1")   # tus contactos te encuentran por tu correo
     alias = db.Column(db.String(20), unique=True, nullable=True)
     codigo = db.Column(db.String(8), unique=True, nullable=True)
     avatar = db.Column(db.String(8), nullable=True)  # emoji elegido en el perfil (vacío = inicial del nombre)
@@ -228,6 +231,10 @@ class DailyActivity(db.Model):
     xp = db.Column(db.Integer, nullable=False, default=0)
     niveles = db.Column(db.SmallInteger, nullable=False, default=0)
     perfectos = db.Column(db.SmallInteger, nullable=False, default=0)
+    lecciones = db.Column(db.SmallInteger, nullable=False, default=0)      # lecciones de Aprende
+    mensajes = db.Column(db.SmallInteger, nullable=False, default=0)       # mensajes en Chats
+    ia = db.Column(db.SmallInteger, nullable=False, default=0)             # preguntas al tutor de IA
+    ejecuciones = db.Column(db.SmallInteger, nullable=False, default=0)    # veces que ejecutó código en Trabajo
 
 
 class DailyChallenge(db.Model):
@@ -304,6 +311,8 @@ class Message(db.Model):
     texto = db.Column(db.String(300), nullable=False)
     leido = db.Column(db.Boolean, nullable=False, default=False)
     creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    # Eliminado por quien lo mandó («Eliminar para todos»): el texto y los adjuntos se borran de verdad
+    borrado_en = db.Column(db.DateTime(timezone=True), nullable=True, index=True)
     amistad = db.relationship("Friendship", back_populates="mensajes")
     autor = db.relationship("User")
 
@@ -464,3 +473,18 @@ class TermsAcceptance(db.Model):
     version = db.Column(db.String(20), nullable=False)
     aceptado = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
     ip = db.Column(db.String(45), nullable=False, default="")
+
+
+class AppLoginCode(db.Model):
+    """Código de un solo uso para volver a la app de Android después de entrar con Google en el navegador del celular.
+    Google no deja iniciar sesión dentro de una app (WebView): se entra en el navegador y este código pasa la sesión a la app."""
+    __tablename__ = "codigos_app"
+
+    id = db.Column(db.Integer, primary_key=True)
+    codigo_hash = db.Column(db.String(64), nullable=False, unique=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE", name="fk_codigos_app_usuario"), nullable=False, index=True)
+    nuevo = db.Column(db.Boolean, nullable=False, default=False)
+    creado = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    usado = db.Column(db.Boolean, nullable=False, default=False)
+    # sha256 del secreto que guarda la app mientras espera (así entra aunque el navegador no logre volver a la app)
+    espera_hash = db.Column(db.String(64), nullable=True, index=True)

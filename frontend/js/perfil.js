@@ -39,7 +39,7 @@ const ins = [
 $("insignias").innerHTML = ins.map(([ic, m, t]) => `<span class="insignia med-${m}" title="Medalla de ${m}: ${esc(t)}"><i class="med-ic">${iconoSVG(ic, "med-svg")}</i>${esc(t)}</span>`).join("");
 
 // Lo que llevas puesto
-const NOMBRE_TIPO = { fondo: "Fondo", cursor: "Puntero", tema: "Tema", marco: "Marco", efecto: "Efecto", dedo: "Estela del dedo" };
+const NOMBRE_TIPO = { fondo: "Fondo", cursor: "Puntero", tema: "Tema", marco: "Marco", efecto: "Efecto", dedo: "Rastro" };
 let catalogo = [];
 async function pintarPuesto() {
   const c = await api("/api/cosmeticos/");

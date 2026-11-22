@@ -16,7 +16,7 @@ from .base import PREGUNTAS_POR_LECCION, XP_ETAPA
 
 # Mismo `slug` que la tabla `cursos`; el archivo se llama igual (javascript.py, csharp.py...).
 ORDEN = ["html", "css", "javascript", "python", "sql", "bd", "typescript", "java", "csharp",
-         "kotlin", "swift", "php", "ruby", "go", "rust", "c", "cpp", "terminal", "git", "github", "docker", "node", "nosql"]
+         "kotlin", "swift", "php", "ruby", "go", "rust", "c", "cpp", "terminal", "git", "github", "docker", "node", "nosql", "react"]
 
 # Cursos que se crean solos en la tabla `cursos` si faltan (los demás vienen de codigocamp.sql).
 CURSOS_NUEVOS = {
@@ -26,6 +26,7 @@ CURSOS_NUEVOS = {
     "node": dict(nombre="Node.js", tipo="lenguaje", sigla="NODE", color="#84cc16", descripcion="JavaScript en el servidor: npm, Express y APIs", orden=21),
     "github": dict(nombre="GitHub", tipo="lenguaje", sigla="GH", color="#a78bfa", descripcion="Repositorios, equipo, Actions, Pages y seguridad", orden=22),
     "nosql": dict(nombre="NoSQL", tipo="bd", sigla="NoSQL", color="#22c55e", descripcion="MongoDB, Redis, Firestore, grafos y más", orden=23),
+    "react": dict(nombre="React", tipo="lenguaje", sigla="RE", color="#61dafb", descripcion="Interfaces con componentes, hooks, rutas y Next.js", orden=24),
 }
 
 
@@ -307,7 +308,7 @@ def sincronizar_catalogo(session):
                 plan_seccion["niveles"][k] = nivel
             planes.append(plan_etapa)
 
-    cambio = False
+    cambio = bool(nuevos or ampliados)   # cursos nuevos o etapas agregadas al final también son cambios
     try:
         for plan_etapa in planes:
             etapa = plan_etapa["etapa"]

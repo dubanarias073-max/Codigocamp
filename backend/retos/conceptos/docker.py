@@ -1,6 +1,7 @@
 """Docker: contenedores, imágenes, Dockerfile y Compose. 3 etapas."""
 from ..generador import K
 from .docker_e45 import E4, E5
+from .docker_e678 import E6, E7, E8
 
 E1 = [
 K("Qué es Docker", d="herramienta que empaqueta aplicaciones en contenedores", u="que una app funcione igual en cualquier computador o servidor",
@@ -203,4 +204,7 @@ ETAPAS_CONCEPTOS = [
     ("Compose y producción", "Varios servicios, XAMPP, registros y buenas prácticas", E3),
     ("Docker a fondo", "exec, inspect, caché, multi-stage, seguridad y limpieza", E4),
     ("Orquestación y nube", "Compose avanzado, Kubernetes, CI y despliegue", E5),
+    ("Docker para tus proyectos", "Flask, FastAPI, Django, React, PHP y bases de datos en contenedores", E6),
+    ("Imágenes y seguridad", "ARG, etiquetas, registros, escaneo, BuildKit, límites y contenedores seguros", E7),
+    ("Kubernetes y producción", "ConfigMaps, Ingress, probes, escalado, Helm, Swarm y monitoreo", E8),
 ]

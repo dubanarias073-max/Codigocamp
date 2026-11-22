@@ -16,13 +16,13 @@ from datetime import timedelta, timezone
 from pathlib import PurePosixPath
 
 from flask import Blueprint, current_app, jsonify
-from flask_login import current_user
+from flask_login import current_user, login_required
 
 from models import Attachment, TutorUsage, db, utcnow
 from rutas.archivos import _ruta
 from rutas.adjuntos import tomar
 from servicios.perfil import get_profile
-from utilidades import api_error, client_ip, json_body
+from utilidades import api_error, client_ip, json_body, too_many
 
 bp = Blueprint("tutor", __name__)
 API = "https://generativelanguage.googleapis.com"
@@ -300,6 +300,9 @@ def tutor():
         except ValueError as e:
             return api_error(str(e))
     db.session.add(TutorUsage(usuario_id=usuario.id if usuario else None, ip=client_ip()))
+    if usuario:
+        from servicios.perfil import contar_actividad, get_profile
+        contar_actividad(get_profile(usuario), "ia")
     db.session.commit()
 
     history = data.get("historial") if isinstance(data.get("historial"), list) else []
@@ -347,3 +350,73 @@ def tutor():
         guardar_intercambio(conv, message, [a.nombre for a in adjuntos], answer)
         return jsonify(respuesta=answer, copiloto=copiloto, conversacion={"id": conv.id, "titulo": conv.titulo})
     return jsonify(respuesta=answer, copiloto=copiloto)
+
+
+COMPLETAR = """Eres un motor de autocompletado de código como GitHub Copilot, dentro del editor de CódigoCamp.
+Recibes el archivo con el cursor marcado como <CURSOR>. Devuelve SOLO el texto que va exactamente en el cursor:
+sin explicaciones, sin ``` ni repetir lo que ya está antes o después del cursor.
+- Completa la línea actual y, si es natural, unas pocas líneas más (máximo 12) siguiendo el estilo y la indentación del archivo.
+- Usa los nombres de variables, funciones e imports que ya existen en el archivo y en los otros archivos que te paso.
+- Si el código ya está completo en ese punto o no sabes qué sigue, devuelve una cadena vacía.
+- Comentarios en español, como el resto de CódigoCamp."""
+
+
+@bp.post("/api/tutor/completar/")
+@login_required
+def completar():
+    """Sugerencias en línea (texto fantasma) mientras escribes en Trabajo. Tab las acepta."""
+    data = json_body()
+    if isinstance(data, tuple):
+        return data
+    antes, despues = str(data.get("antes", ""))[-6000:], str(data.get("despues", ""))[:2000]
+    if not antes.strip():
+        return jsonify(texto="")
+    api_key = current_app.config["GEMINI_API_KEY"]
+    if not api_key:
+        return api_error("Falta GEMINI_API_KEY en backend/.env.", 503)
+    if too_many(f"completar:{current_user.id}", 40, 60):   # ~1 cada 1,5 s escribiendo seguido
+        return jsonify(texto="", espera=True)
+    ruta, lenguaje = str(data.get("ruta", ""))[:200], str(data.get("lenguaje", ""))[:30]
+    otros = ""
+    for o in (data.get("otros") or [])[:4]:
+        if isinstance(o, dict):
+            otros += f"\n--- {str(o.get('ruta', ''))[:200]} ---\n{str(o.get('texto', ''))[:3000]}\n"
+    prompt = (f"Archivo: {ruta} ({lenguaje})\n" + (f"Otros archivos del proyecto:{otros}\n" if otros else "")
+              + f"--- {ruta} ---\n{antes}<CURSOR>{despues}")
+    payload = json.dumps({
+        "systemInstruction": {"parts": [{"text": COMPLETAR}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 400, "thinkingConfig": {"thinkingBudget": 0}},
+    }).encode()
+    try:
+        result, _ = generar(payload, api_key, current_app.config["GEMINI_MODEL"], timeout=20)
+        cand = result["candidates"][0]
+        texto = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []) if not p.get("thought"))
+    except urllib.error.HTTPError as e:
+        if e.code == 400:   # modelos sin thinkingConfig: se reintenta sin él
+            try:
+                p2 = json.loads(payload); p2["generationConfig"].pop("thinkingConfig", None)
+                result, _ = generar(json.dumps(p2).encode(), api_key, current_app.config["GEMINI_MODEL"], timeout=20)
+                texto = "".join(p.get("text", "") for p in result["candidates"][0].get("content", {}).get("parts", []) if not p.get("thought"))
+            except Exception:
+                return jsonify(texto="")
+        else:
+            return jsonify(texto="")
+    except Exception:
+        return jsonify(texto="")
+    return jsonify(texto=limpiar_sugerencia(texto, antes, despues))
+
+
+def limpiar_sugerencia(texto, antes, despues):
+    """Quita cercas ```, el marcador y lo que la IA repitió del texto de antes o de después del cursor."""
+    t = texto.replace("<CURSOR>", "")
+    m = re.match(r"^\s*```[\w+-]*\n([\s\S]*?)\n?```\s*$", t)
+    if m:
+        t = m.group(1)
+    linea = antes.rsplit("\n", 1)[-1]
+    if linea.strip() and t.startswith(linea):      # repitió la línea ya escrita
+        t = t[len(linea):]
+    sig = despues.split("\n", 1)[0]
+    if sig.strip() and t.rstrip().endswith(sig.strip()):   # repitió lo que ya está después
+        t = t.rstrip()[: -len(sig.strip())]
+    lineas = t.split("\n")[:12]
+    return "\n".join(lineas).rstrip() if len(lineas) > 1 else lineas[0]

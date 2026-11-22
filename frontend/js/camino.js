@@ -71,6 +71,10 @@ const LENG = {
     abre: (s) => [["x", "db."], ["f", sl(s)], ["x", "."], ["f", "insertMany"], ["p", "(["]],
     leccion: (t) => [["p", "{ "], ["a", "leccion"], ["p", ": "], str(t), ["p", " },"]],
     cofre: () => [["p", "{ "], ["a", "cofre"], ["p", ": "], ["k", "true"], ["p", " },"]], cierra: [["p", "]);"]] },
+  react: { ext: "jsx", com: ["{/* ", " */}"], sangria: "  ",
+    abre: (s) => [["t", "<Seccion"], ["x", " "], ["a", "nombre"], ["p", "="], ["s", `"${sl(s)}"`], ["t", ">"]],
+    leccion: (t) => [["t", "<Leccion"], ["x", " "], ["a", "titulo"], ["p", "="], ["s", JSON.stringify(t)], ["x", " "], ["t", "/>"]],
+    cofre: () => [["t", "<Cofre"], ["x", " "], ["t", "/>"], ["x", " 🎁"]], cierra: [["t", "</Seccion>"]] },
   node: llaves("js", "// ", (n) => [["k", "export async function"], ["x", " "], ["f", n], ["p", "() {"]], ";"),
   bd: { ext: "js", com: "// ", sangria: "  ",
     abre: () => [["x", "db."], ["f", "camino"], ["x", "."], ["f", "insertMany"], ["p", "(["]],
@@ -100,7 +104,7 @@ export function pintarSeccion(slug, seccion, numero, color) {
       : L.leccion(nv.titulo, ultimo);
     const bloqueado = nv.estado === "bloqueado";
     const texto = bloqueado ? `<span class="tk-c">${esc(sg + comentar(L.com, plano(tokens)))}</span>` : esc(sg) + html(tokens);
-    const marca = nv.estado === "hecho" ? (nv.tipo === "cofre" ? "🎁" : "★".repeat(nv.estrellas || 1)) : nv.estado === "actual" ? "▶ EMPEZAR" : "🔒";
+    const marca = nv.estado === "hecho" ? (nv.tipo === "cofre" ? "🎁" : "★".repeat(nv.estrellas || 1)) : nv.estado === "actual" ? "▶ EMPEZAR" : nv.estado === "pendiente" ? "↺ PENDIENTE" : "🔒";
     filas.push(`<button type="button" class="cl ${nv.estado} ${nv.tipo}" data-id="${nv.id}" data-tipo="${nv.tipo}" data-estado="${nv.estado}" aria-label="${esc(nv.titulo)}${bloqueado ? " (bloqueada)" : ""}">
       <span class="cl-n">${++n}</span><span class="cl-g"></span>
       <span class="cl-c">${texto}${nv.estado === "actual" ? '<i class="cursor"></i>' : ""}</span><span class="cl-s">${marca}</span></button>`);

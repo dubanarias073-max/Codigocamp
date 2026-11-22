@@ -1,5 +1,6 @@
 """GitHub: de crear tu cuenta a Actions, Pages, seguridad y open source. 5 etapas."""
 from ..generador import K
+from .github_e678 import E6, E7, E8
 
 E1 = [
 K("Qué es GitHub", d="plataforma en la nube para guardar repositorios de Git y colaborar", u="tener tu código en línea, trabajar en equipo y mostrar tu portafolio",
@@ -414,4 +415,7 @@ ETAPAS_CONCEPTOS = [
     ("GitHub Actions", "CI/CD: workflows, eventos, jobs, secretos y matrices", E3),
     ("Publica y comparte", "Pages, releases, paquetes, gists, CLI y Codespaces", E4),
     ("Seguridad y comunidad", "Dependabot, escaneo, 2FA, Projects, organizaciones y open source", E5),
+    ("Trabaja como en una empresa", "Rulesets, CODEOWNERS, borradores, auto-merge, milestones y búsquedas", E6),
+    ("Actions a fondo", "Caché, contextos, condiciones, entornos, reutilización, OIDC y depuración", E7),
+    ("API, automatización y comunidad", "API REST y GraphQL, apps, webhooks, Copilot y open source", E8),
 ]

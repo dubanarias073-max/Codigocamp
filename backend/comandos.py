@@ -31,7 +31,7 @@ def registrar_comandos(app):
         from retos import sincronizar_catalogo
 
         if sincronizar_catalogo(db.session):
-            print("Catálogo sincronizado; el progreso de niveles se conservó.")
+            print("Catálogo sincronizado: se agregaron o actualizaron cursos, etapas y lecciones; el progreso de los estudiantes se conservó.")
         else:
             print("El catálogo ya estaba actualizado; no se hicieron cambios.")
 

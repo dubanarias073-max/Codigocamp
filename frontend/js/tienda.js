@@ -9,11 +9,11 @@ const COSMETICO = new Set(["fondo", "cursor", "tema", "marco", "efecto", "dedo"]
 const TACTIL = matchMedia("(pointer: coarse)").matches;
 const AYUDA = {
   fondo: "El fondo se ve detrás de todas las páginas. Prueba cómo queda con «Probar».",
-  cursor: TACTIL ? "Los punteros se ven cuando usas mouse (en el computador). En el celular prueba «Para el celular»." : "Pasa el mouse sobre la tarjeta para probar el puntero.",
+  cursor: TACTIL ? "Los punteros se ven cuando usas mouse (en el computador). Cada uno trae 3: normal, mano (enlaces y botones) y texto (para escribir). En el celular prueba los «Rastros»." : "Cada puntero trae 3: normal, mano (enlaces y botones) y texto (para escribir). Pasa el mouse por cada uno para probarlo.",
   tema: "Cambia el color de botones, barras y enlaces en todo CódigoCamp.",
   marco: "Un aro alrededor de tu foto de perfil: se ve en tu perfil, en los chats y en la barra lateral.",
   efecto: "Haz clic en la vista previa para ver el efecto.",
-  dedo: "Estelas para el celular: siguen tu dedo cuando tocas y deslizas la pantalla. Pruébalas tocando y deslizando sobre cada tarjeta.",
+  dedo: "Rastros: siguen tu mouse en el computador y tu dedo en el celular (también mientras desplazas la pantalla). Pruébalos moviendo el mouse o deslizando el dedo sobre cada tarjeta.",
   potenciador: "Vidas, salvarrachas, XP y cofres sorpresa.",
   coleccion: "Todo lo que tienes. Ponte o quítate cada cosmético cuando quieras. Los exclusivos salen de los cofres de Recompensas.",
 };

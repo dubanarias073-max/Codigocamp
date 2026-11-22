@@ -1,4 +1,6 @@
 """Amigos: buscar usuarios, enviar, aceptar y quitar solicitudes."""
+import hashlib
+
 from rutas.cosmeticos import equipados_de, foto_url
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
@@ -28,7 +30,7 @@ def amigos():
                 Message.amistad_id == friendship.id, Message.leido.is_(False),
                 Message.autor_id != current_user.id,
             ).count()
-            item.update(no_leidos=unread, ultimo=last.texto[:60] if last else "", orden=last.id if last else 0)
+            item.update(no_leidos=unread, ultimo=("🚫 Mensaje eliminado" if last.borrado_en else last.texto[:60]) if last else "", orden=last.id if last else 0)
             friends.append(item)
         elif friendship.a_usuario_id == current_user.id:
             received.append(item)
@@ -61,6 +63,36 @@ def usuarios_buscar():
     return jsonify(resultados=[{
         "nombre": p.user.nombre, "alias": p.alias, "avatar": "", "foto": foto_url(p.usuario_id), "relacion": relacion.get(p.usuario_id),
     } for p in filas if p.alias])
+
+
+@bp.post("/api/amigos/contactos/")
+@login_required
+def amigos_contactos():
+    """Quién de tus contactos ya está en CódigoCamp. El teléfono manda solo el sha256 de cada correo (en minúsculas):
+    la agenda nunca llega al servidor y no se guarda nada. Solo aparecen quienes dejan que los encuentren por su correo."""
+    data = json_body()
+    if isinstance(data, tuple):
+        return data
+    hashes = data.get("hashes")
+    if not isinstance(hashes, list):
+        return api_error("Faltan los contactos.")
+    pedidos = {str(h).lower() for h in hashes[:1000] if isinstance(h, str) and len(h) == 64 and all(c in "0123456789abcdef" for c in h.lower())}
+    if not pedidos:
+        return jsonify(resultados=[])
+    if too_many(f"contactos:{current_user.id}", 10, 3600):
+        return api_error("Ya buscaste tus contactos varias veces. Inténtalo en una hora.", 429)
+    relacion = {}
+    for f in my_friendships(current_user.id).all():
+        otro = f.a_usuario_id if f.de_usuario_id == current_user.id else f.de_usuario_id
+        relacion[otro] = "amigo" if f.estado == "aceptada" else ("enviada" if f.de_usuario_id == current_user.id else "recibida")
+    resultados = []
+    filas = (db.session.query(User, Profile).join(Profile, Profile.usuario_id == User.id)
+             .filter(User.activo.is_(True), User.id != current_user.id, Profile.buscable_correo.is_(True), Profile.alias.isnot(None)))
+    for user, p in filas.yield_per(500):
+        h = hashlib.sha256(user.email.strip().lower().encode()).hexdigest()
+        if h in pedidos:
+            resultados.append({"hash": h, "nombre": user.nombre, "alias": p.alias, "foto": foto_url(user.id), "relacion": relacion.get(user.id)})
+    return jsonify(resultados=resultados[:200])
 
 
 @bp.post("/api/amigos/agregar/")

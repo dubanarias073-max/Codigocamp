@@ -85,3 +85,15 @@
   .r-pie #mensaje h2{font-size:16px}
 }
 @media (max-height:560px){ .r-pie #mensaje{max-height:22vh} .r-cuerpo h1{margin:4px 0 10px} }
+
+/* Racha de hoy al terminar (como en Duolingo) */
+.racha-hoy { display: grid; justify-items: center; gap: 6px; margin: 14px auto 18px; padding: 18px 22px; max-width: 320px; border-radius: 22px; background: linear-gradient(160deg, rgba(251, 146, 60, .18), rgba(239, 68, 68, .12)); border: 1px solid rgba(251, 146, 60, .45); animation: racha-entra .55s .8s both cubic-bezier(.3, 1.5, .5, 1); }
+.racha-fuego { font-size: 64px; line-height: 1; filter: drop-shadow(0 6px 18px rgba(249, 115, 22, .55)); animation: racha-llama 1.2s 1.2s ease-in-out infinite alternate; }
+.racha-num { display: flex; align-items: baseline; gap: 8px; }
+.racha-num b { font-size: 40px; font-weight: 900; color: #f97316; animation: racha-num .6s 1.1s both cubic-bezier(.3, 1.8, .5, 1); }
+.racha-num span { font-weight: 800; color: var(--sub); }
+.racha-hoy p { margin: 0; font-weight: 800; }
+@keyframes racha-entra { from { opacity: 0; transform: scale(.6) translateY(20px); } to { opacity: 1; transform: none; } }
+@keyframes racha-llama { from { transform: scale(1) rotate(-3deg); } to { transform: scale(1.12) rotate(3deg); } }
+@keyframes racha-num { from { transform: scale(.3); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .racha-hoy, .racha-fuego, .racha-num b { animation: none; } }

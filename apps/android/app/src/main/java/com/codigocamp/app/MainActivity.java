@@ -16,6 +16,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Message;
+import android.database.Cursor;
+import android.provider.ContactsContract;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.view.ViewGroup;
@@ -35,6 +37,11 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * CódigoCamp en una sola app: la plataforma completa (en un WebView con su propia sesión) + el widget de racha.
@@ -44,6 +51,7 @@ public class MainActivity extends Activity {
     static final String EXTRA_URL = "url";
     private static final int PEDIR_ARCHIVOS = 41;
     private static final int PEDIR_PERMISO = 42;
+    private static final int PEDIR_CONTACTOS = 43;
 
     private WebView web;
     private ValueCallback<Uri[]> alElegirArchivos;
@@ -94,6 +102,8 @@ public class MainActivity extends Activity {
     }
 
     private String urlInicial(Intent intent) {
+        String entrar = urlDeEntrada(intent);
+        if (entrar != null) return entrar;
         String u = intent != null ? intent.getStringExtra(EXTRA_URL) : null;
         if (u != null && u.startsWith(base)) return u;
         return base + "/pages/inicio.html?app=1";
@@ -102,6 +112,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        String entrar = urlDeEntrada(intent);
+        if (entrar != null) { web.loadUrl(entrar); return; }
         String u = intent.getStringExtra(EXTRA_URL);
         if (u != null && u.startsWith(base)) web.loadUrl(u);
     }
@@ -144,7 +156,24 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public String version() { return "2.0"; }
+        public String version() { return "2.1"; }
+
+        /** Pide permiso para leer los contactos (solo la primera vez) y se los entrega a la página con window.ccContactosApp(json). */
+        @JavascriptInterface
+        public void pedirContactos() {
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[] { Manifest.permission.READ_CONTACTS }, PEDIR_CONTACTOS);
+                } else {
+                    leerContactos();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean tieneContactos() {
+            return Build.VERSION.SDK_INT < 23 || checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED;
+        }
 
         /** Guarda en Descargas un archivo que la página armó en memoria (el .zip de Trabajo, un archivo del proyecto…). */
         @JavascriptInterface
@@ -200,9 +229,50 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Lee nombre, correos y teléfonos de la agenda (en segundo plano) y los manda a la página. Nada se guarda en la app. */
+    private void leerContactos() {
+        new Thread(() -> {
+            JSONArray lista = new JSONArray();
+            try {
+                Map<String, JSONObject> porId = new LinkedHashMap<>();
+                String[] cols = { ContactsContract.Data.CONTACT_ID, ContactsContract.Data.DISPLAY_NAME, ContactsContract.Data.MIMETYPE, ContactsContract.Data.DATA1 };
+                String filtro = ContactsContract.Data.MIMETYPE + " IN (?, ?)";
+                String[] tipos = { ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE, ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE };
+                try (Cursor c = getContentResolver().query(ContactsContract.Data.CONTENT_URI, cols, filtro, tipos, ContactsContract.Data.DISPLAY_NAME + " ASC")) {
+                    while (c != null && c.moveToNext() && porId.size() < 2000) {
+                        String id = c.getString(0), nombre = c.getString(1), tipo = c.getString(2), dato = c.getString(3);
+                        if (dato == null || dato.trim().isEmpty()) continue;
+                        JSONObject o = porId.get(id);
+                        if (o == null) {
+                            o = new JSONObject();
+                            o.put("nombre", nombre == null ? "" : nombre);
+                            o.put("email", new JSONArray());
+                            o.put("tel", new JSONArray());
+                            porId.put(id, o);
+                        }
+                        o.getJSONArray(ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE.equals(tipo) ? "email" : "tel").put(dato.trim());
+                    }
+                }
+                for (JSONObject o : porId.values()) lista.put(o);
+                enviarContactos(lista.toString());
+            } catch (Exception e) {
+                enviarContactos("{\"error\":" + JSONObject.quote(String.valueOf(e.getMessage())) + "}");
+            }
+        }).start();
+    }
+
+    private void enviarContactos(String json) {
+        runOnUiThread(() -> web.evaluateJavascript("window.ccContactosApp&&window.ccContactosApp(" + json + ")", null));
+    }
+
     @Override
     public void onRequestPermissionsResult(int codigo, String[] permisos, int[] resultados) {
         super.onRequestPermissionsResult(codigo, permisos, resultados);
+        if (codigo == PEDIR_CONTACTOS) {
+            if (resultados.length > 0 && resultados[0] == PackageManager.PERMISSION_GRANTED) leerContactos();
+            else enviarContactos("{\"error\":\"permiso\"}");
+            return;
+        }
         if (codigo == PEDIR_PERMISO && pendienteDatos != null) {
             byte[] d = pendienteDatos; pendienteDatos = null;
             if (resultados.length > 0 && resultados[0] == PackageManager.PERMISSION_GRANTED) guardarEnDescargas(pendienteNombre, d, pendienteTipo);
@@ -238,6 +308,22 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** codigocamp-app://entrar?c=CÓDIGO (después de entrar con Google en el navegador) -> abrir la sesión aquí. */
+    private String urlDeEntrada(Intent intent) {
+        if (intent == null || intent.getData() == null) return null;
+        Uri d = intent.getData();
+        if (!"codigocamp-app".equals(d.getScheme()) || !"entrar".equals(d.getHost())) return null;
+        String c = d.getQueryParameter("c");
+        if (c == null || !c.matches("[A-Za-z0-9_-]{20,100}")) return null;
+        return base + "/api/auth/app/entrar?c=" + c;
+    }
+
+    /** Google no deja iniciar sesión dentro de una app: se hace en el navegador y vuelve con el código. */
+    private boolean esInicioGoogle(Uri u) {
+        String p = u.getPath() == null ? "" : u.getPath();
+        return esDeCodigoCamp(u) && p.startsWith("/auth/google") && !p.contains("callback");
+    }
+
     private boolean esDeCodigoCamp(Uri u) {
         Uri b = Uri.parse(base);
         return u.getHost() != null && u.getHost().equalsIgnoreCase(b.getHost());
@@ -251,6 +337,17 @@ public class MainActivity extends Activity {
             String esquema = u.getScheme() == null ? "" : u.getScheme();
             if ("codigocamp-widget".equals(esquema)) {   // enlace de la versión anterior: la app ya se conecta sola
                 Toast.makeText(MainActivity.this, "El widget ya está conectado a esta app.", Toast.LENGTH_SHORT).show();
+                return true;
+            }
+            if (esInicioGoogle(u)) {
+                abrirEnNavegador(Uri.parse(base + "/auth/google/?app=1"));
+                Toast.makeText(MainActivity.this, "Elige tu cuenta de Google y luego vuelve a la app.", Toast.LENGTH_LONG).show();
+                return true;
+            }
+            if ("codigocamp-app".equals(esquema)) {
+                Intent i = new Intent(Intent.ACTION_VIEW, u);
+                String entrar = urlDeEntrada(i);
+                if (entrar != null) vista.loadUrl(entrar);
                 return true;
             }
             if (("http".equals(esquema) || "https".equals(esquema)) && esDeCodigoCamp(u)) return false;

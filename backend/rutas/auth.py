@@ -4,7 +4,7 @@ import secrets
 
 from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.flask_client import OAuth
-from flask import Blueprint, current_app, jsonify, redirect, request, url_for
+from flask import Blueprint, current_app, jsonify, redirect, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -49,7 +49,22 @@ def google_login():
     from urllib.parse import urlsplit
     destino = urlsplit(redirect_uri)
     if destino.netloc and destino.netloc.lower() != (request.host or "").lower() and request.args.get("paso") != "1":
-        return redirect(f"{destino.scheme}://{destino.netloc}/auth/google/?paso=1")
+        extra = "&app=1" if request.args.get("app") == "1" else ""
+        if extra and re.fullmatch(r"[a-f0-9]{64}", str(request.args.get("espera", ""))):
+            extra += f"&espera={request.args['espera']}"
+        return redirect(f"{destino.scheme}://{destino.netloc}/auth/google/?paso=1{extra}")
+    # Desde la app de Android: Google no deja entrar dentro de la app, así que esto corre en el navegador del celular y al
+    # final se vuelve a la app con un código de un solo uso (ver google_callback y /api/auth/app/entrar).
+    if request.args.get("app") == "1":
+        session["google_app"] = True
+        espera = str(request.args.get("espera", "")).lower()
+        if re.fullmatch(r"[a-f0-9]{64}", espera):
+            session["google_app_espera"] = espera
+        else:
+            session.pop("google_app_espera", None)
+    else:
+        session.pop("google_app", None)
+        session.pop("google_app_espera", None)
     # select_account: Google siempre deja elegir (o agregar) otra cuenta en vez de entrar con la última usada.
     return oauth.google.authorize_redirect(redirect_uri, prompt="select_account")
 
@@ -100,10 +115,116 @@ def google_callback():
     except IntegrityError:
         db.session.rollback()
         return redirect("/pages/login.html?error=google_conflict")
+    if session.pop("google_app", False):
+        # Se entró desde la app: la sesión NO se abre en este navegador, sino en la app (con el código).
+        return _volver_a_la_app(user, nuevo)
     _entrar(user, "Google")
     _avisar_inicio(user, "Google", nuevo)
     destination = "/pages/inicio.html" if user.profile and user.profile.onboarding_completo else "/pages/onboarding.html"
     return redirect(destination)
+
+
+# ---------- Entrar con Google desde la app de Android ----------
+SEGUNDOS_CODIGO_APP = 180
+PAQUETE_APP = "com.codigocamp.app"
+
+
+def _hash_codigo(codigo):
+    import hashlib
+    return hashlib.sha256(codigo.encode()).hexdigest()
+
+
+def _volver_a_la_app(user, nuevo):
+    from datetime import timedelta
+
+    from models import AppLoginCode, utcnow
+    AppLoginCode.query.filter(AppLoginCode.creado < utcnow() - timedelta(hours=1)).delete()
+    codigo = secrets.token_urlsafe(32)
+    db.session.add(AppLoginCode(codigo_hash=_hash_codigo(codigo), usuario_id=user.id, nuevo=nuevo, espera_hash=session.pop("google_app_espera", None)))
+    db.session.commit()
+    from urllib.parse import quote
+    respaldo = quote(f"{request.host_url.rstrip('/')}/pages/login.html?error=app", safe="")
+    intento = f"intent://entrar?c={codigo}#Intent;scheme=codigocamp-app;package={PAQUETE_APP};S.browser_fallback_url={respaldo};end"
+    directo = f"codigocamp-app://entrar?c={codigo}"
+    nombre = (user.nombre or "").split(" ")[0]
+    html = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Volviendo a CódigoCamp</title><meta name="robots" content="noindex"></head>
+<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#0b1020;color:#e5eaff;font:16px system-ui;text-align:center;padding:24px;box-sizing:border-box">
+<div style="max-width:360px"><div style="font-size:52px">✅</div><h2 style="margin:8px 0">¡Listo{', ' + _esc_html(nombre) if nombre else ''}!</h2>
+<p style="opacity:.8;line-height:1.5">Entraste con Google. Vuelve a la app de CódigoCamp: ya tiene tu sesión abierta (y tu widget se conecta solo). Puedes cerrar esta pestaña.</p>
+<a id="ir" href="{intento}" style="display:block;margin-top:18px;padding:15px 22px;border-radius:14px;background:#caff4e;color:#04130d;font-weight:800;text-decoration:none">Abrir la app CódigoCamp</a>
+<p style="opacity:.6;font-size:13px;margin-top:16px">Este enlace sirve una sola vez y vence en 3 minutos.</p></div>
+<script>setTimeout(function(){{location.href={_json_js(intento)}}},300);document.getElementById("ir").addEventListener("click",function(e){{if(!/android/i.test(navigator.userAgent)){{e.preventDefault();location.href={_json_js(directo)}}}}});</script>
+</body></html>"""
+    resp = current_app.response_class(html, mimetype="text/html")
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    return resp
+
+
+def _esc_html(t):
+    return str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+def _json_js(v):
+    import json
+    return json.dumps(v).replace("<", "\\u003c")
+
+
+@bp.get("/api/auth/app/entrar")
+def entrar_desde_app():
+    """La app abre esta dirección con el código que le pasó el navegador: la sesión queda en la app (y su widget)."""
+    from datetime import timedelta
+
+    from models import AppLoginCode, utcnow
+    codigo = str(request.args.get("c", ""))[:100]
+    if too_many(f"app-entrar:{client_ip()}", 20, 600):
+        return redirect("/pages/login.html?error=app")
+    fila = AppLoginCode.query.filter_by(codigo_hash=_hash_codigo(codigo)).first() if codigo else None
+    creado = fila.creado if fila else None
+    if creado is not None and creado.tzinfo is None:
+        from datetime import timezone
+        creado = creado.replace(tzinfo=timezone.utc)
+    if fila is None or fila.usado or creado < utcnow() - timedelta(seconds=SEGUNDOS_CODIGO_APP):
+        return redirect("/pages/login.html?error=app")
+    fila.usado = True
+    db.session.commit()
+    user = db.session.get(User, fila.usuario_id)
+    if user is None or not user.activo:
+        return redirect("/pages/login.html?error=google_inactive")
+    _entrar(user, "Google")
+    _avisar_inicio(user, "Google", fila.nuevo)
+    destino = "/pages/inicio.html" if user.profile and user.profile.onboarding_completo else "/pages/onboarding.html"
+    return redirect(destino + "?app=1")
+
+
+@bp.post("/api/auth/app/esperar")
+def esperar_desde_app():
+    """La app pregunta cada 2 s mientras eliges tu cuenta de Google en el navegador. Cuando Google termina, la sesión se
+    abre aquí (en la app), aunque el navegador no haya podido volver a la app. Solo la app conoce el secreto: el
+    navegador únicamente vio su sha256."""
+    from datetime import timedelta
+
+    from models import AppLoginCode, utcnow
+    secreto = str((request.get_json(silent=True) or {}).get("secreto", ""))[:100]
+    if not re.fullmatch(r"[A-Za-z0-9_-]{30,100}", secreto) or too_many(f"app-esperar:{client_ip()}", 200, 600):
+        return jsonify(listo=False), 400
+    fila = AppLoginCode.query.filter_by(espera_hash=_hash_codigo(secreto)).order_by(AppLoginCode.id.desc()).first()
+    creado = fila.creado if fila else None
+    if creado is not None and creado.tzinfo is None:
+        from datetime import timezone
+        creado = creado.replace(tzinfo=timezone.utc)
+    if fila is None or fila.usado or creado < utcnow() - timedelta(seconds=SEGUNDOS_CODIGO_APP):
+        return jsonify(listo=False)
+    fila.usado = True
+    db.session.commit()
+    user = db.session.get(User, fila.usuario_id)
+    if user is None or not user.activo:
+        return jsonify(listo=False, error="Esta cuenta está desactivada."), 403
+    _entrar(user, "Google")
+    _avisar_inicio(user, "Google", fila.nuevo)
+    destino = "/pages/inicio.html" if user.profile and user.profile.onboarding_completo else "/pages/onboarding.html"
+    return jsonify(listo=True, destino=destino + "?app=1")
 
 
 @bp.get("/api/auth/me/")

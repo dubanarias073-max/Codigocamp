@@ -1,6 +1,7 @@
 """Terminales: Bash (Linux/macOS/Git Bash), PowerShell y CMD (Windows). 3 etapas."""
 from ..generador import K
 from .terminal_e45 import E4, E5
+from .terminal_e678 import E6, E7, E8
 
 E1 = [
 K("Qué es la terminal", d="programa de texto donde escribes órdenes para el sistema", u="controlar el computador escribiendo comandos en vez de usar el mouse",
@@ -244,4 +245,7 @@ ETAPAS_CONCEPTOS = [
     ("PowerShell, CMD y más", "Las terminales de Windows, paquetes, SSH y VS Code", E3),
     ("Automatiza con scripts", "Bash y PowerShell: argumentos, if, bucles, funciones y cron", E4),
     ("Terminal profesional", "find, sed, awk, curl, WSL, alias y tmux", E5),
+    ("Archivos y texto a fondo", "head, tail, sort, cut, diff, enlaces, permisos, comodines y redirecciones", E6),
+    ("Sistema y redes", "Procesos, servicios, logs, red, SSH, rsync, usuarios y firewall", E7),
+    ("Scripts profesionales", "Modo estricto, arreglos, case, trap, getopts, jq, regex y make", E8),
 ]

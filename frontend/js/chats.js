@@ -46,6 +46,69 @@ function contenido(texto) {
   });
   return frag;
 }
+function llenarBurbuja(d, m) {
+  d.replaceChildren();
+  d.classList.toggle("borrado", Boolean(m.borrado));
+  if (m.borrado) {
+    d.classList.remove("solo-adj");
+    const t = document.createElement("i");
+    t.textContent = m.yo ? "🚫 Eliminaste este mensaje" : "🚫 Se eliminó este mensaje";
+    d.append(t);
+  } else {
+    if (m.texto) d.append(contenido(m.texto));
+    if (m.adjuntos?.length) d.insertAdjacentHTML("beforeend", htmlAdjuntos(m.adjuntos));
+    if (m.yo) d.insertAdjacentHTML("beforeend", '<button type="button" class="cm-mas" aria-label="Opciones del mensaje" title="Opciones">⋯</button>');
+  }
+  const h = document.createElement("small"); h.className = "cm-hora"; h.textContent = m.hora; d.append(h);
+  d._m = m;
+}
+/** Quita de la pantalla los mensajes que se eliminaron (también los que eliminó la otra persona). */
+function aplicarBorrados(ids = []) {
+  for (const id of ids) {
+    const d = $("log").querySelector(`.cm[data-id="${id}"]`);
+    if (d && !d.classList.contains("borrado")) llenarBurbuja(d, { ...d._m, borrado: true, texto: "", adjuntos: [] });
+  }
+}
+// Menú de un mensaje tuyo: ⋯ (o mantener pulsado en el celular) → Copiar / Eliminar para todos
+function menuMensaje(d, x, y) {
+  document.getElementById("cmMenu")?.remove();
+  const m = d._m;
+  if (!m || m.borrado || !m.yo) return;
+  const menu = document.createElement("div");
+  menu.id = "cmMenu"; menu.className = "cm-menu"; menu.setAttribute("role", "menu");
+  menu.innerHTML = `${m.texto ? '<button type="button" role="menuitem" data-a="copiar">📋 Copiar</button>' : ""}<button type="button" role="menuitem" data-a="borrar" class="peligro">🗑 Eliminar para todos</button>`;
+  document.body.append(menu);
+  const r = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(x - r.width, innerWidth - r.width - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(y, innerHeight - r.height - 8))}px`;
+  menu.onclick = async (e) => {
+    const a = e.target.closest("[data-a]")?.dataset.a;
+    menu.remove();
+    if (a === "copiar") navigator.clipboard?.writeText(m.texto).then(() => aviso("Mensaje copiado")).catch(() => {});
+    if (a === "borrar") {
+      if (!confirm("¿Eliminar este mensaje para todos? Tu amigo dejará de verlo.")) return;
+      try { const r2 = await api(`/api/chat/${activo}/${m.id}/`, undefined, "DELETE"); llenarBurbuja(d, r2.mensaje); cargarLista().catch(() => {}); }
+      catch (x) { aviso(x.message, true); }
+    }
+  };
+  setTimeout(() => addEventListener("pointerdown", function fuera(e) { if (!menu.contains(e.target)) { menu.remove(); removeEventListener("pointerdown", fuera); } }), 0);
+}
+$("log").addEventListener("click", (e) => {
+  const b = e.target.closest(".cm-mas");
+  if (b) { const r = b.getBoundingClientRect(); menuMensaje(b.closest(".cm"), r.right, r.bottom + 4); }
+});
+{
+  let t = 0;
+  $("log").addEventListener("touchstart", (e) => {
+    const d = e.target.closest(".cm.yo:not(.borrado)");
+    if (!d || e.touches.length > 1) return;
+    const { clientX: x, clientY: y } = e.touches[0];
+    t = setTimeout(() => { navigator.vibrate?.(15); menuMensaje(d, x, y); }, 500);
+  }, { passive: true });
+  for (const ev of ["touchmove", "touchend", "touchcancel"]) $("log").addEventListener(ev, () => clearTimeout(t), { passive: true });
+  $("log").addEventListener("contextmenu", (e) => { const d = e.target.closest(".cm.yo:not(.borrado)"); if (d) { e.preventDefault(); menuMensaje(d, e.clientX, e.clientY); } });
+}
+
 function nombreDia(fecha) {
   const d = new Date(fecha);
   if (Number.isNaN(d.getTime())) return "";
@@ -66,9 +129,8 @@ function pintar(ms, { forzar = false } = {}) {
     }
     const d = document.createElement("div");
     d.className = "cm" + (m.yo ? " yo" : "") + (ultimoAutor === m.yo ? " seguido" : "") + (m.adjuntos?.length && !m.texto ? " solo-adj" : "");
-    if (m.texto) d.append(contenido(m.texto));
-    if (m.adjuntos?.length) d.insertAdjacentHTML("beforeend", htmlAdjuntos(m.adjuntos));
-    const h = document.createElement("small"); h.className = "cm-hora"; h.textContent = m.hora; d.append(h);
+    d.dataset.id = m.id;
+    llenarBurbuja(d, m);
     log.appendChild(d); ultimo = m.id; ultimoAutor = m.yo;
   }
   if (abajo || !ms.length) log.scrollTop = log.scrollHeight;
@@ -152,7 +214,52 @@ $("solicitudes").onclick = async (e) => {
 };
 const copiar = (texto, ok) => navigator.clipboard?.writeText(texto).then(() => aviso(ok)).catch(() => aviso(texto));
 $("copiar").onclick = () => copiar(datos.yo.codigo, "ID copiado");
-$("invitar").onclick = () => copiar(`${location.origin}/pages/chats.html?agregar=${datos.yo.codigo}`, "Enlace copiado: mándalo a quien quieras invitar");
+const enlaceInvitacion = () => `${location.origin}/pages/chats.html?agregar=${datos.yo.codigo}`;
+$("invitar").onclick = async () => {
+  const url = enlaceInvitacion();
+  if (navigator.share && TACTIL) {   // en el celular: el menú de compartir (WhatsApp, SMS, correo…)
+    try { await navigator.share({ title: "CódigoCamp", text: "¡Aprende a programar conmigo en CódigoCamp! Agrégame:", url }); return; }
+    catch (x) { if (x.name === "AbortError") return; }
+  }
+  copiar(url, "Enlace copiado: mándalo a quien quieras invitar");
+};
+
+/* ===== Contactos del teléfono ===== */
+$("contactos").onclick = async () => {
+  const m = await import("/js/contactos.js");
+  const dlg = $("dlgContactos"), cuerpo = $("dlgContCuerpo");
+  dlg.showModal();
+  if (!m.puedeLeerContactos()) {
+    cuerpo.innerHTML = `<p class="nota">Tu navegador no permite elegir contactos. Copia tu enlace de invitación y compártelo.</p>
+      <button class="c-btn pri" type="button" data-copiar-inv>📋 Copiar enlace de invitación</button>`;
+    return;
+  }
+  cuerpo.innerHTML = `<p class="nota">Cargando…</p>`;
+  try {
+    const lista = await m.leerContactos();
+    const { encontrados, otros } = await m.cruzarContactos(lista, api);
+    const enlace = enlaceInvitacion();
+    const fila = (x) => `<li class="ct-fila">${avatar(x)}<span class="ct-txt"><b>${esc(x.nombre)}</b><small>@${esc(x.alias)}${x.contacto && x.contacto !== x.nombre ? " · " + esc(x.contacto) : ""}</small></span>
+      ${x.relacion === "amigo" ? `<span class="ct-ok">✓ Amigos</span>` : x.relacion === "enviada" ? `<span class="ct-ok">Solicitud enviada</span>`
+        : `<button class="c-btn pri" type="button" data-agregar-ct="${esc(x.alias)}">${x.relacion === "recibida" ? "Aceptar solicitud" : "Agregar amigo"}</button>`}</li>`;
+    const invitar = (c, i) => { const e = m.enlacesInvitacion(c, enlace);
+      return `<li class="ct-fila"><span class="c-av">${esc((c.nombre || "?").charAt(0).toUpperCase())}</span><span class="ct-txt"><b>${esc(c.nombre || (c.tel || c.email || [])[0] || "")}</b><small>${esc((c.tel || [])[0] || (c.email || [])[0] || "")}</small></span>
+        <span class="ct-inv">${e.whatsapp ? `<a class="c-btn" href="${e.whatsapp}" target="_blank" rel="noopener" title="Invitar por WhatsApp">WhatsApp</a>` : ""}${e.sms ? `<a class="c-btn" href="${e.sms}" title="Invitar por mensaje">SMS</a>` : ""}${e.correo ? `<a class="c-btn" href="${e.correo}" title="Invitar por correo">Correo</a>` : ""}</span></li>`; };
+    cuerpo.innerHTML = (encontrados.length ? `<h3>Ya está en CódigoCamp (${encontrados.length})</h3><ul class="ct-lista">${encontrados.map(fila).join("")}</ul>`
+      : `<p class="nota">Ninguno de esos contactos está en CódigoCamp todavía. ¡Invítalos!</p>`)
+      + (otros.length ? `<h3>Invitar (${otros.length})</h3><ul class="ct-lista">${otros.slice(0, 300).map(invitar).join("")}</ul>` : "");
+  } catch (x) {
+    if (x.name === "AbortError" || x.name === "InvalidStateError") { dlg.close(); return; }
+    cuerpo.innerHTML = `<p class="nota">${esc(x.message)}</p><button class="c-btn pri" type="button" data-copiar-inv>📋 Copiar enlace de invitación</button>`;
+  }
+};
+$("dlgContCerrar").onclick = () => $("dlgContactos").close();
+$("dlgContactos").onclick = async (e) => {
+  if (e.target === e.currentTarget) return e.currentTarget.close();   // clic fuera del panel
+  if (e.target.closest("[data-copiar-inv]")) return copiar(enlaceInvitacion(), "Enlace copiado: mándalo a quien quieras invitar");
+  const b = e.target.closest("[data-agregar-ct]");
+  if (b) { b.disabled = true; await agregar(b.dataset.agregarCt); b.replaceWith(Object.assign(document.createElement("span"), { className: "ct-ok", textContent: "✓ Listo" })); }
+};
 $("volver").onclick = () => { if (history.state?.chat) history.back(); else cerrar(); };
 $("quitar").onclick = async () => {
   menu(false);
@@ -194,5 +301,5 @@ await cargarLista();
 const invitado = new URLSearchParams(location.search).get("agregar");
 if (invitado) { history.replaceState(null, "", location.pathname); if (invitado.toUpperCase() !== datos.yo.codigo) await agregar(invitado); }
 { const con = Number(new URLSearchParams(location.search).get("con")); if (con && datos.amigos.some((a) => a.id === con)) abrir(con); else if (con) history.replaceState(null, "", location.pathname); }
-setInterval(async () => { if (!document.hidden && activo) { try { const ms = (await api(`/api/chat/${activo}/?despues=${ultimo}`)).mensajes; if (ms.length) $("log").querySelector(".c-saludo")?.remove(); pintar(ms); } catch {} } }, 4000);
+setInterval(async () => { if (!document.hidden && activo) { try { const r = await api(`/api/chat/${activo}/?despues=${ultimo}`); if (r.mensajes.length) $("log").querySelector(".c-saludo")?.remove(); pintar(r.mensajes); aplicarBorrados(r.borrados); } catch {} } }, 4000);
 setInterval(() => { if (!document.hidden) cargarLista().catch(() => {}); }, 15000);

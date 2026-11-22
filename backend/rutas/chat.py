@@ -2,7 +2,9 @@
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from models import Attachment, Message, db
+from datetime import timedelta
+
+from models import Attachment, Message, db, utcnow
 from rutas.adjuntos import publico, tomar
 from servicios.amistades import my_friendships
 from utilidades import api_error, json_body, parse_integer, too_many
@@ -44,6 +46,8 @@ def chat(friendship_id):
         except ValueError as e:
             db.session.rollback()
             return api_error(str(e))
+        from servicios.perfil import contar_actividad, get_profile
+        contar_actividad(get_profile(current_user), "mensajes")
         db.session.commit()
     after = parse_integer(request.args.get("despues"), 0)
     query = Message.query.filter_by(amistad_id=friendship.id)
@@ -56,7 +60,32 @@ def chat(friendship_id):
     if messages:
         for a in Attachment.query.filter(Attachment.mensaje_id.in_([m.id for m in messages])).order_by(Attachment.id).all():
             adj.setdefault(a.mensaje_id, []).append(publico(a))
-    return jsonify(mensajes=[{
-        "id": message.id, "texto": message.texto, "yo": message.autor_id == current_user.id,
-        "hora": hora_local(message.creado_en, _perfil_zona()), "fecha": iso(message.creado_en), "adjuntos": adj.get(message.id, []),
-    } for message in messages])
+    # Mensajes que se eliminaron hace poco (para quitarlos también de la pantalla de la otra persona)
+    borrados = [m.id for m in query.filter(Message.borrado_en.isnot(None), Message.borrado_en > utcnow() - timedelta(days=2)).with_entities(Message.id).all()]
+    return jsonify(mensajes=[_ser(message, adj) for message in messages], borrados=borrados)
+
+
+def _ser(message, adj):
+    return {
+        "id": message.id, "texto": "" if message.borrado_en else message.texto, "yo": message.autor_id == current_user.id,
+        "hora": hora_local(message.creado_en, _perfil_zona()), "fecha": iso(message.creado_en),
+        "adjuntos": [] if message.borrado_en else adj.get(message.id, []), "borrado": bool(message.borrado_en),
+    }
+
+
+@bp.delete("/api/chat/<int:friendship_id>/<int:mensaje_id>/")
+@login_required
+def borrar_mensaje(friendship_id, mensaje_id):
+    """«Eliminar para todos»: solo quien lo mandó. Se borran el texto y los adjuntos (la otra persona ya no los ve)."""
+    friendship = my_friendships(current_user.id).filter_by(id=friendship_id).first()
+    mensaje = Message.query.filter_by(id=mensaje_id, amistad_id=friendship.id).first() if friendship else None
+    if mensaje is None:
+        return api_error("Ese mensaje no existe.", 404)
+    if mensaje.autor_id != current_user.id:
+        return api_error("Solo puedes eliminar los mensajes que tú enviaste.", 403)
+    if not mensaje.borrado_en:
+        mensaje.texto = ""
+        mensaje.borrado_en = utcnow()
+        Attachment.query.filter_by(mensaje_id=mensaje.id).delete()
+        db.session.commit()
+    return jsonify(ok=True, mensaje=_ser(mensaje, {}))

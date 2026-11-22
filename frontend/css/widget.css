@@ -32,3 +32,67 @@ body{font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:v
 .wg-error a{color:var(--verde)}
 @media (max-height:170px){.wg-semana{display:none}.wg-tabs{display:none}}
 @media (max-width:260px){.wg-tabs button{padding:2px 6px;font-size:11px}.wg-hora{display:none}}
+
+/* ===== Codi, la mascota ===== */
+.wg-codi{display:flex;align-items:center;gap:10px;min-height:0}
+.codi{width:clamp(58px,26vmin,104px);height:auto;flex:none;overflow:visible;animation:cd-flota 3.2s ease-in-out infinite;transform-origin:50% 90%}
+.cd-cuerpo{fill:#22c55e;stroke:#0f5132;stroke-width:3}
+.cd-fuego .cd-cuerpo{fill:#fb923c;stroke:#9a3412}
+.cd-alarma .cd-cuerpo{fill:#f87171;stroke:#7f1d1d}
+.cd-preocupado .cd-cuerpo{fill:#facc15;stroke:#854d0e}
+.cd-dormido .cd-cuerpo{fill:#94a3b8;stroke:#334155}
+.cd-ojo{fill:#fff}.cd-pupila{fill:#0b1020}
+.cd-linea{fill:none;stroke:#0b1020;stroke-width:3.2;stroke-linecap:round}
+.cd-boca{fill:#0b1020}
+.cd-mejilla{fill:#fff;opacity:.35}
+.cd-tag{font:800 13px ui-monospace,Consolas,monospace;fill:#0b1020;text-anchor:middle;opacity:.55}
+.cd-llama{fill:#ff9f1c;stroke:#c2410c;stroke-width:2;transform-origin:48px 30px;animation:cd-llama .5s ease-in-out infinite alternate}
+.cd-z{font:800 14px system-ui;fill:var(--sub);animation:cd-z 2.4s ease-in-out infinite}.cd-z2{font-size:11px;animation-delay:.8s}
+.cd-gota{fill:#60a5fa;animation:cd-gota 1.6s ease-in infinite}
+.cd-excl{font:900 26px system-ui;fill:#ff6b6b;animation:cd-late .6s ease-in-out infinite alternate}
+.cd-brillo{fill:#fde047;animation:cd-late 1.2s ease-in-out infinite alternate;transform-origin:80px 25px}
+.cd-alarma{animation:cd-tiembla .35s linear infinite}
+.cd-dormido{animation:cd-respira 4s ease-in-out infinite}
+.cd-fuego{animation:cd-salta 1s ease-in-out infinite}
+@keyframes cd-flota{50%{transform:translateY(-4px)}}
+@keyframes cd-salta{0%,100%{transform:translateY(0) scale(1,1)}40%{transform:translateY(-8px) scale(.96,1.04)}60%{transform:translateY(0) scale(1.04,.96)}}
+@keyframes cd-tiembla{0%,100%{transform:rotate(0)}25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+@keyframes cd-respira{50%{transform:scale(1.03,.97)}}
+@keyframes cd-llama{to{transform:scale(1.08,.92) skewX(-4deg)}}
+@keyframes cd-z{0%{opacity:0;transform:translate(0,6px)}40%{opacity:1}100%{opacity:0;transform:translate(6px,-8px)}}
+@keyframes cd-gota{0%{opacity:0;transform:translateY(-4px)}30%{opacity:1}100%{opacity:0;transform:translateY(10px)}}
+@keyframes cd-late{to{transform:scale(1.25);opacity:.75}}
+@media (prefers-reduced-motion:reduce){.codi,.codi *{animation:none!important}}
+.wg-globo{position:relative;display:grid;gap:2px;min-width:0;padding:8px 10px;border-radius:14px;background:color-mix(in srgb,var(--txt) 8%,transparent);border:1px solid var(--borde)}
+.wg-globo::before{content:"";position:absolute;left:-7px;top:50%;margin-top:-6px;border:6px solid transparent;border-right-color:var(--borde);border-left:0}
+.wg-num{font-size:clamp(22px,10vmin,40px);line-height:1;color:var(--fuego)}
+.wg-num small{font-size:12px;color:var(--sub);font-weight:600}
+.wg-globo span{font-size:12.5px;font-weight:600}
+.wg-cuenta{color:var(--fuego)}
+.wg-semana .hecho i{filter:drop-shadow(0 0 4px #ff9f1c)}
+.wg-semana .hoy i{animation:cd-late 1s ease-in-out infinite alternate}
+
+/* ===== Hoy: meta y encargos ===== */
+.wg-meta{display:flex;justify-content:space-between;align-items:baseline;font-size:13px}
+.wg-meta b{font-size:18px;color:var(--verde)}
+.wg-encargos{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:3px;overflow:auto;min-height:0}
+.wg-encargos li{display:flex;align-items:center;gap:6px;font-size:12px}
+.wg-encargos li.listo .wg-et{text-decoration:line-through;color:var(--sub)}
+.wg-check{flex:none;width:15px;height:15px;border:2px solid var(--borde);border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:900;color:#111508}
+.wg-encargos li.listo .wg-check{background:var(--verde);border-color:var(--verde)}
+.wg-et{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wg-encargos small{color:var(--sub);font-variant-numeric:tabular-nums}
+.wg-mas{font-size:11.5px;color:var(--verde);text-decoration:none;font-weight:700}
+
+/* ===== Reto rápido ===== */
+.wg[data-vista="reto"] .wg-cuerpo{justify-content:flex-start;overflow:auto}
+.wg-preg{margin:0;font-weight:700;font-size:13px}
+.wg-cod{margin:0;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.3);font:11.5px/1.35 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:80px;overflow:auto}
+.wg-ops{display:grid;gap:4px}
+.wg-ops button{padding:6px 9px;border:1px solid var(--borde);border-bottom-width:3px;border-radius:10px;background:color-mix(in srgb,var(--txt) 5%,transparent);color:var(--txt);font:600 12px system-ui,sans-serif;text-align:left;cursor:pointer;transition:transform .1s}
+.wg-ops button:active:not(:disabled){transform:translateY(2px);border-bottom-width:1px}
+.wg-ops button.bien{border-color:var(--verde);background:color-mix(in srgb,var(--verde) 20%,transparent)}
+.wg-ops button.mal{border-color:var(--rojo);background:color-mix(in srgb,var(--rojo) 20%,transparent);animation:cd-tiembla .3s 2}
+.wg-ops button:disabled{cursor:default}
+.wg-fb{margin:0;font-size:12px;font-weight:700}.wg-fb.ok{color:var(--verde)}.wg-fb.no{color:var(--rojo)}
+@media (max-height:200px){.wg-codi .codi{width:52px}.wg[data-vista="racha"] .wg-semana{display:none}}

@@ -58,6 +58,58 @@ if (yaDentro) {
     actualizarReglas();
   }
 
+  // En la app de Android, Google no deja entrar dentro de la app: se abre en el navegador del celular y al terminar
+  // vuelve a la app con un código de un solo uso (así la sesión y el widget quedan en la app).
+  const enApp = Boolean(globalThis.CodigoCampApp) || /CodigoCampApp\//.test(navigator.userAgent);
+  document.querySelectorAll('a.google-acceso').forEach((a) => {
+    if (!enApp) return;
+    a.addEventListener("click", async (e) => {
+      e.preventDefault();
+      // Secreto que solo conoce la app: el navegador solo ve su sha256. Mientras eliges tu cuenta en el navegador, la app
+      // pregunta al servidor y entra sola en cuanto Google termina (aunque el navegador no logre volver a la app).
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      const secreto = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      const huella = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secreto)))].map((x) => x.toString(16).padStart(2, "0")).join("");
+      const url = new URL(`/auth/google/?app=1&espera=${huella}`, location.origin).href;
+      try { globalThis.CodigoCampApp.abrirFuera(url); } catch { location.href = url; return; }
+      esperarGoogle(secreto);
+    });
+  });
+
+  function esperarGoogle(secreto) {
+    document.getElementById("esperaGoogle")?.remove();
+    const capa = document.createElement("div");
+    capa.id = "esperaGoogle";
+    capa.setAttribute("role", "dialog");
+    capa.setAttribute("aria-live", "polite");
+    capa.style.cssText = "position:fixed;inset:0;z-index:999;display:grid;place-items:center;padding:24px;background:rgba(5,10,25,.72);backdrop-filter:blur(4px)";
+    capa.innerHTML = `<div style="max-width:340px;padding:26px 22px;border-radius:20px;background:var(--panel,#fff);color:var(--txt,#111);text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.35)">
+      <div style="width:42px;height:42px;margin:0 auto 12px;border:4px solid rgba(127,127,127,.25);border-top-color:var(--acc,#4ade80);border-radius:50%;animation:girarG 1s linear infinite"></div>
+      <b style="font-size:18px">Continúa en el navegador</b>
+      <p style="margin:10px 0 18px;line-height:1.5;opacity:.8">Elige tu cuenta de Google. Cuando termines, vuelve aquí: la app entra sola.</p>
+      <button type="button" style="padding:11px 20px;border-radius:12px;border:1px solid rgba(127,127,127,.4);background:none;color:inherit;font:inherit;font-weight:700">Cancelar</button></div>
+      <style>@keyframes girarG{to{transform:rotate(360deg)}}</style>`;
+    document.body.append(capa);
+    let vivo = true;
+    capa.querySelector("button").onclick = () => { vivo = false; capa.remove(); };
+    const inicio = Date.now();
+    const csrf = () => decodeURIComponent((document.cookie.match(/(?:^|; )csrftoken=([^;]*)/) || [])[1] || "");
+    const preguntar = async () => {
+      if (!vivo) return;
+      if (Date.now() - inicio > 180_000) { capa.remove(); mostrarError(ERRORES_GOOGLE.app); return; }
+      try {
+        const r = await fetch("/api/auth/app/esperar", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() }, body: JSON.stringify({ secreto }) });
+        const j = await r.json().catch(() => ({}));
+        if (j.listo) { vivo = false; location.replace(j.destino || "/pages/inicio.html?app=1"); return; }
+        if (j.error) { vivo = false; capa.remove(); mostrarError(j.error); return; }
+      } catch { /* sin red un momento: se vuelve a intentar */ }
+      setTimeout(preguntar, document.hidden ? 1000 : 2000);
+    };
+    // Al volver a la app (la pestaña vuelve a estar visible) se pregunta enseguida.
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && vivo) preguntar(); });
+    setTimeout(preguntar, 2500);
+  }
+
   // Si Google no dejó entrar, el servidor vuelve con ?error=…: se explica qué pasó (antes no se veía nada).
   const params = new URLSearchParams(location.search);
   const ERRORES_GOOGLE = {
@@ -65,6 +117,7 @@ if (yaDentro) {
     google_email: "Tu cuenta de Google no tiene un correo verificado. Usa otra cuenta de Google o entra con tu correo y contraseña.",
     google_conflict: "Ese correo ya está unido a OTRA cuenta de Google. Entra con la cuenta de Google que usaste la primera vez, o con tu correo y contraseña (si no la recuerdas: «¿Olvidaste tu contraseña?»).",
     google_inactive: "Esta cuenta está desactivada.",
+    app: "El enlace para volver a la app venció o ya se usó. Toca otra vez «Continuar con Google».",
   };
   const MOTIVOS_GOOGLE = {
     estado: "Google volvió a una dirección distinta a la que usaste para entrar. Abre CódigoCamp siempre con la misma dirección (por ejemplo http://localhost:5000, no 127.0.0.1) y vuelve a intentarlo.",

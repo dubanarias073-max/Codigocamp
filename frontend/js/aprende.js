@@ -28,6 +28,7 @@ const CONFIG = {
   node:       { k: "node", n: "Node.js", c: "#84cc16", run: "srv" },
   github:     { k: "github", n: "GitHub", c: "#a78bfa", run: "srv" },
   nosql:      { k: "nosql", n: "NoSQL", c: "#22c55e", run: "srv" },
+  react:      { k: "react", n: "React", c: "#61dafb", run: "react" },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -67,8 +68,27 @@ function pintarLangs() {
     `<button type="button" class="lg${k === lang ? ' on' : ''}" data-k="${k}" style="--c:${v.c}" aria-pressed="${k === lang}">${logo(v.f, 20)}${v.n}</button>`).join('');
 }
 
-async function abrir(k, i = 0) {
-  lang = k; idx = i;
+/** Primera lección que aún no has hecho (si ya hiciste todas, la última). */
+function primeraPendiente(k) {
+  const total = LEC[k].l.length, hs = new Set(hechas[k] || []);
+  for (let i = 0; i < total; i++) if (!hs.has(i)) return i;
+  return Math.max(0, total - 1);
+}
+/** Lo que hiciste en otro dispositivo (o antes de borrar los datos del navegador) también cuenta. */
+async function traerHechas(k) {
+  try {
+    const { hechas: titulos = [] } = await api(`/api/progreso/lecciones/${encodeURIComponent(LEC[k].f)}/`);
+    if (!titulos.length) return;
+    const set = new Set(titulos);
+    const mias = new Set(hechas[k] || []);
+    LEC[k].l.forEach((y, i) => { if (set.has(y[0])) mias.add(i); });
+    hechas[k] = [...mias].sort((a, b) => a - b);
+    guardar();
+  } catch { /* sin conexión: queda lo guardado en este navegador */ }
+}
+
+async function abrir(k, i = null) {
+  lang = k; idx = i ?? 0;
   pintarLangs();
   const C = LEC[k];
   $('rutaTit').textContent = 'Lecciones de ' + C.n;
@@ -83,7 +103,13 @@ async function abrir(k, i = 0) {
     if (C.run === 'srv' && !SAL) { try { SAL = (await import('/js/lecciones/salidas.js')).default; } catch { SAL = {}; } }
     if (lang !== k) return;            // el usuario cambió de lenguaje mientras cargaba
   }
+  if (i === null) {
+    await traerHechas(k);
+    if (lang !== k) return;
+    idx = primeraPendiente(k);          // se abre donde vas: la primera lección que te falta
+  }
   pintar();
+  if (i === null) document.querySelector('#pasos button.on')?.scrollIntoView({ block: 'nearest' });
 }
 
 function pintar() {
@@ -133,6 +159,7 @@ function pintar() {
   $('modo').textContent = L.run === 'srv' ? 'Muestra el resultado esperado'
     : L.run === 'web' ? 'Se ve al instante'
     : L.run === 'ver' ? 'Ejemplos para copiar'
+    : L.run === 'react' ? 'Se ve al instante (React 19)'
     : 'Se ejecuta en tu navegador';
   $('vista').hidden = true; $('vista').removeAttribute('srcdoc'); out.hidden = false;
   $('prev').disabled = idx === 0;
@@ -156,7 +183,13 @@ $('next').onclick = () => {
   api('/api/progreso/leccion/', { curso: LEC[lang].f, leccion: LEC[lang].l[idx][0] })
     .then((r) => import('/js/cofres.js').then((m) => m.abrirPremiosNuevos(r?.desafios_completados || [])))
     .catch(() => {});
-  if (idx < LEC[lang].l.length - 1) idx++;
+  // Sigue con la siguiente que te falte (si la siguiente ya la habías hecho, se la salta)
+  const total = LEC[lang].l.length, hs = new Set(hechas[lang]);
+  let sig = idx + 1;
+  while (sig < total && hs.has(sig)) sig++;
+  if (sig >= total) sig = primeraPendiente(lang);
+  if (hs.size >= total) { sig = idx; aviso(`¡Terminaste todas las lecciones de ${LEC[lang].n}! 🎉`); }
+  idx = sig;
   pintar();
   scrollTo({ top: 0, behavior: 'smooth' });
 };
@@ -192,6 +225,14 @@ const RUN = {
 
   // HTML y CSS: se ven en un recuadro aislado
   web: async (code) => { const v = $('vista'); v.srcdoc = code; v.hidden = false; out.hidden = true; return ['', 0]; },
+
+  // React: JSX/TSX se transpila en el navegador y se dibuja en un recuadro aislado (librerías desde esm.sh)
+  async react(code) {
+    const { transpilarModulo } = await import('/js/trabajo/ejecucion.js');
+    const js = await transpilarModulo(prepararReact(code), 'App.tsx');
+    const v = $('vista'); v.srcdoc = paginaReact(js); v.hidden = false; out.hidden = true;
+    return ['', 0];
+  },
 
   // JavaScript: en un iframe aislado, sin acceso a la página
   js: (code) => correrJS(code),
@@ -264,6 +305,50 @@ const RUN = {
     } catch (x) { throw new Error(/sesi|segur|ejecutor|conectar/i.test(x.message) ? aviso : x.message); }
   }
 };
+
+/* ===== React en Aprende ===== */
+const RV = '19.1.0';
+const EXT = '?external=react,react-dom';
+const MAPA_REACT = {
+  'react': `https://esm.sh/react@${RV}`,
+  'react/': `https://esm.sh/react@${RV}/`,
+  'react-dom': `https://esm.sh/react-dom@${RV}?external=react`,
+  'react-dom/client': `https://esm.sh/react-dom@${RV}/client?external=react`,
+  'react-router-dom': `https://esm.sh/react-router-dom@7.6.0${EXT},react-router`,
+  'react-router': `https://esm.sh/react-router@7.6.0${EXT}`,
+  'zustand': `https://esm.sh/zustand@5.0.5?external=react`,
+  '@tanstack/react-query': `https://esm.sh/@tanstack/react-query@5.80.0?external=react`,
+  'react-hook-form': `https://esm.sh/react-hook-form@7.57.0?external=react`,
+  'react-error-boundary': `https://esm.sh/react-error-boundary@6.0.0?external=react`,
+  'axios': 'https://esm.sh/axios@1.9.0',
+};
+
+/** Ajusta el código de la lección para el recuadro: rutas en memoria y dibujo automático de <App />. */
+export function prepararReact(code) {
+  // En el recuadro no hay barra de direcciones: BrowserRouter se cambia por MemoryRouter (mismas rutas y enlaces)
+  let c = code.replace(/import\s*\{([^}]*)\}\s*from\s*(["'])react-router(-dom)?\2/g, (todo, nombres) =>
+    todo.replace(nombres, nombres.replace(/\bBrowserRouter\b(?!\s+as)/, 'MemoryRouter as BrowserRouter')));
+  const dibuja = /createRoot\s*\(|ReactDOM\.render\s*\(|hydrateRoot\s*\(/.test(c);
+  if (!dibuja) {
+    if (!/\b(function|const|let|class)\s+App\b/.test(c)) throw new Error('Define un componente llamado App para verlo (por ejemplo: function App() { return <h1>Hola</h1>; }).');
+    c += '\nimport { createRoot as __ccRaiz } from "react-dom/client";\n__ccRaiz(document.getElementById("root"), { onCaughtError: (e) => console.log("ℹ️ Un Error Boundary atrapó: " + (e?.message ?? e)) }).render(<App />);\n';
+  }
+  return c;
+}
+
+function paginaReact(js) {
+  const mapa = JSON.stringify({ imports: MAPA_REACT });
+  const consola = `<script>(()=>{const caja=()=>document.getElementById("cc-consola");const fmt=a=>a.map(x=>{if(x instanceof Error)return x.message;try{return typeof x==="object"?JSON.stringify(x):String(x)}catch{return String(x)}}).join(" ");` +
+    `try{localStorage.length}catch{const m=new Map();const ls={getItem:k=>m.has(String(k))?m.get(String(k)):null,setItem:(k,v)=>m.set(String(k),String(v)),removeItem:k=>m.delete(String(k)),clear:()=>m.clear(),key:i=>[...m.keys()][i]??null,get length(){return m.size}};Object.defineProperty(window,"localStorage",{value:ls});Object.defineProperty(window,"sessionStorage",{value:ls})}` +
+    `` +
+    `const poner=(t,err)=>{const c=caja();if(!c)return;c.hidden=false;const l=document.createElement("div");l.textContent=t;if(err)l.className="e";c.appendChild(l)};` +
+    `const log=console.log.bind(console);console.log=(...a)=>{log(...a);poner(fmt(a))};const er=console.error.bind(console);console.error=(...a)=>{er(...a);if(!/^Warning:|The above error occurred|Consider adding an error boundary/.test(String(a[0])))poner(fmt(a),1)};` +
+    `addEventListener("error",e=>poner("Error: "+(e.message||e.error),1));addEventListener("unhandledrejection",e=>poner("Error: "+(e.reason?.message||e.reason),1));})()<\/script>`;
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
+    `<style>body{font-family:system-ui,sans-serif;margin:12px;color:#111}#cc-consola{font:12px ui-monospace,monospace;background:#0f172a;color:#e2e8f0;padding:6px 8px;border-radius:8px;margin-top:14px;max-height:140px;overflow:auto}#cc-consola::before{content:"Consola";display:block;color:#94a3b8;margin-bottom:2px}#cc-consola .e{color:#fca5a5}</style>` +
+    `<script type="importmap">${mapa}<\/script>${consola}</head><body><div id="root"></div><div id="cc-consola" hidden></div>` +
+    `<script type="module">${js.replace(/<\/script/gi, '<\\/script')}<\/script></body></html>`;
+}
 
 async function ejecutar() {
   const b = $('run');

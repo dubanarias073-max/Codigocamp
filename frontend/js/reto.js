@@ -1,4 +1,5 @@
 // Lógica de reto.html
+import { sonar, vibrar } from "/js/sonidos.js";
 import { api, getUser } from "/js/auth.js";
 import { correr } from "/js/retos-motor.js";
 const $ = (id) => document.getElementById(id);
@@ -232,12 +233,15 @@ async function continuar() {
   try {
     const r = await api(`/api/nivel/${datos.nivel.id}/completar/`, { fallos });
     const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    sonar("leccion"); vibrar([30, 60, 30]);
     $("cuerpo").innerHTML = `<div class="fin"><div class="grande">${"⭐".repeat(r.estrellas)}</div><h1>¡Nivel completado!</h1>
+      ${r.racha_hoy ? `<div class="racha-hoy" role="status"><div class="racha-fuego" aria-hidden="true">🔥</div><div class="racha-num"><b>${r.perfil.racha_actual}</b><span>${r.perfil.racha_actual === 1 ? "día de racha" : "días de racha"}</span></div><p>${r.perfil.racha_actual > (r.racha_antes || 0) ? "¡Hiciste la racha de hoy!" : "¡Empezaste una racha nueva!"}</p></div>` : ""}
       <div class="botin"><div>✨ +${r.xp_ganado} XP</div>${r.minerales_ganados.diamante ? `<div>💎 +${r.minerales_ganados.diamante} diamante</div>` : ""}
         <div>🔥 Racha: ${r.perfil.racha_actual}</div></div>
       ${r.desafios_completados.map((d) => `<div class="tarjeta" style="margin-bottom:12px">🎁 <b>¡Desafío superado!</b> ${esc(d.titulo)}<br><small>Premio: ${esc(d.premio)}</small></div>`).join("")}
       <a class="bj" href="/pages/inicio.html?curso=${datos.curso.slug}">Continuar</a></div>`;
     // Como en Duolingo: los cofres de lo que acabas de cumplir se abren aquí mismo.
+    if (r.racha_hoy) { sonar("racha", 0.85); setTimeout(() => vibrar([20, 40, 60]), 850); }
     import("/js/cofres.js").then((m) => m.abrirPremiosNuevos(r.desafios_completados || [])).catch(() => {});
     try { navigator.serviceWorker?.controller?.postMessage("actualizar-widget"); } catch { /* sin service worker */ }
   } catch (e) { $("cuerpo").replaceChildren(el("p", e.message, "vacio")); }

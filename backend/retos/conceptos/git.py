@@ -1,6 +1,7 @@
 """Git y GitHub: control de versiones, ramas y trabajo en equipo. 3 etapas."""
 from ..generador import K
 from .git_e45 import E4, E5
+from .git_e678 import E6, E7, E8
 
 E1 = [
 K("Qué es Git", d="sistema de control de versiones que guarda el historial de un proyecto", u="volver a versiones anteriores y saber quién cambió qué",
@@ -228,4 +229,7 @@ ETAPAS_CONCEPTOS = [
     ("GitHub y equipo", "Remotos, push, pull requests, forks y publicación", E3),
     ("Git avanzado", "Rebase, cherry-pick, reflog, bisect, blame, hooks y submódulos", E4),
     ("Flujos profesionales", "Git Flow, trunk-based, commits convencionales, versiones y revisión", E5),
+    ("Git en el día a día", "Configuración, historial, deshacer, remotos y finales de línea", E6),
+    ("Git por dentro", "Objetos, HEAD, merges, conflictos, parches y repositorios grandes", E7),
+    ("Git profesional", "Firmas, hooks del equipo, changelog, hotfix, secretos y buenas prácticas", E8),
 ]

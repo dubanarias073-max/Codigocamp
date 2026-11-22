@@ -74,6 +74,7 @@ export function menuContextual(x, y, items) {
   m.setAttribute("role", "menu");
   items.forEach((it) => {
     if (it === "-") { m.insertAdjacentHTML("beforeend", '<div class="sep" role="separator"></div>'); return; }
+    if (it.deshabilitado) { const t = document.createElement("div"); t.className = "titulo"; t.textContent = it.texto; m.appendChild(t); return; }
     const b = document.createElement("button");
     b.type = "button";
     b.setAttribute("role", "menuitem");

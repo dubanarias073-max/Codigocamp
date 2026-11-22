@@ -29,32 +29,82 @@ export class SesionGitHub {
     this.fetchFn = fetchFn;
     this.config = null;
     this.oyentes = new Set();
-    this.datos = this.leer();
+    this.leer();
     this.enCurso = null;
   }
 
+  // Varias cuentas de GitHub (como en VS Code: «Cuentas»). Se guardan las que marcaste «Recordar» en localStorage y las
+  // demás solo en esta pestaña (sessionStorage). Una está activa: es la que usan git push / pull / clone.
   leer() {
-    for (const almacen of [sessionStorage, localStorage]) {
-      try { const d = JSON.parse(almacen.getItem(this.clave) || "null"); if (d?.token) return d; } catch { /* nada */ }
+    const cuentas = new Map();
+    let activa = null;
+    for (const [almacen, recordar] of [[localStorage, true], [sessionStorage, false]]) {
+      let d = null;
+      try { d = JSON.parse(almacen.getItem(this.clave) || "null"); } catch { /* nada */ }
+      if (!d) continue;
+      const lista = Array.isArray(d.cuentas) ? d.cuentas : d.token ? [d] : [];   // formato viejo: una sola cuenta
+      for (const c of lista) if (c?.token && c.login) cuentas.set(c.login.toLowerCase(), { ...c, recordar });
+      if (d.activa && !recordar) activa = d.activa;
+      else if (d.activa && !activa) activa = d.activa;
+      else if (!d.cuentas && d.login && !activa) activa = d.login;
     }
-    return null;
+    this.lista = [...cuentas.values()];
+    this.activaLogin = this.lista.find((c) => c.login.toLowerCase() === String(activa || "").toLowerCase())?.login ?? this.lista[0]?.login ?? null;
+    return this.datos;
   }
 
-  guardar(datos, recordar) {
-    this.datos = datos;
-    try { sessionStorage.removeItem(this.clave); localStorage.removeItem(this.clave); } catch { /* nada */ }
-    if (datos) { try { (recordar ? localStorage : sessionStorage).setItem(this.clave, JSON.stringify(datos)); } catch { /* sin espacio */ } }
+  #escribir() {
+    const recordadas = this.lista.filter((c) => c.recordar);
+    const sesion = this.lista.filter((c) => !c.recordar);
+    const limpiar = (c) => { const { recordar, ...resto } = c; void recordar; return resto; };
+    try {
+      if (recordadas.length) localStorage.setItem(this.clave, JSON.stringify({ cuentas: recordadas.map(limpiar), activa: this.activaLogin }));
+      else localStorage.removeItem(this.clave);
+      if (sesion.length || this.activaLogin) sessionStorage.setItem(this.clave, JSON.stringify({ cuentas: sesion.map(limpiar), activa: this.activaLogin }));
+      else sessionStorage.removeItem(this.clave);
+    } catch { /* sin espacio */ }
     for (const f of this.oyentes) { try { f(this.datos); } catch { /* nada */ } }
   }
 
+  /** Compatibilidad: guardar(null) cierra la sesión activa; guardar(datos, recordar) agrega o actualiza esa cuenta y la activa. */
+  guardar(datos, recordar = false) {
+    if (!datos) { this.cerrarSesion(); return; }
+    this.lista = this.lista.filter((c) => c.login.toLowerCase() !== datos.login.toLowerCase());
+    this.lista.push({ ...datos, recordar });
+    this.activaLogin = datos.login;
+    this.#escribir();
+  }
+
   alCambiar(f) { this.oyentes.add(f); return () => this.oyentes.delete(f); }
+  get datos() { return this.lista.find((c) => c.login === this.activaLogin) ?? null; }
+  get cuentas() { return this.lista.map(({ token, ...c }) => ({ ...c, activa: c.login === this.activaLogin, conToken: Boolean(token) })); }
   get token() { return this.datos?.token || null; }
   get usuario() { return this.datos?.login || null; }
   /** Para el Git real: el token solo se entrega si la URL es de GitHub. */
   tokenPara(url) { return esGitHub(url) ? this.token : null; }
-  cerrarSesion() { this.guardar(null); }
-  /** GitHub rechazó el token (vencido, revocado…): se olvida para pedir uno nuevo. */
-  invalidar() { if (this.datos) this.guardar(null); }
+  /** Usar otra de tus cuentas para git push / pull / clone. */
+  usar(login) {
+    const c = this.lista.find((x) => x.login.toLowerCase() === String(login).toLowerCase());
+    if (!c) return false;
+    this.activaLogin = c.login;
+    this.#escribir();
+    return true;
+  }
+  /** Cierra la sesión de una cuenta (la activa si no dices cuál). Si quedan otras, se activa la siguiente. */
+  cerrarSesion(login = this.activaLogin) {
+    if (!login) return;
+    this.lista = this.lista.filter((c) => c.login.toLowerCase() !== String(login).toLowerCase());
+    if (!this.lista.some((c) => c.login === this.activaLogin)) this.activaLogin = this.lista[0]?.login ?? null;
+    this.#escribir();
+  }
+  cerrarTodas() { this.lista = []; this.activaLogin = null; this.#escribir(); }
+  /** GitHub rechazó el token (vencido, revocado…): se olvida esa cuenta para pedir uno nuevo. */
+  invalidar() { if (this.datos) this.cerrarSesion(); }
+  /** Agrega otra cuenta (el cuadro de GitHub deja elegir con cuál entrar). */
+  async agregarCuenta() {
+    this.enCurso ??= this.dialogo("Agrega otra cuenta de GitHub. En la ventana de GitHub elige la cuenta (o «Use a different account»).", { otra: true }).finally(() => { this.enCurso = null; });
+    return this.enCurso;
+  }
 
   async cargarConfig() {
     if (this.config) return this.config;
@@ -89,7 +139,7 @@ export class SesionGitHub {
     return this.enCurso;
   }
 
-  async dialogo(motivo) {
+  async dialogo(motivo, { otra = false } = {}) {
     const cfg = await this.cargarConfig();
     return new Promise((resolver) => {
       const d = document.createElement("dialog");
@@ -135,7 +185,7 @@ export class SesionGitHub {
       const conVentana = () => {
         const estado = aleatorio();
         // Se abre YA, dentro del clic: si no, Safari y Chrome la bloquean.
-        ventana = window.open(`/auth/github/?estado=${estado}`, "cc-github", "popup=yes,width=620,height=780");
+        ventana = window.open(`/auth/github/?estado=${estado}${otra ? "&otra=1" : ""}`, "cc-github", "popup=yes,width=620,height=780");
         if (!ventana) { error("El navegador bloqueó la ventana emergente. Permite ventanas emergentes para CódigoCamp o usa un token."); return; }
         espera("Termina de iniciar sesión en la ventana de GitHub…");
         const recibir = (m) => {

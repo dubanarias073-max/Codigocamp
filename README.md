@@ -47,7 +47,7 @@
 2. En **MySQL Workbench**, conéctate a `127.0.0.1` en el puerto `3306` con el usuario `root`.
 3. Abre `base de datos/codigocamp.sql` con **File → Open SQL Script** y pulsa el rayo ⚡ (**Execute**).
 
-*(El script crea la base `codigocamp`, todas sus tablas y los 23 cursos. Ejecútalo solo en una instalación nueva; al arrancar Flask posteriormente, actualiza columnas nuevas sin borrar datos).*
+*(El script crea la base `codigocamp`, todas sus tablas y los cursos (React y los cursos nuevos se crean solos al ejecutar `sync-retos`). Ejecútalo solo en una instalación nueva; al arrancar Flask posteriormente, actualiza columnas nuevas sin borrar datos).*
 
 ### 2.2 Preparar el backend
 
@@ -127,7 +127,7 @@ flask --app app seed-retos
 ```
 
 - `check-retos`: Revisa que todo el contenido de los cursos esté bien estructurado.
-- `seed-retos`: Carga en la base las etapas, secciones, lecciones y preguntas de los 23 cursos (tarda alrededor de 1 minuto).
+- `seed-retos`: Carga en la base las etapas, secciones, lecciones y preguntas de los 24 cursos, incluido React (tarda alrededor de 1 minuto).
 
 ### 2.5 Arrancar en local
 
@@ -225,7 +225,7 @@ Ejecútalos dentro de `backend` con el entorno virtual activado (`venv\Scripts\a
 
 ### Cuenta, gamificación e IA
 - **Seguridad:** Inicio de sesión con correo o Google, recuperación de clave con tokens de 30 minutos y cierre remoto de sesiones activas en **Configuración → Seguridad**.
-- **Motivación:** Rachas diarias, escudos salvarrachas (máx. 2), encargos diarios, cofres de sección y de logro, tienda de cosméticos (temas, marcos, punteros, fondos animados, efectos y **estelas del dedo para el celular**) y perfil personalizable.
+- **Motivación:** Rachas diarias, escudos salvarrachas (máx. 2), encargos diarios, cofres de sección y de logro, tienda de cosméticos (temas, marcos, punteros, fondos animados, efectos y **rastros que siguen tu mouse o tu dedo**; cada puntero trae normal, mano y texto) y perfil personalizable.
 - **Zona horaria:** «Hoy», la racha, las metas, los avisos de racha y las horas de los chats usan la zona horaria que detecta el dispositivo de cada persona (Bogotá, Madrid…), no la del servidor.
 - **Cerrar sesión de verdad:** cerrar sesión revoca la sesión en el servidor (la cookie y el token del widget dejan de servir). Con «Cerrar aquí» o «Cerrar en todos los dispositivos» además se olvidan esos dispositivos: al volver a entrar llega el correo «Nuevo inicio de sesión».
 - **Social e IA:** Chat entre amigos con envío de archivos (hasta 1 GB) y tutor virtual con Gemini con historial persistente.
@@ -240,11 +240,17 @@ Ejecútalos dentro de `backend` con el entorno virtual activado (`venv\Scripts\a
 |---|---|
 | **Editor Monaco** | Mismo motor de VS Code con múltiples pestañas, búsqueda global (`Ctrl+Shift+F`) y paleta de comandos (`Ctrl+Shift+P`). |
 | **Vista previa (como Live Server)** | Se abre **al lado del código** (o como pestaña) y se **recarga sola** mientras escribes, sin perder dónde ibas. Tiene selector de páginas, atrás/adelante, tamaño celular/tableta y el botón ↗ **Abrir en el navegador**: una dirección real `https://<tu-servidor>/live/<clave>/index.html` que funciona en cualquier navegador o celular, con los enlaces entre páginas, el CSS, el JS y las imágenes, y que también se recarga sola al guardar. La página corre aislada (no puede usar la cuenta de quien la abre) y con «Cambiar enlace» el anterior deja de funcionar. |
+| **Varias vistas previas** | Una pestaña por página (index.html, login.html…) dentro del panel; «Ejecutar» en otro HTML abre otra vista. El enlace del navegador arma la página con el mismo motor que Trabajo (React/JSX, módulos, npm) y usa la dirección pública de `APP_URL` si entraste por localhost. |
+| **Cuentas de GitHub** | Varias cuentas: cambiar la activa, agregar otra, cerrar sesión de una o de todas (panel de Git o `gh auth login/switch/logout/status`). |
 | **Autocompletado** | Como en VS Code: mientras escribes aparece la lista de sugerencias y **Enter** (o Tab) inserta la elegida. Python, Java, C/C++, C#, PHP, SQL (con las tablas y columnas de tus `CREATE TABLE`), Go, Rust, Ruby, Kotlin, Swift y Bash, además del IntelliSense de JS/TS/HTML/CSS. Incluye fragmentos (`def`, `for`, `main`, `sout`, `log`, `mysql`…), Emmet en HTML (`!`, `ul>li*3`, `div.caja`) y los nombres de tu proyecto. Funciona también en el celular. |
 | **Terminal y Git** | Terminal Bash simulada (`ls`, `cd`, `cat`, `python`, `npm`, `pip`, `git`), clonación, ramas, commits, merges y `git push` directo a GitHub. |
-| **Entornos y servidores** | Soporte para entornos virtuales (`.venv`), vistas previas de FastAPI/Flask/Django y aplicaciones React + Vite. |
+| **Entornos y servidores** | Soporte para entornos virtuales (`.venv`), vistas previas de FastAPI/Flask/Django y apps de Vite: **React, Preact, Vue, Svelte** y vanilla (`npm create vite@latest app -- --template vue`). Los `.vue` y `.svelte` se compilan en el navegador con el compilador oficial de la versión de tu `package.json`. |
+| **Copiloto en línea** | Como GitHub Copilot: mientras escribes, la IA sugiere en gris lo que sigue (usa tu archivo y los relacionados). **Tab** acepta, **Esc** descarta. Se activa o desactiva con «✨ Copiloto» en la barra de estado. |
 | **Bases de datos** | En local (`DEBUG=1`) se conecta directamente a tu MySQL de XAMPP; si MySQL está apagado, crea automáticamente una base SQLite funcional en `.codigocamp/bd/`. |
 | **Asistente IA** | Propone cambios sobre tus archivos con vista previa para aceptar o rechazar cada uno. Primero analiza el archivo y hace **ediciones puntuales** (solo las líneas del error o de lo que pediste: no toca el diseño ni lo demás). Si una propuesta reescribe casi todo un archivo, la marca con ⚠️. |
+| **Idioma** | Español o inglés (Configuración → Apariencia, o el botón 🇺🇸/🇪🇸 en las páginas de entrada). Cambia menús, botones y avisos; las lecciones y retos siguen en español. Se guarda en la cuenta. |
+| **Contactos** | En Chats, «📇 Buscar en mis contactos» (app de Android o Chrome en Android): muestra quién ya está en CódigoCamp para agregarlo y permite invitar al resto por WhatsApp, SMS o correo. Solo viaja al servidor el sha256 de cada correo; la agenda no se guarda. Cada quien decide si lo pueden encontrar (Configuración → Cuenta). |
+| **Widgets** | Codi, la mascota, cambia de ánimo con tu racha (feliz, en llamas, preocupado, alarma, dormido), cuenta atrás cuando la racha está en peligro, pestaña **Hoy** con meta y encargos, y **⚡ Reto rápido** para responder una pregunta de repaso desde el widget. Deslizar cambia de vista. |
 | **Celular** | Pestañas Archivos · Código · Terminal · IA. Para renombrar o **eliminar** un archivo o carpeta: botón **⋯** de la fila o mantener pulsado. |
 
 ### 6.1 Iniciar sesión con GitHub (`git push`)

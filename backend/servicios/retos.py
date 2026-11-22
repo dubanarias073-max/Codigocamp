@@ -44,16 +44,35 @@ def all_levels(course):
     )
 
 
-def allowed_level(user, level):
-    course = level.seccion.etapa.course
+def estados_niveles(user, course):
+    """Estado de cada nivel de un curso: hecho, actual, pendiente o bloqueado.
+
+    «actual» es el siguiente DESPUÉS del más avanzado que hiciste (no el primero que falte en todo el curso): si se
+    agregan lecciones nuevas en secciones que ya pasaste, no te devuelve atrás. Esos huecos quedan como «pendiente»
+    (abiertos, para hacerlos cuando quieras)."""
     completed = {
         item[0] for item in db.session.query(CompletedLevel.nivel_id).join(Level).join(Section).join(Stage).filter(
             CompletedLevel.usuario_id == user.id, Stage.curso_id == course.id,
         ).all()
     }
-    if level.id in completed:
-        return True
-    for item in all_levels(course):
-        if item.id not in completed:
-            return item.id == level.id
-    return False
+    niveles = list(all_levels(course))
+    ultimo = max((i for i, n in enumerate(niveles) if n.id in completed), default=-1)
+    actual = next((n.id for i, n in enumerate(niveles) if i > ultimo and n.id not in completed), None)
+    if actual is None:
+        actual = next((n.id for n in niveles if n.id not in completed), None)
+    estados = {}
+    for i, n in enumerate(niveles):
+        if n.id in completed:
+            estados[n.id] = "hecho"
+        elif n.id == actual:
+            estados[n.id] = "actual"
+        elif i < ultimo:
+            estados[n.id] = "pendiente"
+        else:
+            estados[n.id] = "bloqueado"
+    return estados
+
+
+def allowed_level(user, level):
+    course = level.seccion.etapa.course
+    return estados_niveles(user, course).get(level.id) in ("hecho", "actual", "pendiente")

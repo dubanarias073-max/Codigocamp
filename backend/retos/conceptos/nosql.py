@@ -1,5 +1,6 @@
 """NoSQL: fundamentos, MongoDB básico y avanzado, Redis y otras bases (Firestore, Cassandra, Neo4j…). 5 etapas."""
 from ..generador import K
+from .nosql_e678 import E6, E7, E8
 
 E1 = [
 K("Qué es NoSQL", d="bases de datos que no guardan los datos en tablas relacionales", u="guardar datos flexibles, enormes o muy rápidos de leer",
@@ -397,4 +398,7 @@ ETAPAS_CONCEPTOS = [
     ("MongoDB avanzado", "Embebidos, arreglos, $lookup, agregación, índices y drivers", E3),
     ("Redis", "Clave-valor, expiración, listas, hashes, rankings, pub/sub y caché", E4),
     ("Más allá de MongoDB", "Firestore, Cassandra, Neo4j, DynamoDB, Elasticsearch y diseño", E5),
+    ("MongoDB a fondo", "Operadores, arreglos, upsert, agregación, texto, fechas e importación", E6),
+    ("Modelado y rendimiento", "Relaciones, patrones, índices, explain, transacciones y búsqueda vectorial", E7),
+    ("Redis y otras bases en producción", "Streams, sesiones, caché, bloqueos, Firestore, Cassandra, Neo4j y respaldos", E8),
 ]

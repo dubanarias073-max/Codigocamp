@@ -67,7 +67,10 @@ def iniciar():
         return _pagina(None, "Petición no válida.", "")
     session["gh_estado"] = estado
     from urllib.parse import urlencode
-    q = urlencode({"client_id": _cfg("GITHUB_CLIENT_ID"), "redirect_uri": _redirect_uri(), "scope": ALCANCES, "state": estado, "allow_signup": "true"})
+    datos = {"client_id": _cfg("GITHUB_CLIENT_ID"), "redirect_uri": _redirect_uri(), "scope": ALCANCES, "state": estado, "allow_signup": "true"}
+    if request.args.get("otra") == "1":
+        datos["prompt"] = "select_account"   # agregar otra cuenta: GitHub deja elegir con cuál entrar
+    q = urlencode(datos)
     return redirect(f"https://github.com/login/oauth/authorize?{q}")
 
 

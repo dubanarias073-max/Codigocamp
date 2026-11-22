@@ -16,7 +16,7 @@ from retos.generador import lecciones_aprende  # noqa: E402
 DESTINO = RAIZ.parent / "frontend" / "js" / "lecciones"
 TODOS = [
     "html", "css", "bd", "javascript", "python", "sql", "typescript", "c", "cpp", "java", "csharp",
-    "go", "kotlin", "php", "ruby", "rust", "swift", "terminal", "git", "github", "docker", "node", "nosql",
+    "go", "kotlin", "php", "ruby", "rust", "swift", "terminal", "git", "github", "docker", "node", "nosql", "react",
 ]
 SALIDA_SRV = {"c", "cpp", "java", "csharp", "php", "go", "rust", "swift", "kotlin", "ruby", "terminal", "git", "github", "docker", "node", "nosql"}   # lenguajes que muestran la salida esperada
 

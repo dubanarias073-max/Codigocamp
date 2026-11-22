@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <script src="/js/i18n.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chats · CódigoCamp</title>
   <link rel="icon" type="image/png" href="/img/favicon.png">
@@ -32,6 +33,7 @@
             <button class="c-ico" id="copiar" type="button" title="Copiar tu ID" aria-label="Copiar tu ID"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
             <button class="c-btn pri" id="invitar" type="button" title="Copiar enlace de invitación"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Invitar</button>
           </div>
+          <button class="c-contactos" id="contactos" type="button">📇 Buscar en mis contactos</button>
           <form class="c-add" id="fAgregar">
             <label class="c-buscar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><input id="quien" maxlength="30" placeholder="Busca por nombre, @usuario o ID" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Buscar personas por nombre, usuario o ID"></label>
             <button class="c-btn" type="submit">Agregar</button>
@@ -65,6 +67,11 @@
         </section>
       </div>
     </main>
+    <dialog class="dlg-contactos" id="dlgContactos" aria-labelledby="dlgContTit">
+      <header><h2 id="dlgContTit">Tus contactos</h2><button class="c-ico" type="button" id="dlgContCerrar" aria-label="Cerrar">✕</button></header>
+      <p class="nota" id="dlgContNota">Elige contactos de tu teléfono para ver quién ya está en CódigoCamp o invitarlos. No guardamos tu agenda.</p>
+      <div id="dlgContCuerpo"></div>
+    </dialog>
     <aside class="der" id="der" aria-label="Tus estadísticas"></aside>
   </div>
   <nav class="inf" id="inf" aria-label="Principal"></nav>

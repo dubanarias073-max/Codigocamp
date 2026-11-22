@@ -73,7 +73,13 @@ public class WidgetRacha extends AppWidgetProvider {
         v.setTextViewText(R.id.vidas, "❤️ " + d.optInt("vidas", 0) + "  💎 " + d.optInt("diamantes", 0));
         v.setTextViewText(R.id.racha, String.valueOf(racha));
         v.setTextViewText(R.id.rachaTxt, racha == 1 ? "día de racha" : "días de racha");
-        v.setTextViewText(R.id.meta, "🎯 " + d.optInt("xp_hoy", 0) + "/" + d.optInt("meta_xp", 0) + " XP\n" + d.optInt("progreso_hoy", 0) + "% de hoy");
+        JSONArray encargos = d.optJSONArray("encargos");
+        String lineaEncargos = encargos != null && encargos.length() > 0 ? "\n📋 " + d.optInt("encargos_hechos", 0) + "/" + encargos.length() + " encargos" : "";
+        v.setTextViewText(R.id.meta, "🎯 " + d.optInt("xp_hoy", 0) + "/" + d.optInt("meta_xp", 0) + " XP\n" + d.optInt("progreso_hoy", 0) + "% de hoy" + lineaEncargos);
+        // Ánimo de Codi, la mascota (igual que en el widget web): cambia con tu racha y la hora
+        String animo = d.optString("animo", "");
+        v.setTextViewText(R.id.animo, "fuego".equals(animo) ? "🔥" : "feliz".equals(animo) ? "😄" : "preocupado".equals(animo) ? "😟"
+                : "alarma".equals(animo) ? "😱" : "dormido".equals(animo) ? "😴" : "🔥");
         JSONArray semana = d.optJSONArray("semana");
         for (int i = 0; i < 7; i++) {
             JSONObject dia = semana != null ? semana.optJSONObject(i) : null;

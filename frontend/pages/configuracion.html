@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <script src="/js/i18n.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Configuración · CódigoCamp</title>
   <link rel="icon" type="image/png" href="/img/favicon.png">
@@ -41,6 +42,7 @@
               <p class="nota">Tu ID: <b id="codigo"></b> <button type="button" class="mini" id="copiarId">Copiar</button> · Correo: <b id="correo"></b></p>
               <button class="bj" type="submit">Guardar</button>
             </form>
+            <label class="preferencia-sonido" for="buscable"><input id="buscable" type="checkbox"><span><b>Que mis contactos me encuentren</b><small>Si alguien tiene tu correo en su teléfono y busca en sus contactos desde Chats, te verá para agregarte. Nadie ve tu correo.</small></span></label>
           </section>
           <section role="tabpanel" class="tarjeta conf-sec" id="aprendizaje"><header class="sec-cab"><span class="sec-ic">🎯</span><div><h2>Aprendizaje</h2><p>Curso y meta diaria</p></div></header>
             <form id="fAprender">
@@ -55,7 +57,13 @@
               <label class="tema-op"><input type="radio" name="tema" value="claro"><span class="tema-prev claro"></span>Claro</label>
               <label class="tema-op"><input type="radio" name="tema" value="oscuro"><span class="tema-prev oscuro"></span>Oscuro</label>
             </div>
-            <label class="preferencia-sonido" for="sonido"><input id="sonido" type="checkbox"><span><b>Sonidos de respuesta</b><small>Un tono al acertar o fallar en los retos.</small></span></label>
+            <div class="idioma-conf"><b>Idioma de la aplicación</b>
+              <div class="idioma-ops" role="radiogroup" aria-label="Idioma">
+                <label class="idioma-op"><input type="radio" name="idioma" value="es"><span>🇪🇸 Español</span></label>
+                <label class="idioma-op"><input type="radio" name="idioma" value="en"><span>🇺🇸 English</span></label>
+              </div>
+              <small>Los menús, botones y avisos cambian de idioma. Las lecciones y retos siguen en español.</small></div>
+            <label class="preferencia-sonido" for="sonido"><input id="sonido" type="checkbox"><span><b>Sonidos</b><small>Al acertar o fallar, al terminar una lección, al hacer tu racha y al abrir cofres.</small></span></label>
             <label class="preferencia-sonido" for="movimiento"><input id="movimiento" type="checkbox"><span><b>Menos animaciones</b><small>Quita fondos animados, efectos y la lluvia de código al cargar.</small></span></label>
             <div class="puestos" id="puestos"></div>
             <p class="nota"><a href="/pages/tienda.html">Consigue fondos, punteros, temas, marcos y efectos en la tienda →</a> <button type="button" class="mini" id="quitarTodo">Quitar todos</button></p>

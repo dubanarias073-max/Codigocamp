@@ -48,7 +48,7 @@ K("Python 3",
   u="saber qué versión usar y evitar tutoriales antiguos",
   mas="Python 2 dejó de recibir soporte en 2020. Hoy todo se hace con Python 3 (3.12 o superior). Si un tutorial usa print \"hola\" sin paréntesis, es de Python 2 y no funcionará. Para ver tu versión: python --version.",
   k=["Hoy se usa Python 3.", "Python 2 dejó de tener soporte en 2020.", "En Python 3, print lleva paréntesis."],
-  sit="Un tutorial usa print \"hola\" sin paréntesis y te da error. ¿De qué versión es ese código?",
+  sit="Un tutorial viejo usa print \"hola\" sin paréntesis y te da error. ¿Qué versión de Python debes usar y aprender hoy?",
   cod="""import sys
 print(sys.version_info.major >= 3)     # True: estamos en Python 3
 print("print lleva paréntesis en Python 3")""",

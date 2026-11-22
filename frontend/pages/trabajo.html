@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <script src="/js/i18n.js"></script>
   <script src="/js/carga.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Trabajo · CódigoCamp</title>
@@ -89,6 +90,7 @@
             </section>
             <div class="sash sash-vista" id="sashVista" role="separator" aria-orientation="vertical" aria-label="Cambiar el ancho de la vista previa" tabindex="0" hidden></div>
             <section class="vista-panel" id="panelVista" hidden aria-label="Vista previa del proyecto">
+              <div class="vista-pestanas" id="vistaPestanas" role="tablist" aria-label="Vistas previas abiertas"></div>
               <div class="vista-cab">
                 <div class="vista-nav">
                   <button type="button" class="icono-btn" id="vistaAtras" title="Atrás" aria-label="Página anterior" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -111,6 +113,7 @@
                 <p>Como Live Server: los enlaces entre tus páginas funcionan y se recarga sola cuando guardas. Sirve en tu celular o para mostrársela a alguien.</p>
                 <div class="live-url"><input id="liveUrl" readonly aria-label="Dirección de tu página"><button type="button" class="btn sm" id="liveCopiar">Copiar</button></div>
                 <div class="live-btns"><a class="btn pri sm" id="liveAbrir" href="#" target="_blank" rel="noopener">Abrir en otra pestaña</a><button type="button" class="btn sm ghost" id="liveCambiar" title="El enlace anterior deja de funcionar">Cambiar enlace</button></div>
+                <p class="live-local" id="liveLocal" hidden>⚠️ Entraste a CódigoCamp por <b>localhost</b>: esta dirección solo abre en este computador. Para abrirla en tu celular u otro dispositivo, entra a CódigoCamp con tu dirección pública (la del túnel) o ponla en <code>APP_URL</code> del archivo <code>backend/.env</code>.</p>
                 <small>Cualquiera con el enlace puede ver la página (no tu cuenta). Funciona con HTML, CSS y JavaScript; las apps de React/Vite o con backend de Python se ven aquí en la vista previa.</small>
               </div>
               <div class="vista-marco" id="vistaMarco"><iframe id="vista" title="Vista previa del proyecto" sandbox="allow-scripts allow-popups allow-forms"></iframe></div>
@@ -145,6 +148,7 @@
           <button type="button" class="estado-item" id="estadoGuardado" role="status" aria-live="polite" title="Estado del guardado (clic para guardar ahora)">Sincronizando…</button>
           <button type="button" class="estado-item" id="estCarpeta" hidden title="Carpeta del computador vinculada"></button>
           <button type="button" class="estado-item est-servidor" id="estServidor" hidden title="Servidor de Python encendido: clic para abrirlo en la vista previa"></button>
+          <button type="button" class="estado-item" id="copilotoLinea" aria-pressed="true" title="La IA sugiere el código que sigue mientras escribes (Tab acepta, Esc descarta)" hidden>✨ Copiloto: Sí</button>
           <button type="button" class="estado-item" id="autoGuardado" aria-pressed="true" title="Activa o desactiva el guardado automático. Desactivado, guardas tú con Ctrl+S.">Autoguardado: Sí</button>
         </div>
         <div class="estado-der">

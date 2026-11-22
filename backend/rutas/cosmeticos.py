@@ -279,7 +279,23 @@ def _datos_widget(usuario):
     else:
         estado = "Empieza tu racha hoy"
     base = request.host_url.rstrip("/")
+    # Encargos de hoy (los mismos de Recompensas)
+    from models import DailyChallenge
+    from servicios.perfil import encargos_del_dia, progreso_encargo
+    hechos = {x.clave for x in DailyChallenge.query.filter_by(usuario_id=usuario.id, fecha=hoy).all()}
+    encargos = [{"titulo": e["titulo"], "meta": e["meta"], "progreso": min(e["meta"], progreso_encargo(e, act)), "completado": e["clave"] in hechos}
+                for e in encargos_del_dia(usuario.id, hoy)]
+    # Ánimo de la mascota Codi (como el búho de Duolingo): cambia según tu racha y la hora
+    if practicado:
+        animo = "fuego" if racha >= 7 else "feliz"
+    elif racha:
+        animo = "alarma" if hora >= 18 else "preocupado"
+    else:
+        animo = "dormido"
+    medianoche = (ahora + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     return dict(
+        animo=animo, segundos_restantes=int((medianoche - ahora).total_seconds()), encargos=encargos,
+        encargos_hechos=sum(1 for e in encargos if e["completado"]), pregunta=_pregunta_rapida(usuario, p),
         racha=racha, racha_maxima=p.racha_maxima, xp=p.xp_total, diamantes=p.diamante, meta=p.meta_minutos,
         nombre=(usuario.nombre or "").split(" ")[0], practicado_hoy=practicado, estado=estado, salvarrachas=p.salvarrachas,
         semana=semana, semana_texto=" ".join(x["icono"] for x in semana), xp_hoy=xp_hoy, meta_xp=meta_xp,
@@ -289,6 +305,32 @@ def _datos_widget(usuario):
         url_practicar=f"{base}/pages/inicio.html?app=1", url_cofres=f"{base}/pages/recompensas.html?app=1",
         url_calendario=f"{base}/pages/perfil.html?app=1#calendario", actualizado=ahora.strftime("%H:%M"), zona=ahora.tzname(),
     )
+
+
+def _pregunta_rapida(usuario, p):
+    """Una pregunta de opción múltiple para responder desde el widget: de lo que ya estudiaste en tu curso (repaso),
+    o de la primera sección si aún no empiezas. Cambia cada 30 minutos. Solo es práctica: no da XP ni gasta vidas."""
+    import random
+    from datetime import datetime
+    from models import Challenge, CompletedLevel, Level, Section, Stage
+    if not p.curso_actual_id:
+        return None
+    base_q = (Challenge.query.join(Level, Level.id == Challenge.nivel_id).join(Section, Section.id == Level.seccion_id)
+              .join(Stage, Stage.id == Section.etapa_id).filter(Stage.curso_id == p.curso_actual_id, Challenge.tipo == "opcion"))
+    hechos = base_q.join(CompletedLevel, (CompletedLevel.nivel_id == Level.id) & (CompletedLevel.usuario_id == usuario.id))
+    ids = [x.id for x in hechos.with_entities(Challenge.id).limit(400)]
+    if not ids:
+        ids = [x.id for x in base_q.order_by(Stage.orden, Section.orden, Level.orden).with_entities(Challenge.id).limit(40)]
+    if not ids:
+        return None
+    turno = int(datetime.utcnow().timestamp() // 1800)
+    reto = db.session.get(Challenge, random.Random(f"{usuario.id}:{turno}").choice(ids))
+    opciones = list(reto.opciones or [])
+    if len(opciones) < 2 or reto.respuesta not in opciones:
+        return None
+    random.Random(reto.id + turno).shuffle(opciones)
+    return {"id": reto.id, "enunciado": reto.enunciado, "codigo": (reto.codigo or "")[:400], "opciones": opciones,
+            "respuesta": reto.respuesta, "explicacion": reto.explicacion or ""}
 
 
 def _firma_widget(fila):

@@ -16,7 +16,7 @@ const infoCurso = (slug = actual) => cursos.find((c) => c.slug === slug);
 // El curso que ves es el curso guardado: Inicio y Aprende comparten la misma elección.
 const marcarTarjeta = (slug) => {
   const nombre = infoCurso(slug)?.nombre || "";
-  [...document.querySelectorAll("#der .tarjeta")].find((t) => t.querySelector("h3")?.textContent === "Tu curso")?.querySelector("p")?.replaceChildren(nombre);
+  document.querySelector('#der [data-tarjeta="curso"] p')?.replaceChildren(nombre);
 };
 if (actual !== prog.curso_actual?.slug) { elegirCurso(actual).catch(() => {}); marcarTarjeta(actual); }
 
