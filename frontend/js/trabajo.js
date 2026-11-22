@@ -29,6 +29,7 @@ import { cargarGitReal } from "/js/trabajo/cargargit.js";
 import { SesionGitHub } from "/js/trabajo/sesiongithub.js";
 import { PanelExtensiones, faltantesPython } from "/js/trabajo/extensiones.js";
 import { almacenDeVenv, listarVenvs } from "/js/trabajo/venv.js";
+import { crearPaquetesServidor } from "/js/trabajo/pyservidor.js";
 import { aplicarCambio, contextoProyecto, extraerCambios, validarCambios } from "/js/trabajo/copiloto.js";
 import { formato } from "/js/formato-ia.js";
 import { CSS_ADJUNTOS, crearAdjuntador } from "/js/adjuntar.js";
@@ -145,8 +146,15 @@ const bd = new ClienteBD();
 const sesionGitHub = new SesionGitHub({ cuenta: claveCuenta(user), api });
 const motorGit = () => cargarGitReal({ usuario: user, archivos, credencial: sesionGitHub });
 const ejecutores = crearEjecutores({ api, almacenPip, archivos, bd });
+// Lo que el navegador no puede instalar (paquetes con código en C) va a un pip de verdad en el servidor.
+const pyServidor = crearPaquetesServidor(CUENTA);
+const pipServidor = {
+  almacen: pyServidor,
+  instalar: (lista) => api("/api/python/pip", { paquetes: lista }),
+  desinstalar: (lista) => api("/api/python/pip", { accion: "desinstalar", paquetes: lista }),
+};
 const paquetes = {
-  pip: (o) => ejecutarPip({ cargarPy: cargarPyodide, almacen: almacenPip, ...o }),
+  pip: (o) => ejecutarPip({ cargarPy: cargarPyodide, almacen: almacenPip, servidor: pipServidor, ...o }),
   npm: (o) => ejecutarNpm({ ...o, nombreProyecto: "mi-proyecto" }),
 };
 const shell = new Shell({
@@ -162,6 +170,7 @@ const shell = new Shell({
   abrir: (ruta) => abrir(ruta, { enfocar: false }),
   abrirVista: (ruta) => abrirVista(ruta),
   abrirUrl: (url) => abrirUrlServidor(url),
+  pyServidor,
 });
 // ---------------------------------------------------------------- celular: una sección a la vez ----
 const MOVIL = matchMedia("(max-width: 760px)");
@@ -896,9 +905,77 @@ function ejecutarActual() {
   // Un .js que usa una página del proyecto se «ejecuta» abriendo esa página (corre en el navegador, no en Node).
   const pagina = /\.m?js$/i.test(ruta) ? paginaQueUsa(proyecto(), ruta) : null;
   if (pagina) { abrirVista(pagina); return; }
+  // .jsx / .tsx (o un .js/.ts con React): se ve el componente en la vista previa.
+  if (esReact(ruta, proyecto().files[ruta])) { verComponente(ruta); return; }
   const comando = comandoParaArchivo(ruta, panel.activa?.sesion.cwd ?? "");
   if (!comando) { aviso(`No sé ejecutar archivos .${FS.extension(ruta) || "sin extensión"}. Los de texto solo se editan.`); return; }
   panel.correr(comando);
+}
+
+// ------------------------------------------------------------- componentes React sueltos ----
+function esReact(ruta, texto = "") {
+  if (/\.(jsx|tsx)$/i.test(ruta)) return true;
+  return /\.(m?js|ts)$/i.test(ruta) && (/from\s*["'](react|preact)(\/[^"']*)?["']/.test(texto) || /return\s*\(?\s*<[A-Za-z>]/.test(texto));
+}
+/** Abre la página del proyecto que usa el componente; si no hay ninguna, crea vista-<Nombre>.html que lo monta. */
+function verComponente(ruta) {
+  const py = proyecto();
+  const dir = FS.carpetaDe(ruta);
+  const raiz = carpetaDelPaquete(py, dir) ?? null;
+  const paginas = Object.keys(py.files).filter((h) => /\.html?$/i.test(h) && usaModulos(py, h) && !/(^|\/)vista-[^/]*\.html$/i.test(h));
+  const propia = paginas.find((h) => raiz !== null ? FS.dentroDe(h, raiz) || FS.carpetaDe(h) === raiz : FS.carpetaDe(h) === dir);
+  if (propia) { abrirVista(propia); return; }
+  const base = FS.nombreBase(ruta).replace(/\.[^.]+$/, "");
+  const vista = FS.unir(dir, `vista-${base}.html`);
+  if (!FS.tieneArchivo(py, vista)) {
+    const r = FS.crearArchivo(py, vista, paginaDeComponente(FS.nombreBase(ruta), base, py.files[ruta] ?? ""));
+    if (!r.ok) { aviso(r.error, { tipo: "error" }); return; }
+    proyectoCambio({ origen: "explorador", creado: vista });
+    aviso(`Creé «${FS.nombreBase(vista)}» para ver tu componente. Cambia el .${FS.extension(ruta)} y la vista se actualiza sola.`, { tipo: "info", ms: 7000 });
+  }
+  abrirVista(vista);
+}
+function paginaDeComponente(archivo, base, texto) {
+  const seMontaSolo = /createRoot\s*\(|ReactDOM\.render\s*\(|\brender\s*\(\s*</.test(texto);
+  const montar = seMontaSolo ? `import './${archivo}';` : `import { createElement, Component } from 'react';
+import { createRoot } from 'react-dom/client';
+import * as modulo from './${archivo}';
+
+// Se muestra lo que exporta tu archivo: el «export default» o el primer componente exportado.
+const Componente = modulo.default ?? Object.values(modulo).find((v) => typeof v === 'function');
+class Errores extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    return this.state.error
+      ? createElement('pre', { className: 'cc-error' }, String(this.state.error.message || this.state.error))
+      : this.props.children;
+  }
+}
+const raiz = createRoot(document.getElementById('root'));
+raiz.render(Componente
+  ? createElement(Errores, null, createElement(Componente))
+  : createElement('p', { className: 'cc-error' }, 'Exporta tu componente para verlo aquí, por ejemplo: export default function ${/^[A-Z]/.test(base) ? base : "App"}() { … }'));`;
+  return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${base} · vista previa</title>
+  <style>
+    body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; }
+    .cc-error { padding: 12px 14px; border-radius: 10px; background: #fee2e2; color: #991b1b; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <!-- Página creada para ver ${archivo}. Puedes borrarla cuando quieras. -->
+  <div id="root"></div>
+  <script type="module">
+${montar.split("\n").map((l) => "    " + l).join("\n")}
+  </script>
+</body>
+</html>
+`;
 }
 
 // ------------------------------------------------------------------- cambios del proyecto ----

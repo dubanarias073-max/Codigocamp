@@ -171,6 +171,63 @@ function mostrarEmojis(si) { $("emojis").hidden = !si; $("verEmojis").setAttribu
 function menu(si) { $("cMenu").hidden = !si; $("cMas").setAttribute("aria-expanded", String(si)); }
 $("verEmojis").onclick = () => mostrarEmojis($("emojis").hidden);
 $("cMas").onclick = (e) => { e.stopPropagation(); menu($("cMenu").hidden); };
+
+/* ===== Perfil del amigo: toca su foto o su nombre arriba del chat (o ⋮ → Ver perfil) ===== */
+const NOMBRE_TIPO = { marco: "Marco", fondo: "Fondo", tema: "Tema", cursor: "Puntero", efecto: "Efecto al hacer clic", dedo: "Rastro" };
+const RAREZA = { comun: "Común", raro: "Raro", epico: "Épico", legendario: "Legendario", mitico: "Mítico" };
+const fecha = (iso) => iso ? new Date(iso + "T12:00:00").toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" }) : "—";
+async function abrirPerfil() {
+  if (!activo) return;
+  menu(false);
+  const dlg = $("dlgPerfil"), c = $("pfCuerpo");
+  c.innerHTML = '<p class="nota">Cargando perfil…</p>';
+  dlg.showModal();
+  let p;
+  try { p = await api(`/api/amigos/${activo}/perfil/`); }
+  catch (x) { c.innerHTML = `<p class="nota">${esc(x.message)}</p>`; return; }
+  const max = Math.max(1, ...p.semana.map((d) => d.xp));
+  const dias = ["D", "L", "M", "X", "J", "V", "S"];
+  const foto = fotoDe({ foto: p.foto, avatar: p.avatar, nombre: p.nombre, cosmeticos: { marco: p.equipados.marco?.clave } }, { tam: 84 });
+  const barra = (v, t, color) => `<span class="pf-barra"><i style="width:${t ? Math.min(100, Math.round(v * 100 / t)) : 0}%;${color ? `background:${esc(color)}` : ""}"></i></span>`;
+  c.innerHTML = `
+    <section class="pf-top">
+      <span class="pf-foto">${foto}</span>
+      <div><h3 id="pfNombre">${esc(p.nombre)}</h3><small>@${esc(p.alias || "")} · ID ${esc(p.codigo || "")}</small>
+        <div class="pf-chips">
+          <span class="pf-chip">⭐ Nivel ${p.nivel}</span>
+          <span class="pf-chip${p.racha_actual ? " fuego" : ""}">🔥 ${p.racha_actual} día${p.racha_actual === 1 ? "" : "s"} de racha</span>
+          ${p.activo_hoy ? '<span class="pf-chip ok">✅ Practicó hoy</span>' : ""}
+        </div></div>
+    </section>
+    <div class="pf-xp"><small>${p.xp_nivel}/100 XP para el nivel ${p.nivel + 1} · ${p.xp_total} XP en total</small>${barra(p.xp_nivel, 100)}</div>
+    <section class="pf-stats">
+      <div><b>${p.niveles_completados}</b><small>niveles de retos</small></div>
+      <div><b>${p.estrellas}</b><small>estrellas</small></div>
+      <div><b>${p.lecciones_total}</b><small>lecciones en Aprende</small></div>
+      <div><b>${p.racha_maxima}</b><small>mejor racha</small></div>
+      <div><b>${p.cosmeticos_total}</b><small>cosméticos</small></div>
+    </section>
+    ${p.curso_actual ? `<p class="pf-curso">Está aprendiendo <b style="color:${esc(p.curso_actual.color)}">${esc(p.curso_actual.nombre)}</b></p>` : ""}
+    <section><h4>Esta semana</h4><div class="pf-semana">${p.semana.map((d) => `<span title="${d.xp} XP"><i style="height:${Math.round(d.xp * 100 / max)}%"></i><small>${dias[new Date(d.dia + "T12:00:00").getDay()]}</small></span>`).join("")}</div></section>
+    ${p.cursos.length ? `<section><h4>Retos por curso</h4>${p.cursos.map((k) => `<div class="pf-fila"><span>${esc(k.nombre)}</span><small>${k.niveles}/${k.total} · ⭐ ${k.estrellas}</small>${barra(k.niveles, k.total, k.color)}</div>`).join("")}</section>` : ""}
+    ${p.lecciones.length ? `<section><h4>Lecciones de Aprende</h4><div class="pf-tags">${p.lecciones.map((l) => `<span style="--c:${esc(l.color)}">${esc(l.nombre)} · ${l.hechas}</span>`).join("")}</div></section>` : ""}
+    <section><h4>Lo que tiene puesto</h4><div class="pf-cosm">${Object.entries(NOMBRE_TIPO).map(([t, n]) => {
+      const e = p.equipados[t];
+      return `<div class="pf-c${e ? "" : " vacio"}"><span class="pf-prev" data-tipo="${t}" data-clave="${e ? esc(e.clave) : ""}"></span><small>${n}</small><b>${e ? esc(e.nombre) : "—"}</b>${e ? `<em class="r-${esc(e.rareza)}">${RAREZA[e.rareza] ?? esc(e.rareza)}</em>` : ""}</div>`;
+    }).join("")}</div></section>
+    ${p.intereses?.length ? `<section><h4>Le interesa</h4><div class="pf-tags">${p.intereses.map((i) => `<span>${esc(i)}</span>`).join("")}</div></section>` : ""}
+    <p class="pf-fechas">En CódigoCamp desde el ${fecha(p.miembro_desde)} · Amigos desde el ${fecha(p.amigos_desde)}</p>
+    <button class="btn pri pf-escribir" type="button" id="pfEscribir">💬 Escribirle</button>`;
+  try {
+    const { vistaPrevia } = await import("/js/cosmeticos.js");
+    for (const el of c.querySelectorAll(".pf-prev[data-clave]:not([data-clave=''])")) { try { vistaPrevia(el, el.dataset.clave, el.dataset.tipo); } catch { /* sin vista previa */ } }
+  } catch { /* sin vistas previas */ }
+  $("pfEscribir").onclick = () => { dlg.close(); $("texto").focus(); };
+}
+$("verPerfil").onclick = abrirPerfil;
+$("cab").addEventListener("click", (e) => { if (e.target.closest("#cAv, .c-cab-txt")) abrirPerfil(); });
+$("dlgPerfilCerrar").onclick = () => $("dlgPerfil").close();
+$("dlgPerfil").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 addEventListener("click", (e) => { if (!e.target.closest("#cMenu")) menu(false); });
 
 /* ===== Buscar personas ===== */

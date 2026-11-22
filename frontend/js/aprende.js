@@ -1,6 +1,17 @@
 // Lógica de aprende.html
 import { iniciar, api, elegirCurso, aviso } from "/js/app.js";
 import { logo } from "/js/logos.js";
+import { LEE_ENTRADA } from "/js/trabajo/entradateclado.js";
+const SERVIDOR = new Set(['java', 'c', 'cpp', 'csharp', 'php', 'go', 'rust', 'swift', 'kotlin', 'ruby']);
+const avisoEnLinea = new Set();
+
+/* ===== Editor de VS Code (Monaco) en Aprende: colores, autocompletado y atajos. Si no carga, queda el editor simple. ===== */
+const IDIOMA_MONACO = { html: 'html', css: 'css', javascript: 'javascript', python: 'python', sql: 'sql', bd: 'sql',
+  typescript: 'typescript', java: 'java', c: 'c', cpp: 'cpp', csharp: 'csharp', php: 'php', go: 'go', rust: 'rust',
+  swift: 'swift', kotlin: 'kotlin', ruby: 'ruby', terminal: 'shell', git: 'shell', docker: 'dockerfile', node: 'javascript',
+  github: 'yaml', nosql: 'javascript', react: 'typescript' };
+let editorMonaco = null;
+
 const { prog } = await iniciar("aprende");
 
 /* Los cursos activos vienen de la API; esta tabla solo define el motor y los alias de archivos. */
@@ -155,6 +166,8 @@ function pintar() {
 
   const claveCodigo = lang + ':' + idx;
   ed.value = typeof codigosEditados[claveCodigo] === 'string' ? codigosEditados[claveCodigo] : x[3];
+  $('entrada').value = '';
+  mostrarEntrada();
   out.className = ''; out.textContent = TXT_INICIAL;
   $('modo').textContent = L.run === 'srv' ? 'Muestra el resultado esperado'
     : L.run === 'web' ? 'Se ve al instante'
@@ -203,6 +216,7 @@ $('reset').onclick = () => {
 ed.addEventListener('input', () => {
   codigosEditados[lang + ':' + idx] = ed.value;
   guardarCodigo();
+  mostrarEntrada();
 });
 ed.onkeydown = (e) => {
   if (e.key === 'Tab') { e.preventDefault(); const s = ed.selectionStart; ed.setRangeText('  ', s, ed.selectionEnd, 'end'); }
@@ -296,15 +310,70 @@ const RUN = {
   async srv(code, k) {
     const L = LEC[k];
     const sal = SAL?.[L.f]?.[idx];
-    if (sal !== undefined && code.trim() === L.l[idx][3].trim()) return [sal, 0];
-    const aviso = 'Este lenguaje no se ejecuta en el navegador. Para ver el resultado de tu código cambiado hace falta tener ' + L.n + ' instalado en el servidor.\nPulsa «Restablecer» para ver el resultado esperado de la lección.';
+    const entrada = $('entradaCaja').hidden ? '' : $('entrada').value;
+    if (sal !== undefined && code.trim() === L.l[idx][3].trim() && !entrada) return [sal, 0];
+    if (!SERVIDOR.has(L.f)) return ['Estos ejemplos se practican en Trabajo → Terminal (o en tu propio equipo). Pulsa «Restablecer» para ver el resultado esperado de la lección.', 0];
     try {
-      const d = await api('/api/run', { lenguaje: L.f, codigo: code });
-      if (d.error && /no tiene .* instalado/.test(d.salida || '')) return [aviso, 1];
-      return [d.salida || '', !!d.error];
-    } catch (x) { throw new Error(/sesi|segur|ejecutor|conectar/i.test(x.message) ? aviso : x.message); }
+      const d = await api('/api/run', { lenguaje: L.f, codigo: code, entrada });
+      let texto = d.salida || '';
+      if (d.donde === 'en_linea' && !avisoEnLinea.has(L.f)) { avisoEnLinea.add(L.f); texto += '\n\n(Compilado en línea porque el servidor no tiene ' + L.n + ' instalado. No pongas contraseñas en el código.)'; }
+      return [texto, !!d.error];
+    } catch (x) { throw new Error(x.message); }
   }
 };
+
+
+function mostrarEntrada() {
+  const L = LEC[lang];
+  const caja = $('entradaCaja');
+  if (!L || L.run !== 'srv' || !SERVIDOR.has(L.f)) { caja.hidden = true; return; }
+  const lee = LEE_ENTRADA[L.f]?.test(ed.value);
+  caja.hidden = !lee;
+  if (lee && !$('entrada').value) caja.open = true;
+}
+async function mejorarEditor() {
+  try {
+    const M = await import('/js/trabajo/monaco.js');
+    const monaco = await M.cargarMonaco({ limite: 15000 });
+    try {
+      for (const d of [monaco.languages.typescript.typescriptDefaults, monaco.languages.typescript.javascriptDefaults]) {
+        d.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: false });
+      }
+    } catch { /* sin servicio de TypeScript */ }
+    const t = document.documentElement.dataset.tema;
+    const oscuro = t === 'oscuro' || (t !== 'claro' && matchMedia('(prefers-color-scheme: dark)').matches);
+    const caja = $('edMonaco');
+    caja.hidden = false;
+    const editor = monaco.editor.create(caja, {
+      value: ed.value, language: IDIOMA_MONACO[lang] || 'plaintext', theme: oscuro ? 'codigocamp-oscuro' : 'codigocamp-claro',
+      automaticLayout: true, minimap: { enabled: false }, fontSize: 14, lineNumbers: 'on', scrollBeyondLastLine: false,
+      wordWrap: 'on', tabSize: 4, renderLineHighlight: 'line', bracketPairColorization: { enabled: true },
+      quickSuggestions: true, padding: { top: 10, bottom: 10 }, scrollbar: { alwaysConsumeMouseWheel: false },
+    });
+    const valor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+    let desdeMonaco = false;
+    Object.defineProperty(ed, 'value', {
+      configurable: true,
+      get() { return valor.get.call(ed); },
+      set(v) {
+        valor.set.call(ed, v);
+        if (desdeMonaco) return;
+        monaco.editor.setModelLanguage(editor.getModel(), IDIOMA_MONACO[lang] || 'plaintext');
+        if (editor.getValue() !== v) editor.setValue(v);
+        mostrarEntrada();
+      },
+    });
+    editor.onDidChangeModelContent(() => {
+      desdeMonaco = true; ed.value = editor.getValue(); desdeMonaco = false;
+      ed.dispatchEvent(new Event('input'));
+    });
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => ejecutar());
+    const alto = () => { caja.style.height = Math.min(560, Math.max(220, editor.getContentHeight() + 4)) + 'px'; editor.layout(); };
+    editor.onDidContentSizeChange(alto); alto();
+    ed.hidden = true;
+    editorMonaco = editor;
+  } catch { $('edMonaco').hidden = true; ed.hidden = false; }
+}
 
 /* ===== React en Aprende ===== */
 const RV = '19.1.0';
@@ -378,3 +447,5 @@ try { if (localStorage.getItem('cc_ruta_cerrada') === '1') panel(true, false); }
 
 document.body.classList.remove('cargando');
 abrir(lang);
+
+mejorarEditor();

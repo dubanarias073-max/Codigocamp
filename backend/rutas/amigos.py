@@ -157,3 +157,61 @@ def amigo_quitar(friendship_id):
     db.session.delete(friendship)
     db.session.commit()
     return jsonify(ok=True)
+
+
+@bp.get("/api/amigos/<int:friendship_id>/perfil/")
+@login_required
+def amigo_perfil(friendship_id):
+    """Perfil de un amigo: lo que se ve al tocar su nombre en el chat. Solo entre amigos (solicitud aceptada)."""
+    from datetime import date, timedelta
+
+    from cosmeticos import POR_CLAVE
+    from models import CompletedLevel, Course, DailyActivity, LessonDone, Level, OwnedCosmetic, Section, Stage
+
+    amistad = db.session.get(Friendship, friendship_id)
+    if not amistad or amistad.estado != "aceptada" or current_user.id not in (amistad.de_usuario_id, amistad.a_usuario_id):
+        return api_error("No encontramos a ese amigo.", 404)
+    otro = amistad.a_usuario if amistad.de_usuario_id == current_user.id else amistad.de_usuario
+    p = get_profile(otro)
+
+    # Retos: niveles completados y estrellas por curso
+    filas = (db.session.query(Course.id, Course.nombre, Course.sigla, Course.color, Course.slug,
+                              func.count(CompletedLevel.id), func.coalesce(func.sum(CompletedLevel.estrellas), 0))
+             .join(Stage, Stage.curso_id == Course.id).join(Section, Section.etapa_id == Stage.id)
+             .join(Level, Level.seccion_id == Section.id).join(CompletedLevel, CompletedLevel.nivel_id == Level.id)
+             .filter(CompletedLevel.usuario_id == otro.id).group_by(Course.id).all())
+    ids = [f[0] for f in filas]
+    totales = dict(db.session.query(Course.id, func.count(Level.id)).join(Stage, Stage.curso_id == Course.id)
+                   .join(Section, Section.etapa_id == Stage.id).join(Level, Level.seccion_id == Section.id)
+                   .filter(Course.id.in_(ids)).group_by(Course.id).all()) if ids else {}
+    cursos = [{"nombre": n, "sigla": s, "color": c, "slug": sl, "niveles": cnt, "total": totales.get(i, 0), "estrellas": int(e)}
+              for i, n, s, c, sl, cnt, e in filas]
+    cursos.sort(key=lambda x: -x["niveles"])
+    # Aprende: lecciones hechas por curso
+    lecc = (db.session.query(Course.nombre, Course.color, func.count(LessonDone.id)).join(LessonDone, LessonDone.curso_id == Course.id)
+            .filter(LessonDone.usuario_id == otro.id).group_by(Course.id).order_by(func.count(LessonDone.id).desc()).all())
+    # Actividad de los últimos 7 días
+    hoy = date.today()
+    dias = {a.fecha: a.xp for a in DailyActivity.query.filter(DailyActivity.usuario_id == otro.id,
+                                                               DailyActivity.fecha >= hoy - timedelta(days=6)).all()}
+    semana = [{"dia": (hoy - timedelta(days=6 - k)).isoformat(), "xp": dias.get(hoy - timedelta(days=6 - k), 0)} for k in range(7)]
+    # Cosméticos: los que tiene puestos y cuántos tiene
+    equipados = {t: ({"clave": c, "nombre": POR_CLAVE[c]["nombre"], "rareza": POR_CLAVE[c]["rareza"]} if c in POR_CLAVE else None)
+                 for t, c in equipados_de(otro.id).items()}
+    propios = OwnedCosmetic.query.filter_by(usuario_id=otro.id).count()
+
+    return jsonify(
+        nombre=otro.nombre, alias=p.alias, codigo=p.codigo, foto=foto_url(otro.id), avatar=p.avatar or "",
+        nivel=p.nivel, xp_total=p.xp_total, xp_nivel=p.xp_total % 100,
+        racha_actual=p.racha_actual, racha_maxima=p.racha_maxima,
+        activo_hoy=p.ultima_actividad == hoy,
+        rol=p.rol, intereses=p.intereses or [],
+        curso_actual=({"nombre": p.curso_actual.nombre, "sigla": p.curso_actual.sigla, "color": p.curso_actual.color}
+                      if p.curso_actual else None),
+        miembro_desde=p.creado_en.date().isoformat() if p.creado_en else None,
+        amigos_desde=amistad.creada_en.date().isoformat() if amistad.creada_en else None,
+        niveles_completados=sum(c["niveles"] for c in cursos), estrellas=sum(c["estrellas"] for c in cursos),
+        cursos=cursos[:12], lecciones=[{"nombre": n, "color": c, "hechas": k} for n, c, k in lecc[:12]],
+        lecciones_total=sum(k for _, _, k in lecc), semana=semana,
+        equipados=equipados, cosmeticos_total=propios,
+    )

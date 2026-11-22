@@ -58,6 +58,11 @@
               <button class="btn pri sm" id="run" type="button">▶ Ejecutar</button>
             </div>
             <textarea id="ed" spellcheck="false" aria-label="Editor de código"></textarea>
+            <div id="edMonaco" class="ed-monaco" hidden></div>
+            <details class="entrada-caja" id="entradaCaja" hidden>
+              <summary>⌨️ Entrada del teclado <small>(lo que escribirías cuando el programa pregunta)</small></summary>
+              <textarea id="entrada" rows="3" spellcheck="false" placeholder="Escribe un dato por línea. Ejemplo:&#10;Ana&#10;17" aria-label="Entrada del teclado para el programa"></textarea>
+            </details>
             <p class="sal-t">Resultado</p>
             <pre id="out" aria-live="polite">Pulsa «Ejecutar» (o Ctrl + Enter) para ver el resultado.</pre>
             <iframe id="vista" sandbox="allow-scripts allow-modals" title="Vista previa" hidden></iframe>

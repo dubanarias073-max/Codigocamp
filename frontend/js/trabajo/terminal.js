@@ -107,6 +107,7 @@ class Terminal {
     input.setAttribute("aria-label", "Escribe un comando");
     input.addEventListener("keydown", (e) => this.#teclaEntrada(e));
     input.addEventListener("input", () => { this.ultimoTab = false; });
+    input.addEventListener("paste", (e) => this.#pegar(e));
     contenedor.appendChild(input);
     this.entrada = input;
     this.#bajar();
@@ -141,6 +142,8 @@ class Terminal {
   pedirLinea(texto, { secreto = false } = {}) {
     return new Promise((resolver) => {
       if (texto) this.escribir(texto);
+      // Líneas pegadas de antemano (varias respuestas a la vez): se usan en orden, como en una terminal real.
+      if (this.colaLectura?.length && !secreto) { const v = this.colaLectura.shift(); this.#congelarTexto(v); resolver(v); return; }
       this.lectura = { resolver, secreto };
       const input = this.#crearEntrada(this.#linea());
       if (secreto) { input.type = "password"; input.autocomplete = "off"; input.setAttribute("aria-label", "Valor secreto (no se muestra)"); }
@@ -215,6 +218,39 @@ class Terminal {
     } else this.ultimoTab = true;
   }
 
+  /** Pegar varias líneas: cada línea es un comando (o una respuesta, si un programa está pidiendo datos). */
+  #pegar(e) {
+    const texto = e.clipboardData?.getData("text/plain") ?? "";
+    if (!/[\r\n]/.test(texto)) return;
+    e.preventDefault();
+    const input = this.entrada;
+    const lineas = texto.replace(/\r\n?/g, "\n").split("\n");
+    const ultima = lineas.pop();               // lo que va después del último salto queda escrito, sin ejecutar
+    const antes = input.value.slice(0, input.selectionStart);
+    const despues = input.value.slice(input.selectionEnd);
+    lineas[0] = antes + lineas[0];
+    if (this.lectura) {
+      const [primera, ...resto] = lineas;
+      this.colaLectura = [...(this.colaLectura ?? []), ...resto];
+      input.value = primera;
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      return;
+    }
+    void this.#enviarVarias(lineas, ultima + despues);
+  }
+
+  async #enviarVarias(lineas, resto) {
+    for (const linea of lineas) {
+      if (this.cerrada || !this.entrada) return;
+      this.entrada.value = linea;
+      await this.#enviar();
+      if (this.control?.signal.aborted) { this.colaLectura = []; break; }
+    }
+    if (this.entrada && resto) { this.entrada.value = resto; this.entrada.setSelectionRange(resto.length, resto.length); }
+  }
+
+  #congelarTexto(v) { this.escribir(v + "\n"); }
+
   async #enviar() {
     const linea = this.entrada.value;
     this.#congelar(linea);
@@ -230,6 +266,7 @@ class Terminal {
     this.raiz.focus({ preventScroll: true });
     try { await this.panel.shell.ejecutar(linea, this.sesion); }
     catch (error) { this.escribir(`Error inesperado: ${error?.message || error}\n`); }
+    this.colaLectura = [];
     this.ocupado = false;
     this.panel.alOcupado();
     if (this.cerrada) return;

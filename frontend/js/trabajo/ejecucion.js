@@ -771,7 +771,16 @@ export async function ejecutarPython(o) {
     pyo.FS.chdir(cwd);
     pyo.setStdout({ batched: (s) => o.out(s + "\n") });
     pyo.setStderr({ batched: (s) => o.err(s + "\n") });
-    pyo.setStdin({ stdin: () => { const r = globalThis.prompt?.("Entrada para input():"); if (r === null || r === undefined) return undefined; o.out(r + "\n"); return r; } });
+    // Lo escrito en la terminal antes de ejecutar (o pegado, o «echo … | python»): una línea por cada input().
+    const lineas = typeof o.entrada === "string" ? o.entrada.replace(/\r\n?/g, "\n").split("\n") : null;
+    if (lineas && lineas[lineas.length - 1] === "") lineas.pop();
+    pyo.setStdin({ stdin: () => {
+      if (lineas) return lineas.length ? lineas.shift() : undefined;
+      const r = globalThis.prompt?.("Entrada para input():");
+      if (r === null || r === undefined) return undefined;
+      o.out(r + "\n");
+      return r;
+    } });
     pyo.runPython(`import sys\nfor _p in (${JSON.stringify(cwd)}, ${JSON.stringify(RAIZ_PY)}):\n    if _p not in sys.path: sys.path.insert(0, _p)\nsys.argv = ${JSON.stringify([o.ruta === "<cadena>" ? "-c" : FS.nombreBase(o.ruta), ...(o.args || [])])}`);
     if (conBd) pyo.runPython(`preparar_bd(${JSON.stringify(RAIZ_PY)})`);
     await pyo.runPythonAsync(o.codigo, { filename: o.ruta === "<cadena>" ? "<cadena>" : `${RAIZ_PY}/${o.ruta}` });
@@ -823,12 +832,28 @@ export function crearEjecutores({ api, almacenPip = null, archivos = null, bd = 
     servidorPy: async (o) => (await import("./servidorpy.js")).ejecutarServidorPy({ ...o, almacenPip: o.almacenPip ?? almacenPip, archivos, bd }),
     sql: ejecutarSQL,
     cargarSQL,
-    async servidor({ lenguaje, codigo }) {
-      let reloj;
-      const limite = new Promise((resolver) => { reloj = setTimeout(() => resolver({ salida: "El servidor tardó demasiado en responder. Inténtalo de nuevo.", error: true }), 45_000); });
+    async docker({ args, archivos = null, entrada = "", cwd = "" }) {
       try {
-        const d = await Promise.race([api("/api/run", { lenguaje, codigo }), limite]);
+        const d = await api("/api/docker", { args, archivos, entrada, cwd, proyecto: "mi-proyecto" });
+        return { salida: d.salida || "", error: Boolean(d.error), puertos: d.puertos || [] };
+      } catch (error) {
+        return { salida: error.message, error: true, puertos: [] };
+      }
+    },
+    async pythonServidor({ ruta, archivos, entrada = "", args = [] }) {
+      try {
+        const d = await api("/api/python/run", { ruta, archivos, entrada, args });
         return { salida: d.salida || "", error: Boolean(d.error) };
+      } catch (error) {
+        return { salida: error.message, error: true };
+      }
+    },
+    async servidor({ lenguaje, codigo, entrada = "", archivos = [] }) {
+      let reloj;
+      const limite = new Promise((resolver) => { reloj = setTimeout(() => resolver({ salida: "El servidor tardó demasiado en responder (los compiladores en línea a veces van lentos). Inténtalo de nuevo.", error: true }), 75_000); });
+      try {
+        const d = await Promise.race([api("/api/run", { lenguaje, codigo, entrada, archivos }), limite]);
+        return { salida: d.salida || "", error: Boolean(d.error), donde: d.donde || "" };
       } catch (error) {
         return { salida: error.message, error: true };
       } finally {

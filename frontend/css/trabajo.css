@@ -119,6 +119,7 @@ html:has(.trabajo-pagina) { height: 100%; }
 .fi-c { background: #555599; } .fi-cs { background: #178600; } .fi-go { background: #00add8; } .fi-rs { background: #dea584; color: #222; }
 .fi-php { background: #4f5d95; } .fi-rb { background: #cc342d; } .fi-sql { background: #e38c00; } .fi-sh { background: #4eaa25; }
 .fi-kt { background: #a97bff; } .fi-txt { background: #6b7a9e; } .fi-git { background: #f14e32; }
+.fi-docker { background: #1d63ed; font-size: 10px; }
 .fila.edicion { background: var(--sel-fila); overflow: visible; }
 .fila-input { flex: 1; min-width: 0; height: 24px; margin-right: 6px; padding: 0 8px; border: 2px solid var(--cy); border-radius: 8px; background: var(--campo-bg); color: var(--txt); font: inherit; outline: 0; }
 .fila-input.invalido { border-color: var(--rojo); }

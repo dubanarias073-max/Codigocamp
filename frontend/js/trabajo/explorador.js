@@ -1,6 +1,7 @@
 // Explorador de archivos: árbol con crear / renombrar en línea, eliminar, mover arrastrando y menú contextual.
 import { dialogo, menuContextual } from "./dialogos.js";
 import * as FS from "./fs.js";
+import { codigoInicial } from "./iniciales.js";
 import { chevron, iconoArchivo, iconoCarpeta } from "./iconos.js";
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -357,7 +358,7 @@ export class Explorador {
       let r;
       if (edicion.modo === "renombrar") r = FS.mover(py, edicion.ruta, ruta);
       else if (edicion.modo === "carpeta") r = FS.crearCarpeta(py, ruta);
-      else r = FS.crearArchivo(py, ruta, "");
+      else r = FS.crearArchivo(py, ruta, codigoInicial(ruta));
       this.edicion = null;
       if (!r.ok) { this.render(); this.alCambiar({ origen: "aviso", error: r.error }); return; }
       if (edicion.modo === "renombrar") {

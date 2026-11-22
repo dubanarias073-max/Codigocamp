@@ -172,7 +172,9 @@ function urlPaquete(deps, nombre, subruta) {
 export async function prepararModulos(py, rutaHtml, { transpilar, enlaces = new Map() }) {
   const dirHtml = FS.carpetaDe(rutaHtml);
   const raiz = carpetaDelPaquete(py, dirHtml) ?? dirHtml;
-  const deps = dependenciasDe(py, dirHtml);
+  const deps = { ...dependenciasDe(py, dirHtml) };
+  // Sin package.json (o sin React declarado) un .jsx igual funciona: React viene por defecto.
+  if (!("preact" in deps)) for (const [n, v] of Object.entries({ react: "18.3.1", "react-dom": "18.3.1" })) if (!(n in deps)) deps[n] = v;
   const alias = aliasDeVite(py, raiz);
   const env = entornoDeVite(py, raiz);
   const prologo = `const __ccEnv = ${JSON.stringify(env)};\n`;

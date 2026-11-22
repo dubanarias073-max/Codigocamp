@@ -8,6 +8,8 @@ import { activar as activarVenv, almacenDeVenv, crearVenv, desactivar as desacti
 import * as FS from "./fs.js";
 import { ejecutarGit } from "./git.js";
 import { esMarcador, leerMarcador, formatoBytes } from "./archivos.js";
+import { LEE_ENTRADA } from "./entradateclado.js";
+import { archivosParaServidor, necesitaServidor } from "./pyservidor.js";
 import { importarEn } from "./importar.js";
 import { comandoSqlite } from "./sqlite.js";
 import { ClienteBD, comandoMysql, comandoPuente } from "./bd.js";
@@ -161,6 +163,13 @@ export function comandoParaArchivo(ruta, cwd = "") {
   const base = FS.nombreBase(ruta).replace(/\.[^.]+$/, "");
   const salida = relativa(cwd, FS.unir(FS.carpetaDe(ruta), base));
   const bin = salida.startsWith("..") ? salida : `./${salida}`;
+  const nombre = FS.nombreBase(ruta).toLowerCase();
+  const dirRel = relativa(cwd, FS.carpetaDe(ruta)) || ".";
+  if (nombre === "dockerfile") {
+    const tag = (FS.nombreBase(FS.carpetaDe(ruta)) || "miapp").toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^[^a-z0-9]+/, "") || "miapp";
+    return `docker build -t ${tag} -f ${r} ${dirRel} && docker run --rm ${tag}`;
+  }
+  if (/^(docker-)?compose\.ya?ml$/.test(nombre)) return `${dirRel === "." ? "" : `cd ${dirRel} && `}docker compose up -d && docker compose ps`;
   switch (FS.extension(ruta)) {
     case "js": case "mjs": case "cjs": return `node ${r}`;
     case "ts": return `ts-node ${r}`;
@@ -181,11 +190,11 @@ export function comandoParaArchivo(ruta, cwd = "") {
 }
 
 const LENGUAJE_SERVIDOR = { java: "java", c: "c", cpp: "cpp", cc: "cpp", cs: "csharp", php: "php", go: "go", rs: "rust", swift: "swift", kt: "kotlin", rb: "ruby" };
-const NO_DISPONIBLE = ["pnpm", "yarn", "apt", "apt-get", "brew", "sudo", "curl", "wget", "ssh", "docker", "make", "cmake", "cargo", "composer", "gem", "bundle", "vim", "nano", "vi", "emacs", "chmod", "chown", "kill", "ps", "top", "man"];
+const NO_DISPONIBLE = ["pnpm", "yarn", "apt", "apt-get", "brew", "sudo", "curl", "wget", "ssh", "make", "cmake", "cargo", "composer", "gem", "bundle", "vim", "nano", "vi", "emacs", "chmod", "chown", "kill", "ps", "top", "man"];
 
 export const NOMBRES_COMANDOS = [
   "cat", "cd", "clear", "cls", "code", "cp", "date", "echo", "env", "exit", "export", "find", "gcc", "g++", "gh", "git", "go", "grep", "head", "help",
-  "history", "java", "javac", "kotlinc", "ls", "vite", "mkdir", "mv", "node", "npm", "npx", "php", "pip", "pip3", "pwd", "python", "python3", "rm", "rmdir", "ruby", "run", "rustc", "sqlite3", "mysql", "mariadb", "psql", "mongosh", "mongo", "redis-cli", "bd-puente",
+  "history", "true", "false", "printf", "docker", "docker-compose", "java", "javac", "kotlinc", "ls", "vite", "mkdir", "mv", "node", "npm", "npx", "php", "pip", "pip3", "pwd", "python", "python3", "rm", "rmdir", "ruby", "run", "rustc", "sqlite3", "mysql", "mariadb", "psql", "mongosh", "mongo", "redis-cli", "bd-puente",
   "swift", "tail", "tree", "touch", "ts-node", "wc", "whoami", "dotnet", "py", "dir", "type", "ll", "virtualenv", "deactivate", "source", "which", "where", "fastapi", "uvicorn", "flask",
 ];
 
@@ -203,9 +212,11 @@ const AYUDA = [
   color.azul("venv") + "       python -m venv .venv → source .venv/bin/activate (o .venv\\Scripts\\activate) → pip install … → deactivate",
   color.azul("React") + "      npm create vite@latest mi-app -- --template react   (o react-ts, vanilla, preact) → cd mi-app → npm run dev",
   "            go run · php · ruby · swift · java Archivo.java · gcc/g++ archivo -o prog && ./prog · rustc · kotlinc   (se ejecutan en el servidor)",
+  color.azul("Docker") + "     docker build -t app . · docker run --rm app · docker run -d -p 8080:80 app · docker ps · logs · exec · stop · rm · docker compose up -d | ps | logs | down",
+  color.azul("Varios") + "     pega varias líneas y se ejecutan en orden · printf 'Ana\\n17\\n' | python pide.py",
   color.azul("Atajos") + "     ↑/↓ historial · Tab completar · Ctrl+C cancelar · Ctrl+L limpiar · Ctrl+D salir",
   "",
-  color.gris("No es un sistema operativo real: sudo, curl, ssh, editores de terminal, etc. no están disponibles."),
+  color.gris("No es un sistema operativo real: sudo, curl, ssh y editores de terminal no están disponibles (Docker sí: corre en el servidor)."),
 ].join("\n");
 
 // ----------------------------------------------------------------------- shell ----
@@ -219,8 +230,8 @@ export class Shell {
    * @param {object} o.ejecutores   { node, python, ts, servidor, sql } (ver ejecucion.js)
    */
   constructor({ proyecto, cambio = () => {}, usuario = "estudiante", abrir = () => {}, ejecutores = {}, ahora = () => new Date(), github = null, paquetes = null,
-    importar = (origen, opciones) => importarEn(this.proyecto(), origen, opciones), leerArchivo = null, subirArchivo = null, abrirVista = null, bd = null, gitReal = null, abrirUrl = null, credencialGitHub = null }) {
-    Object.assign(this, { proyecto, cambio, usuario, abrir, ejecutores, ahora, github, paquetes, importar, leerArchivo, subirArchivo, abrirVista, abrirUrl, credencialGitHub });
+    importar = (origen, opciones) => importarEn(this.proyecto(), origen, opciones), leerArchivo = null, subirArchivo = null, abrirVista = null, bd = null, gitReal = null, abrirUrl = null, credencialGitHub = null, pyServidor = null }) {
+    Object.assign(this, { proyecto, cambio, usuario, abrir, ejecutores, ahora, github, paquetes, importar, leerArchivo, subirArchivo, abrirVista, abrirUrl, credencialGitHub, pyServidor });
     this.bd = bd ?? new ClienteBD();
     this.gitReal = gitReal; // () => Promise<MotorGit>: Git de verdad (isomorphic-git)
     this.tokenGitHub = null; // solo en memoria: se pierde al recargar la página y no se guarda en ningún sitio
@@ -1112,9 +1123,96 @@ COMANDOS.python = async function python(a, io) {
     io.out(`\x1b[90m(${FS.nombreBase(f.ruta)} inicia un servidor: CódigoCamp lo sirve como ${esFlask ? "flask run" : "uvicorn"} en la vista previa)\x1b[0m\n`);
     return servidorPy(this, io, { estilo: esFlask ? "flask" : "uvicorn", spec: arranque[2]?.includes(":") ? arranque[2] : `${modulo}:${variable}`, carpetaModulo: carpeta, puerto, recargar });
   }
-  return ej({ ...contexto(this, io), ...extra, ruta: f.ruta, codigo: f.codigo, args: a.slice(1) });
+  // Importa un paquete que solo está en el servidor (pip con código en C): se ejecuta allí.
+  const delServidor = this.pyServidor && this.ejecutores.pythonServidor ? necesitaServidor(io.py(), f.ruta, this.pyServidor.modulos()) : null;
+  if (delServidor) return pythonEnServidor(this, io, f, a.slice(1), delServidor);
+  // input(): los datos se piden en la terminal (o llegan pegados / por tubería) y Python los lee en orden.
+  const lee = LEE_ENTRADA.python.test(f.codigo) || [...importsLocales(io.py(), f.ruta)].some((r) => LEE_ENTRADA.python.test(io.py().files[r] ?? ""));
+  const entrada = lee ? await pedirEntrada(io, "python", "input(") : io.entrada ?? null;
+  if (io.sesion.senal?.aborted) return 130;
+  return ej({ ...contexto(this, io), ...extra, ruta: f.ruta, codigo: f.codigo, args: a.slice(1), entrada });
 };
+// Docker de verdad: se ejecuta con el Docker del servidor de CódigoCamp (Docker Desktop si lo corres en tu PC).
+const DOCKER_CON_ARCHIVOS = new Set(["build", "run", "compose", "create", "cp", "image"]);
+async function comandoDocker(a, io, { compose = false } = {}) {
+  const ej = this.ejecutores.docker;
+  if (!ej) return ejecutorNo(io, "Docker");
+  const args = compose ? ["compose", ...a] : [...a];
+  const sub = args[0] ?? "help";
+  const py = io.py();
+  const archivos = DOCKER_CON_ARCHIVOS.has(sub)
+    ? Object.keys(py.files).filter((r) => !esMarcador(py.files[r]) && !/(^|\/)(node_modules|\.git|__pycache__|\.venv|venv)\//.test(r)).map((r) => ({ ruta: r, contenido: py.files[r] }))
+    : null;
+  const interactivo = args.some((x) => /^-[a-zA-Z]*i[a-zA-Z]*$/.test(x) || x === "--interactive") && sub !== "build";
+  const entrada = interactivo ? await pedirEntrada(io, "docker", "-i") : io.entrada ?? "";
+  if (io.sesion.senal?.aborted) return 130;
+  if (["build", "pull", "compose"].includes(sub)) io.err(color.gris(sub === "compose" && args[1] === "up" ? "Levantando los servicios con Docker (si hay que descargar o construir imágenes, puede tardar unos minutos)…\n" : `docker ${sub}: trabajando (puede tardar unos minutos)…\n`));
+  const r = await ej({ args, archivos, entrada, cwd: io.sesion.cwd });
+  const texto = r.salida && !r.salida.endsWith("\n") ? r.salida + "\n" : r.salida || "";
+  (r.error ? io.err : io.out)(texto);
+  const publica = (sub === "run" && args.some((x) => /^(-p|--publish)(=|$)|^-P$/.test(x))) || (sub === "compose" && /^(up|start|restart)$/.test(args.find((x, i) => i > 0 && !x.startsWith("-")) ?? "")) || sub === "start" || sub === "restart";
+  if (r.puertos?.length && !r.error && publica) {
+    for (const p of r.puertos) io.out(color.cian(`🌐 Tu contenedor está en http://${location.hostname}:${p}`) + color.gris("  (ábrelo en otra pestaña)\n"));
+  }
+  return r.error ? 1 : 0;
+}
+COMANDOS.docker = function docker(a, io) { return comandoDocker.call(this, a, io); };
+COMANDOS["docker-compose"] = function dockerCompose(a, io) { return comandoDocker.call(this, a, io, { compose: true }); };
+COMANDOS.printf = function printf(a, io) {
+  if (!a.length) { io.err("printf: uso: printf formato [argumentos]\n"); return 2; }
+  const escapes = (t) => t.replace(/\\(n|t|r|\\|"|'|a|b|0)/g, (x, c) => ({ n: "\n", t: "\t", r: "\r", "\\": "\\", '"': '"', "'": "'", a: "", b: "", 0: "" })[c]);
+  const [formato, ...args] = a;
+  const usa = /%[-+ 0#]*\d*(?:\.\d+)?[sdifxXoc]/.test(formato);
+  let salida = "";
+  let i = 0;
+  do {
+    salida += escapes(formato).replace(/%%|%([-+ 0#]*)(\d*)(?:\.(\d+))?([sdifxXoc])/g, (todo, banderas, ancho, prec, tipo) => {
+      if (todo === "%%") return "%";
+      const v = args[i++] ?? "";
+      let t;
+      if (tipo === "s") t = prec ? v.slice(0, +prec) : v;
+      else if (tipo === "c") t = v.slice(0, 1);
+      else if (tipo === "f") t = (parseFloat(v) || 0).toFixed(prec ? +prec : 6);
+      else { const n = parseInt(v, 10) || 0; t = tipo === "x" ? n.toString(16) : tipo === "X" ? n.toString(16).toUpperCase() : tipo === "o" ? n.toString(8) : String(n); }
+      if (ancho) t = banderas.includes("-") ? t.padEnd(+ancho) : t.padStart(+ancho, banderas.includes("0") && tipo !== "s" ? "0" : " ");
+      return t;
+    });
+  } while (usa && i < args.length);
+  io.out(salida);
+  return 0;
+};
+COMANDOS.true = () => 0;
+COMANDOS.false = () => 1;
+COMANDOS[":"] = () => 0;
 COMANDOS.python3 = COMANDOS.python;
+
+/** .py del proyecto que importa un programa (en su misma carpeta), para saber si alguno usa input(). */
+function importsLocales(py, ruta) {
+  const dir = FS.carpetaDe(ruta);
+  const vistos = new Set();
+  const pendientes = [ruta];
+  while (pendientes.length) {
+    const r = pendientes.pop();
+    for (const m of (py.files[r] ?? "").matchAll(/^[ \t]*(?:from[ \t]+([\w]+)|import[ \t]+([\w]+))/gm)) {
+      const local = FS.unir(dir, `${m[1] ?? m[2]}.py`);
+      if (FS.tieneArchivo(py, local) && !vistos.has(local)) { vistos.add(local); pendientes.push(local); }
+    }
+  }
+  return vistos;
+}
+
+async function pythonEnServidor(shell, io, f, args, modulo) {
+  const entrada = await pedirEntrada(io, "python", f.codigo);
+  if (io.sesion.senal?.aborted) return 130;
+  const archivos = archivosParaServidor(io.py(), f.ruta);
+  io.err(color.gris(`Ejecutando ${f.ruta} en el servidor (usa «${modulo}», instalado allí con pip)…\n`));
+  const { salida, error } = await shell.ejecutores.pythonServidor({ ruta: f.ruta, archivos, entrada, args });
+  const texto = salida && !salida.endsWith("\n") ? salida + "\n" : salida || "";
+  (error ? io.err : io.out)(texto);
+  const falta = /No module named '([\w.]+)'/.exec(texto)?.[1];
+  if (error && falta) io.err(color.amarillo(`Instálalo con: pip install ${falta.split(".")[0]}\n`));
+  return error ? 1 : 0;
+}
 COMANDOS.pip = async function pip(a, io) {
   if (!this.paquetes) return ejecutorNo(io, "pip");
   const venv = this.almacenVenv(io);
@@ -1182,12 +1280,45 @@ COMANDOS["redis-cli"] = function redis(a, io) {
 };
 COMANDOS["bd-puente"] = function puente(a, io) { return comandoPuente({ args: a, out: io.out, err: io.err, cliente: this.bd }); };
 
-async function enServidor(shell, io, lenguaje, f, { guardarComo, nombreBin } = {}) {
+const AUXILIARES = { java: ["java"], c: ["h", "c"], cpp: ["h", "hpp", "hh", "cpp", "cc", "cxx", "c"] };
+
+/** Los demás archivos que el compilador necesita: otras clases de Java de la carpeta, cabeceras y .c/.cpp de C/C++. */
+export function archivosAuxiliares(py, lenguaje, rutaPrincipal) {
+  const ext = AUXILIARES[lenguaje];
+  if (!ext) return [];
+  const carpeta = FS.carpetaDe(rutaPrincipal);
+  const rutas = lenguaje === "java" ? FS.archivosEn(py, carpeta) : FS.archivosEn(py, carpeta).filter((r) => FS.carpetaDe(r) === carpeta);
+  return rutas.filter((r) => r !== rutaPrincipal && ext.includes(FS.extension(r)) && !esMarcador(py.files[r]))
+    .slice(0, 40).map((r) => ({ nombre: r, contenido: py.files[r] }));
+}
+
+async function pedirEntrada(io, lenguaje, codigo) {
+  if (io.entrada !== null && io.entrada !== undefined) return io.entrada;   // programa < datos.txt  o  echo 5 | programa
+  if (!LEE_ENTRADA[lenguaje]?.test(codigo) || !io.sesion.leerLinea) return "";
+  io.err(color.gris("Este programa lee datos del teclado. Escribe cada dato y pulsa Enter; deja una línea vacía para ejecutar.\n"));
+  const lineas = [];
+  while (lineas.length < 200) {
+    const l = await io.sesion.leerLinea(color.cian("» "));
+    if (l === null || l === "" || io.sesion.senal?.aborted) break;
+    lineas.push(l);
+  }
+  return lineas.join("\n");
+}
+
+const AVISO_EN_LINEA = new Set();
+async function enServidor(shell, io, lenguaje, f, { guardarComo } = {}) {
   const ej = shell.ejecutores.servidor;
   if (!ej) return ejecutorNo(io, "La ejecución en servidor");
-  io.err(color.gris(`Ejecutando ${lenguaje} en el servidor…\n`));
-  const { salida, error } = await ej({ lenguaje, codigo: f.codigo, senal: io.sesion.senal });
+  const entrada = await pedirEntrada(io, lenguaje, f.codigo);
+  if (io.sesion.senal?.aborted) return 130;
+  const archivos = archivosAuxiliares(io.py(), lenguaje, f.ruta);
+  io.err(color.gris(`Compilando y ejecutando ${f.ruta}${archivos.length ? ` (+${archivos.length} archivo${archivos.length === 1 ? "" : "s"} del proyecto)` : ""}…\n`));
+  const { salida, error, donde } = await ej({ lenguaje, codigo: f.codigo, entrada, archivos, senal: io.sesion.senal });
   const texto = salida && !salida.endsWith("\n") ? salida + "\n" : salida || "";
+  if (donde === "en_linea" && !AVISO_EN_LINEA.has(lenguaje)) {
+    AVISO_EN_LINEA.add(lenguaje);
+    io.err(color.gris(`(Se compiló en línea —Wandbox${lenguaje === "kotlin" ? " / Kotlin Playground" : ""}— porque el servidor de CódigoCamp no tiene este compilador instalado. Funciona sin instalar nada; no pongas contraseñas en el código.)\n`));
+  }
   if (guardarComo) {
     // Compilar y ejecutar ocurren juntos en el servidor: se guarda el resultado y se muestra al lanzar el programa.
     io.sesion.binarios[guardarComo] = { texto, codigo: error ? 1 : 0 };

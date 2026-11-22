@@ -160,7 +160,9 @@ const CSS_BASE = `
 #cc-fondo{position:fixed;inset:0;z-index:-1;pointer-events:none}
 #cc-fondo canvas{width:100%;height:100%;display:block}
 html.cc-con-fondo body{background:transparent!important}
-html.cc-con-fondo.cc-fondo-oscuro .tarjeta,html.cc-con-fondo.cc-fondo-oscuro .lado,html.cc-con-fondo.cc-fondo-oscuro .der .tarjeta{backdrop-filter:blur(6px)}
+#cc-fondo::after{content:"";position:absolute;inset:0;background:var(--cc-velo,transparent)}
+html.cc-con-fondo :is(.tarjeta,.lado,.inf,.cab,header,nav,aside,.ruta,.teoria,.explorador,.asistente,.editor-tarjeta,.ide-barra,.ide-estado,.lab,.panel,.chat,.pe-cab,.r-pie){-webkit-backdrop-filter:blur(8px) saturate(1.25);backdrop-filter:blur(8px) saturate(1.25)}
+html.cc-con-fondo :is(dialog,[role=dialog],[role=menu],[role=listbox],.ide-dialogo,.ide-menu,.ide-avisos,.ide-aviso,.modal,.menu,.toast,.aviso,select option){--panel:var(--cc-panel-solido)!important;--panel2:var(--cc-panel2-solido)!important;--surf:var(--cc-surf-solido)!important;--bg:var(--cc-bg-solido)!important}
 .cc-marco{position:relative;display:inline-grid;place-items:center;border-radius:50%;padding:4px;isolation:isolate}
 .cc-marco::before{content:"";position:absolute;inset:0;border-radius:50%;z-index:-1}
 .cc-marco>*{border-radius:50%}
@@ -553,12 +555,56 @@ input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button
     document.body.prepend(caja);
     html.classList.add("cc-con-fondo");
     if (f.oscuro) html.classList.add("cc-fondo-oscuro");
+    veloFondo();
     if (f.canvas) animarCanvas(f.canvas, caja);
     if (reducido()) caja.style.animation = "none";
   }
   // Efecto (clic) y estela del dedo (celular)
   activarEfecto(eq.efecto);
   activarDedo(eq.dedo);
+}
+
+/* Con un fondo comprado los paneles se vuelven translúcidos (se ve el fondo) pero conservan
+   suficiente color para leer bien. Menús, diálogos, editor y terminal siguen opacos. */
+const ALFA = { panel: 56, panel2: 62, surf: 56, surf2: 56, surf3: 56, "lado-bg": 50, bg: 30, "chip-bg": 66, "campo-bg": 80,
+  "unidad-bg": 52, "sec-bg": 64, "inf-bg": 60, "pie-bg": 66, "guia-bg": 64, "pieza-bg": 70, "nodo-bg": 74, "caja-bg": 58,
+  "mix-a": 58, "mix-b": 58, "mes-b-bg": 64, "lab-top": 70, "onb-form-bg": 74 };
+const PRIMER_COLOR = /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|color\([^)]*\)/i;
+let observadorTema = null;
+function luminancia(color) {
+  const c = document.createElement("canvas").getContext("2d");
+  if (!c) return 0;
+  c.fillStyle = "#000"; c.fillStyle = color; c.fillRect(0, 0, 1, 1);
+  const [r, g, b] = c.getImageData(0, 0, 1, 1).data;
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+function veloFondo() {
+  const html = document.documentElement;
+  estilo("cc-cosm-velo", "");
+  if (!html.classList.contains("cc-con-fondo")) return;
+  const cs = getComputedStyle(document.body);
+  const v = (n) => cs.getPropertyValue("--" + n).trim();
+  const base = v("panel") || "#0d1b1a";
+  const solido = { panel: base, panel2: v("panel2") || base, surf: v("surf") || base, bg: v("bg") || base };
+  const reglas = [];
+  for (const [n, a] of Object.entries(ALFA)) {
+    let val = v(n);
+    if (!val) continue;
+    if (/gradient\(/.test(val)) val = (val.replace(/radial-gradient\([^()]*(\([^()]*\)[^()]*)*\),?/g, "").match(PRIMER_COLOR) || [base])[0];
+    reglas.push(`--${n}:color-mix(in srgb,${val} ${a}%,transparent)!important`);
+  }
+  for (const [n, val] of Object.entries(solido)) reglas.push(`--cc-${n}-solido:${val}`);
+  reglas.push("--body-img:none!important");
+  // Tema claro + fondo oscuro (o al revés): el texto que va directo sobre el fondo no se leería → velo más fuerte.
+  const temaOscuro = luminancia(solido.bg) < 0.4;
+  const fondoOscuro = html.classList.contains("cc-fondo-oscuro");
+  reglas.push(`--cc-velo:color-mix(in srgb,${solido.bg} ${temaOscuro === fondoOscuro ? 10 : 42}%,transparent)`);
+  estilo("cc-cosm-velo", `html.cc-con-fondo body,html.cc-con-fondo .trabajo-app{${reglas.join(";")}}`);
+  if (!observadorTema) {
+    observadorTema = new MutationObserver(() => veloFondo());
+    observadorTema.observe(html, { attributes: true, attributeFilter: ["data-tema"] });
+    matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => veloFondo());
+  }
 }
 
 /** Lo último que se aplicó (para pintarlo al instante mientras carga la página). */

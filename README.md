@@ -184,6 +184,11 @@ Compress-Archive backend\almacen_archivos $HOME\almacen_archivos-respaldo.zip -F
 | `BD_PERMITIR_PROPIA` | `0` | `1` permite abrir la propia base `codigocamp` desde Trabajo (bloqueado por defecto). |
 | `TRABAJO_RED` | `1` | Permite que el Python de Trabajo realice peticiones HTTP externas. |
 | `PISTON_URL`, `PISTON_KEY` | — | Servidor externo opcional para ejecutar lenguajes compilados (Java, C, C++, Go, Rust). |
+| `EJECUCION_EN_LINEA` | `1` | Si el servidor no tiene el compilador, Java, C, C++, C#, PHP, Go, Rust, Swift, Ruby (Wandbox) y Kotlin (Kotlin Playground) se compilan en línea. `0` lo apaga. |
+| `PYTHON_SERVIDOR` | `1` | Los paquetes de pip con código en C que el navegador no soporta se instalan con pip de verdad en un entorno virtual por usuario, y los programas que los usan se ejecutan en el servidor. `0` lo apaga. |
+| `PYTHON_VENVS_DIR` | carpeta temporal | Dónde se guardan esos entornos virtuales (uno por usuario). |
+| `DOCKER_TRABAJO` | `auto` | Docker de verdad en la terminal de Trabajo (`docker …`, `docker compose …`). `auto` = solo en desarrollo (`DEBUG=1`), `1` siempre, `0` nunca. Necesita Docker Desktop abierto. Cada usuario solo ve sus contenedores; sin `--privileged`, red del host ni carpetas fuera del proyecto. |
+| `DOCKER_DIR` | carpeta temporal | Dónde se copian los proyectos para Docker. |
 
 *(Si no configuras credenciales SMTP, los correos no fallan: se guardan como archivos `.eml` dentro de `backend/almacen_archivos/correos/` para revisarlos en local).*
 

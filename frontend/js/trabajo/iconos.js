@@ -9,7 +9,9 @@ const POR_EXT = {
 };
 
 export function iconoArchivo(ruta) {
-  const [texto, clase] = POR_EXT[extension(ruta)] ?? (nombreBase(ruta) === ".gitignore" ? ["◆", "git"] : ["≡", "txt"]);
+  const base = nombreBase(ruta).toLowerCase();
+  const docker = base === "dockerfile" || base === ".dockerignore" || /^(docker-)?compose\.ya?ml$/.test(base);
+  const [texto, clase] = docker ? ["🐳", "docker"] : POR_EXT[extension(ruta)] ?? (base === ".gitignore" ? ["◆", "git"] : ["≡", "txt"]);
   return `<span class="fi fi-${clase}" aria-hidden="true">${texto}</span>`;
 }
 

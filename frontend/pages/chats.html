@@ -51,7 +51,7 @@
             <span class="c-av" id="cAv"></span>
             <div class="c-cab-txt"><b id="cNombre"></b><small id="cAlias"></small></div>
             <button class="c-ico" id="cMas" type="button" aria-label="Opciones" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
-            <div class="c-menu" id="cMenu" hidden><button id="quitar" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg>Quitar amigo</button></div>
+            <div class="c-menu" id="cMenu" hidden><button id="verPerfil" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Ver perfil</button><button id="quitar" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg>Quitar amigo</button></div>
           </header>
           <div class="c-log" id="log" aria-live="polite" hidden></div>
           <div class="c-abajo">
@@ -67,6 +67,10 @@
         </section>
       </div>
     </main>
+    <dialog class="dlg-contactos dlg-perfil" id="dlgPerfil" aria-labelledby="pfNombre">
+      <header><h2>Perfil</h2><button class="c-ico" type="button" id="dlgPerfilCerrar" aria-label="Cerrar">✕</button></header>
+      <div id="pfCuerpo" class="pf-cuerpo"></div>
+    </dialog>
     <dialog class="dlg-contactos" id="dlgContactos" aria-labelledby="dlgContTit">
       <header><h2 id="dlgContTit">Tus contactos</h2><button class="c-ico" type="button" id="dlgContCerrar" aria-label="Cerrar">✕</button></header>
       <p class="nota" id="dlgContNota">Elige contactos de tu teléfono para ver quién ya está en CódigoCamp o invitarlos. No guardamos tu agenda.</p>

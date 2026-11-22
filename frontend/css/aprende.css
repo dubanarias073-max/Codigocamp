@@ -89,3 +89,10 @@
 .aula.sin-ruta { grid-template-columns: minmax(0, 1fr); }
 .aula.sin-ruta .ruta { display: none; }
 .aula.sin-ruta #rutaAbrir { display: inline-flex; }
+
+/* Editor de VS Code y entrada del teclado */
+.aula .ed-monaco{width:100%;min-height:220px;border-top:1px solid var(--borde,#2a3350);border-bottom:1px solid var(--borde,#2a3350)}
+.aula .entrada-caja{margin:0;padding:8px 14px;border-bottom:1px solid var(--borde,#2a3350);background:color-mix(in srgb,var(--cy,#22d3ee) 6%,transparent)}
+.aula .entrada-caja summary{cursor:pointer;font-weight:700;font-size:13.5px}
+.aula .entrada-caja summary small{font-weight:500;opacity:.75}
+.aula .entrada-caja textarea{display:block;width:100%;margin-top:8px;padding:8px 10px;box-sizing:border-box;border:1px solid var(--borde,#2a3350);border-radius:8px;background:transparent;color:inherit;font:13px/1.4 ui-monospace,Consolas,monospace;resize:vertical}

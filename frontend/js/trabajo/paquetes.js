@@ -78,7 +78,7 @@ export function limpiarRequisito(linea) {
  * @param {()=>Promise<object>} o.cargarPy   devuelve la instancia de Pyodide
  * @param {{leer:()=>string[], guardar:(l:string[])=>void}} o.almacen
  */
-export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy, almacen, revisar = revisarPip }) {
+export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy, almacen, revisar = revisarPip, servidor = null }) {
   const [sub, ...resto] = args;
   if (!sub || sub === "help" || sub === "--help") { out("Uso: pip install <paquete>[==versión] | install -r requirements.txt | uninstall <paquete> | list | freeze\n"); return sub ? 0 : 1; }
   if (sub === "--version" || sub === "-V") { out("pip (micropip en Pyodide, CódigoCamp)\n"); return 0; }
@@ -93,6 +93,7 @@ export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy
     const enVenv = Boolean(almacen.venv);
     const mostrar = sub === "freeze" ? filas.filter(([n]) => propios.has(nombreDe(n)))
       : enVenv ? [["pip", "24.0"], ...filas.filter(([n]) => propios.has(nombreDe(n)))] : filas;
+    if (servidor) for (const [n, v] of Object.entries(servidor.almacen.leer())) if (!mostrar.some(([m]) => nombreDe(m) === n)) mostrar.push([sub === "freeze" ? n : `${n} (servidor)`, v.version || ""]);
     out(sub === "freeze" ? mostrar.map(([n, v]) => `${n}==${v}`).join("\n") + (mostrar.length ? "\n" : "")
       : `${"Package".padEnd(28)}Version\n${"-".repeat(28)} ${"-".repeat(10)}\n${mostrar.map(([n, v]) => n.padEnd(28) + v).join("\n")}\n`);
     return 0;
@@ -147,21 +148,28 @@ export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy
   if (malos.length) { err(`ERROR: «${malos[0]}» no es un nombre de paquete válido (se admiten nombres de PyPI con versión opcional: nombre==1.2.3). Las URL y rutas no están permitidas.\n`); return 1; }
 
   let pyo;
+  let micropip = null;
   try {
     err(color.gris("Cargando Python (solo la primera vez, puede tardar unos segundos)…\n"));
     pyo = await cargarPy();
     await pyo.loadPackage("micropip");
-  } catch (e) { err(`${e.message}\n`); return 1; }
-  const micropip = pyo.pyimport("micropip");
+    micropip = pyo.pyimport("micropip");
+  } catch (e) {
+    if (!(sub === "install" && servidor)) { err(`${e.message.split("\n")[0]}\n`); return 1; }
+    err(color.gris("El instalador del navegador no cargó (¿sin internet?): se instala todo en el servidor.\n"));
+  }
   let guardados = almacen.leer();
   let codigo = 0;
   const fallidos = [];
+  const paraServidor = [];   // no existen para el navegador → pip de verdad en el servidor
   const version = (n) => { try { return pyo.runPython(`import importlib.metadata as _m\ntry:\n    _v = _m.version(${JSON.stringify(n)})\nexcept Exception:\n    _v = ""\n_v`); } catch { return ""; } };
   for (const espec of especs) {
     const n = nombreDe(espec);
+    if (!micropip && sub === "install") { paraServidor.push(espec); continue; }
     try {
       if (sub === "install") {
         const rev = await revisar(n);
+        if (!rev.ok && servidor && rev.existe !== false) { paraServidor.push(espec); continue; }
         if (!rev.ok) {
           err(`ERROR: ${espec} no se puede instalar en Trabajo: ${rev.motivo}.\n${rev.alternativa ? `  Alternativa: ${rev.alternativa}\n` : ""}`);
           if (rev.existe !== false) err(color.gris("  Trabajo ejecuta Python dentro del navegador. En tu PC (VS Code) sí se instala con pip normal.\n"));
@@ -173,6 +181,10 @@ export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy
         instaladosEnSesion.add(n);
         guardados = [...guardados.filter((g) => nombreDe(g) !== n), instalado];
         out(`${color.verde("✔")} ${instalado}${instalado === espec && version(n) && !espec.includes("==") ? " " + version(n) : ""} instalado\n`);
+      } else if (servidor?.almacen.tiene(n)) {
+        await servidor.desinstalar([n]);
+        servidor.almacen.quitar([n]);
+        out(`Desinstalado ${n} (del servidor)\n`);
       } else {
         await micropip.uninstall(n);
         instaladosEnSesion.delete(n);
@@ -180,16 +192,32 @@ export async function ejecutarPip({ args, proyecto, cwd = "", out, err, cargarPy
         out(`Desinstalado ${n}\n`);
       }
     } catch (error) {
+      if (sub === "install" && servidor) { paraServidor.push(espec); continue; }
       err(`ERROR: ${espec}: ${explicarErrorPip(error.message)}\n`);
       fallidos.push(espec);
       codigo = 1;
     }
   }
   almacen.guardar(guardados);
+  if (paraServidor.length) {
+    out(`${color.cian("→")} ${paraServidor.join(", ")}: ${paraServidor.length === 1 ? "tiene" : "tienen"} código que el navegador no puede usar. Se ${paraServidor.length === 1 ? "instala" : "instalan"} con pip en el servidor de CódigoCamp (la primera vez puede tardar unos minutos)…\n`);
+    try {
+      const r = await servidor.instalar(paraServidor);
+      if (r.instalados?.length) {
+        servidor.almacen.agregar(r.instalados);
+        for (const i of r.instalados) out(`${color.verde("✔")} ${i.paquete} ${i.version} instalado en el servidor\n`);
+        out(color.gris("Los programas que importen estos paquetes se ejecutan en el servidor automáticamente (python archivo.py o el botón Ejecutar).\n"));
+      }
+      for (const f of r.fallidos ?? []) { err(`ERROR: ${f.paquete}: ${f.motivo}\n`); fallidos.push(f.paquete); codigo = 1; }
+    } catch (e) {
+      err(`ERROR: no se pudo instalar en el servidor: ${e.message}\n`);
+      fallidos.push(...paraServidor); codigo = 1;
+    }
+  }
   if (sub === "install" && especs.length > 1) {
     const bien = especs.length - fallidos.length;
     out(`\n${color.negrita("Resumen:")} ${color.verde(`${bien} instalado${bien === 1 ? "" : "s"}`)}${omitidos.length ? ` · ${color.gris(`${omitidos.length} omitido${omitidos.length === 1 ? "" : "s"} (no hacen falta aquí)`)}` : ""}${fallidos.length ? ` · ${color.rojo(`${fallidos.length} con error: ${fallidos.join(", ")}`)}` : ""}\n`);
-    if (fallidos.length) out(color.gris("Los que fallan suelen tener código en C sin versión para el navegador. Si tu código no los importa, puedes ignorarlos; si los usa, busca una alternativa en Extensiones (Ctrl+Shift+X).\n"));
+    if (fallidos.length) out(color.gris(servidor ? "Los que fallan no existen en PyPI con ese nombre o versión, o necesitan programas del sistema que el servidor no tiene. Revisa el nombre y la versión.\n" : "Los que fallan suelen tener código en C sin versión para el navegador. Si tu código no los importa, puedes ignorarlos; si los usa, busca una alternativa en Extensiones (Ctrl+Shift+X).\n"));
   }
   if (sub === "install" && codigo === 0) out(color.gris(almacen.venv
     ? `Instalado en el entorno virtual «${almacen.venv.split("/").pop()}» (queda en ${almacen.venv}/lib/python3.12/site-packages/cc-requisitos.txt). pip freeze > requirements.txt lo guarda para compartir.\n`
