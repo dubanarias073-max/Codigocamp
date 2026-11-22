@@ -1,6 +1,8 @@
-// Sonidos de CódigoCamp (como en Duolingo, pero propios): se sintetizan con Web Audio, sin archivos.
-//   correcto · incorrecto · leccion (terminaste una lección) · racha (¡hiciste la racha de hoy!) · cofre (se abre) ·
-//   premio (cada premio que sale del cofre) · legendario (premio exclusivo) · moneda · clic
+// Sonidos de CódigoCamp con temática de código y sistemas operativos (originales: se sintetizan con Web Audio, sin archivos).
+//   correcto («compilación exitosa») · incorrecto (zumbido de error del sistema) · clic (tecla mecánica) · teclear ·
+//   moneda (commit) · leccion (arranque del sistema) · racha (llamarada + acorde de inicio) · cofre (descomprimir datos) ·
+//   premio (notificación) · legendario (logro desbloqueado, consola retro) · ejecutar (Enter + ventilador) ·
+//   programa_ok (proceso terminó con código 0) · programa_error (excepción) · arranque (inicio de sesión)
 // Se apagan en Configuración («Sonidos»), igual que los de las preguntas (cc_sonido = "0").
 
 let ctx = null;
@@ -45,6 +47,17 @@ function tono(f, t, dur, { tipo = "sine", fin = f, vol = 0.12, ataque = 0.012, d
   o.start(t);
   o.stop(t + dur + 0.03);
 }
+function filtrado(f, t, dur, { tipo = "square", fin = f, vol = 0.08, corte = 1800, ataque = 0.005 } = {}) {
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass"; lp.frequency.value = corte; lp.Q.value = 0.7;
+  lp.connect(salida);
+  tono(f, t, dur, { tipo, fin, vol, ataque, destino: lp });
+}
+/** Tecla mecánica: chasquido de ruido muy corto + «toc» grave. */
+function tecla(t, { vol = 0.06, agudo = 4500 } = {}) {
+  ruido(t, 0.018, { vol, desde: agudo, hasta: agudo * 1.4, q: 2.5 });
+  tono(180 + Math.random() * 60, t, 0.03, { tipo: "triangle", vol: vol * 0.7, ataque: 0.002 });
+}
 function ruido(t, dur, { vol = 0.08, desde = 800, hasta = 4000, q = 0.8 } = {}) {
   const n = Math.max(1, Math.floor(ctx.sampleRate * dur));
   const buf = ctx.createBuffer(1, n, ctx.sampleRate);
@@ -67,38 +80,61 @@ function ruido(t, dur, { vol = 0.08, desde = 800, hasta = 4000, q = 0.8 } = {}) 
 const nota = (n) => 440 * 2 ** ((n - 69) / 12);   // número MIDI → Hz
 
 const SONIDOS = {
-  correcto(t) { tono(nota(76), t, 0.12, { fin: nota(79) }); tono(nota(83), t + 0.09, 0.2, { fin: nota(88) }); },
-  incorrecto(t) { tono(nota(55), t, 0.18, { tipo: "triangle", fin: nota(50), vol: 0.1 }); tono(nota(50), t + 0.13, 0.24, { tipo: "triangle", fin: nota(45), vol: 0.09 }); },
-  clic(t) { tono(nota(84), t, 0.05, { tipo: "square", vol: 0.04 }); },
-  moneda(t) { tono(nota(88), t, 0.07, { tipo: "square", vol: 0.05 }); tono(nota(95), t + 0.06, 0.16, { tipo: "square", vol: 0.05 }); },
-  // Terminaste la lección: fanfarria corta que sube (Do–Mi–Sol–Do) con un acorde final
-  leccion(t) {
-    [72, 76, 79].forEach((n, i) => tono(nota(n), t + i * 0.11, 0.16, { tipo: "triangle", vol: 0.11 }));
-    [84, 88, 91].forEach((n) => tono(nota(n), t + 0.34, 0.55, { tipo: "sine", vol: 0.07 }));
-    tono(nota(60), t + 0.34, 0.55, { tipo: "triangle", vol: 0.07 });
-    for (let i = 0; i < 5; i++) tono(nota(96 + i * 2), t + 0.5 + i * 0.05, 0.12, { vol: 0.025 });
+  // ✔ Compilación exitosa: Enter + dos «bips» de terminal que suben + destello
+  correcto(t) {
+    tecla(t, { vol: 0.05 });
+    filtrado(nota(79), t + 0.03, 0.09, { tipo: "square", vol: 0.07, corte: 3200 });
+    filtrado(nota(86), t + 0.11, 0.18, { tipo: "square", vol: 0.07, corte: 3600, fin: nota(91) });
+    tono(nota(98), t + 0.2, 0.22, { vol: 0.035 });
   },
-  // ¡Racha de hoy! Llamarada (ruido que sube) + acorde cálido que crece
+  // ✖ Error del sistema: zumbido grave de dos tonos (como un «bonk» de error), filtrado para que no moleste
+  incorrecto(t) {
+    filtrado(nota(50), t, 0.16, { tipo: "sawtooth", vol: 0.09, corte: 900 });
+    filtrado(nota(44), t + 0.14, 0.26, { tipo: "sawtooth", vol: 0.09, corte: 700, fin: nota(41) });
+    ruido(t, 0.05, { vol: 0.03, desde: 300, hasta: 500, q: 4 });
+  },
+  clic(t) { tecla(t, { vol: 0.05 }); },
+  // Ráfaga de tecleo (Codi escribiendo código)
+  teclear(t) { for (let i = 0; i < 7; i++) tecla(t + i * (0.055 + Math.random() * 0.04), { vol: 0.04, agudo: 3800 + Math.random() * 1600 }); },
+  // git commit: «ping» de 8 bits
+  moneda(t) { filtrado(nota(88), t, 0.06, { tipo: "square", vol: 0.05, corte: 5000 }); filtrado(nota(95), t + 0.06, 0.16, { tipo: "square", vol: 0.05, corte: 6000 }); },
+  // Lección terminada = el sistema arranca: acorde cálido que se abre + arpegio de 8 bits
+  leccion(t) {
+    [48, 55, 64, 67].forEach((n, i) => tono(nota(n), t + i * 0.02, 1.1, { tipo: "triangle", vol: 0.06, ataque: 0.18 }));
+    [72, 76, 79, 84, 88].forEach((n, i) => filtrado(nota(n), t + 0.35 + i * 0.07, 0.14, { tipo: "square", vol: 0.045, corte: 4200 }));
+    tono(nota(91), t + 0.75, 0.6, { vol: 0.04, ataque: 0.02 });
+  },
+  // ¡Racha de hoy! Llamarada + acorde de inicio
   racha(t) {
     ruido(t, 0.45, { vol: 0.07, desde: 300, hasta: 3500 });
-    [67, 71, 74, 79].forEach((n, i) => tono(nota(n), t + 0.15 + i * 0.07, 0.6 - i * 0.05, { tipo: "sawtooth", vol: 0.035, ataque: 0.04 }));
-    tono(nota(91), t + 0.45, 0.35, { vol: 0.06 });
-    tono(nota(95), t + 0.58, 0.45, { vol: 0.05 });
+    [55, 62, 67, 71].forEach((n, i) => tono(nota(n), t + 0.1 + i * 0.03, 0.9, { tipo: "triangle", vol: 0.05, ataque: 0.12 }));
+    [79, 83, 86, 91].forEach((n, i) => filtrado(nota(n), t + 0.4 + i * 0.06, 0.16, { tipo: "square", vol: 0.04, corte: 4500 }));
   },
-  // El cofre se abre: crujido de madera, golpe y destellos que suben
+  // Cofre = descomprimiendo datos: chirridos rápidos de transferencia + destellos
   cofre(t) {
-    ruido(t, 0.22, { vol: 0.05, desde: 200, hasta: 600, q: 3 });
-    tono(nota(43), t + 0.18, 0.18, { tipo: "triangle", fin: nota(36), vol: 0.14 });
-    ruido(t + 0.2, 0.25, { vol: 0.06, desde: 2000, hasta: 9000, q: 0.6 });
-    [79, 83, 86, 91, 95, 98].forEach((n, i) => tono(nota(n), t + 0.28 + i * 0.055, 0.25, { vol: 0.05 }));
+    for (let i = 0; i < 10; i++) filtrado(nota(60 + ((i * 7) % 24)), t + i * 0.025, 0.03, { tipo: "square", vol: 0.035, corte: 3000 });
+    tecla(t + 0.27, { vol: 0.06 });
+    ruido(t + 0.28, 0.25, { vol: 0.05, desde: 2000, hasta: 9000, q: 0.6 });
+    [79, 83, 86, 91, 95].forEach((n, i) => tono(nota(n), t + 0.32 + i * 0.05, 0.22, { vol: 0.045 }));
   },
-  // Cada premio que sale
-  premio(t) { tono(nota(86), t, 0.09, { tipo: "triangle", vol: 0.07 }); tono(nota(93), t + 0.07, 0.2, { tipo: "sine", vol: 0.06 }); },
-  // Premio exclusivo / legendario: acorde brillante con eco
+  // Notificación del sistema (cada premio)
+  premio(t) { tono(nota(84), t, 0.08, { vol: 0.06 }); tono(nota(91), t + 0.07, 0.18, { tipo: "triangle", vol: 0.06 }); },
+  // Logro desbloqueado: arpegio de consola retro + acorde brillante
   legendario(t) {
-    [76, 80, 83, 88].forEach((n) => tono(nota(n), t, 0.9, { vol: 0.05, ataque: 0.03 }));
-    [88, 92, 95, 100].forEach((n, i) => tono(nota(n), t + 0.12 + i * 0.08, 0.5, { vol: 0.035 }));
-    ruido(t, 0.6, { vol: 0.025, desde: 5000, hasta: 12000 });
+    [72, 76, 79, 84, 88, 91, 96].forEach((n, i) => filtrado(nota(n), t + i * 0.05, 0.1, { tipo: "square", vol: 0.045, corte: 6000 }));
+    [84, 88, 91, 96].forEach((n) => tono(nota(n), t + 0.38, 0.9, { vol: 0.04, ataque: 0.03 }));
+    ruido(t + 0.36, 0.6, { vol: 0.02, desde: 5000, hasta: 12000 });
+  },
+  // Ejecutar: Enter + zumbido corto de «ventilador» que arranca
+  ejecutar(t) { tecla(t, { vol: 0.06 }); ruido(t + 0.02, 0.22, { vol: 0.025, desde: 150, hasta: 900, q: 1.2 }); },
+  // El programa terminó bien (exit 0)
+  programa_ok(t) { filtrado(nota(81), t, 0.07, { vol: 0.05, corte: 4000 }); filtrado(nota(88), t + 0.07, 0.14, { vol: 0.05, corte: 4500 }); },
+  // El programa terminó con error (excepción / exit ≠ 0)
+  programa_error(t) { filtrado(nota(47), t, 0.22, { tipo: "sawtooth", vol: 0.07, corte: 800, fin: nota(43) }); },
+  // Inicio de sesión: acorde de arranque corto
+  arranque(t) {
+    [60, 64, 67, 72].forEach((n, i) => tono(nota(n), t + i * 0.06, 0.7 - i * 0.08, { tipo: "triangle", vol: 0.05, ataque: 0.05 }));
+    tono(nota(79), t + 0.3, 0.5, { vol: 0.035 });
   },
 };
 

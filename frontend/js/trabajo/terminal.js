@@ -106,7 +106,7 @@ class Terminal {
     input.autocapitalize = "off";
     input.setAttribute("aria-label", "Escribe un comando");
     input.addEventListener("keydown", (e) => this.#teclaEntrada(e));
-    input.addEventListener("input", () => { this.ultimoTab = false; });
+    input.addEventListener("input", () => { this.ultimoTab = false; this.#finBusqueda(); });
     input.addEventListener("paste", (e) => this.#pegar(e));
     contenedor.appendChild(input);
     this.entrada = input;
@@ -121,7 +121,8 @@ class Terminal {
     linea.className = "term-linea term-prompt";
     const ps1 = document.createElement("span");
     ps1.className = "term-ps1";
-    ps1.innerHTML = new RenderAnsi().render(this.#textoPrompt());
+    // Si el bloque sigue abierto (for … do, if … then, comillas), bash pide el resto con «> »
+    ps1.innerHTML = new RenderAnsi().render(this.bloqueAbierto ? "\x1b[90m> \x1b[0m" : this.#textoPrompt());
     linea.appendChild(ps1);
     this.salida.appendChild(linea);
     this.indiceHistorial = null;
@@ -159,7 +160,7 @@ class Terminal {
       else if (ctrl && e.key.toLowerCase() === "c" && input.selectionStart === input.selectionEnd) { e.preventDefault(); this.interrumpir(); }
       return;
     }
-    if (e.key === "Enter") { e.preventDefault(); void this.#enviar(); return; }
+    if (e.key === "Enter") { e.preventDefault(); this.#finBusqueda(); void this.#enviar(); return; }
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       e.preventDefault();
       const h = this.panel.historial;
@@ -172,9 +173,27 @@ class Terminal {
       return;
     }
     if (e.key === "Tab") { e.preventDefault(); this.#completar(); return; }
+    if (e.key === "Escape" && this.busqueda) { e.preventDefault(); input.value = this.busqueda.texto; this.#finBusqueda(); return; }
     if (!ctrl) return;
     const k = e.key.toLowerCase();
-    if (k === "c" && input.selectionStart === input.selectionEnd) { e.preventDefault(); this.#congelar(`${input.value}^C`); this.#prompt(); }
+    if (k === "c" && input.selectionStart === input.selectionEnd) { e.preventDefault(); this.bloqueAbierto = ""; this.busqueda = null; this.#congelar(`${input.value}^C`); this.#prompt(); }
+    else if (k === "r") {
+      // Búsqueda en el historial (como bash): escribe parte de un comando y pulsa Ctrl+R (otra vez = más antiguo)
+      e.preventDefault();
+      const h = this.panel.historial;
+      this.busqueda ??= { texto: input.value, desde: h.length };
+      const { texto } = this.busqueda;
+      let i = this.busqueda.desde - 1;
+      while (i >= 0 && !h[i].includes(texto)) i -= 1;
+      if (i >= 0) {
+        this.busqueda.desde = i;
+        input.value = h[i];
+        input.title = `(búsqueda en el historial) «${texto}» — Ctrl+R: más antiguo · Enter: ejecutar · Esc: cancelar`;
+        input.classList.add("buscando");
+        const pos = h[i].indexOf(texto);
+        input.setSelectionRange(pos, pos + texto.length);
+      } else input.classList.add("sin-resultado");
+    }
     else if (k === "l") { e.preventDefault(); const v = input.value; this.sesion.limpiar(); this.#prompt(); this.entrada.value = v; }
     else if (k === "u") { e.preventDefault(); input.value = input.value.slice(input.selectionStart); input.setSelectionRange(0, 0); }
     else if (k === "a") { e.preventDefault(); input.setSelectionRange(0, 0); }
@@ -193,6 +212,13 @@ class Terminal {
     if (this.lectura) { const { resolver } = this.lectura; this.lectura = null; if (this.entrada) this.#congelar(this.entrada.value); resolver(null); }
     this.escribir("^C\n");
     this.control?.abort();
+  }
+
+  #finBusqueda() {
+    if (!this.busqueda) return;
+    this.busqueda = null;
+    this.entrada?.classList.remove("buscando", "sin-resultado");
+    if (this.entrada) this.entrada.title = "";
   }
 
   #completar() {
@@ -254,8 +280,23 @@ class Terminal {
   async #enviar() {
     const linea = this.entrada.value;
     this.#congelar(linea);
-    if (linea.trim()) this.panel.agregarHistorial(linea);
-    await this.#correr(linea);
+    const anterior = this.bloqueAbierto ?? "";
+    const completo = anterior ? `${anterior}\n${linea}` : linea;
+    if (this.panel.shell.incompleta?.(completo)) {
+      this.bloqueAbierto = completo;
+      if (this.actual) this.actual = null;
+      this.#prompt();
+      return;
+    }
+    this.bloqueAbierto = "";
+    // En el historial queda en una sola línea (como hace bash): for i in 1 2; do echo $i; done
+    const unaLinea = completo.split("\n").reduce((t, l, i) => {
+      if (!i) return l;
+      const sep = /(\b(do|then|else|in)|[{|]|&&|\|\||\\)\s*$/.test(t) || !t.trim() ? " " : "; ";
+      return t.replace(/\\\s*$/, "") + sep + l.trim();
+    }, "");
+    if (unaLinea.trim()) this.panel.agregarHistorial(unaLinea);
+    await this.#correr(completo);
   }
 
   async #correr(linea) {
@@ -264,8 +305,27 @@ class Terminal {
     this.control = new AbortController();
     this.sesion.senal = this.control.signal;
     this.raiz.focus({ preventScroll: true });
-    try { await this.panel.shell.ejecutar(linea, this.sesion); }
-    catch (error) { this.escribir(`Error inesperado: ${error?.message || error}\n`); }
+    let codigo = 0;
+    try { codigo = await this.panel.shell.ejecutar(linea, this.sesion); }
+    catch (error) { codigo = 1; this.escribir(`Error inesperado: ${error?.message || error}\n`); }
+    // Como la terminal de VS Code con Copilot: si un comando falla, se ofrece arreglarlo con la IA
+    if (codigo !== 0 && codigo !== 130 && !this.control?.signal.aborted && this.panel.alIA && !/^\s*(false|exit|test|\[)/.test(linea) && !this.cerrada) {
+      const fila = document.createElement("div");
+      fila.className = "term-linea term-ia";
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "term-ia-btn";
+      b.textContent = "✨ Arreglar con IA";
+      b.title = "La IA explica el error y propone cómo arreglarlo";
+      const lineaCmd = linea.split("\n")[0].slice(0, 200);
+      b.onclick = () => { b.disabled = true; this.panel.alIA(lineaCmd); };
+      fila.append(b);
+      this.salida.appendChild(fila);
+    }
+    if (this.sonarAlTerminar) {   // botón Ejecutar: sonido de «programa terminó bien» o de error
+      this.sonarAlTerminar = false;
+      import("/js/sonidos.js").then(({ sonar }) => sonar(this.control?.signal.aborted ? "clic" : codigo === 0 ? "programa_ok" : "programa_error")).catch(() => {});
+    }
     this.colaLectura = [];
     this.ocupado = false;
     this.panel.alOcupado();
@@ -286,6 +346,8 @@ class Terminal {
       if (this.ocupado || !this.entrada) { this.escribir("\x1b[31mNo se pudo detener el programa anterior. Recarga la página si no responde.\x1b[0m\n"); return false; }
     }
     this.entrada.value = linea;
+    this.sonarAlTerminar = true;
+    import("/js/sonidos.js").then(({ sonar }) => sonar("ejecutar")).catch(() => {});
     void this.#enviar();
     return true;
   }
@@ -306,7 +368,8 @@ export class PanelInferior {
    * @param {Storage} [o.storage] y {string} o.claveHistorial
    * @param {(abierto:boolean)=>void} [o.alCambiar]
    */
-  constructor({ raiz, shell, proyecto, claveHistorial, storage = globalThis.localStorage, alCambiar = () => {}, alOcupado = () => {} }) {
+  constructor({ raiz, shell, proyecto, claveHistorial, storage = globalThis.localStorage, alCambiar = () => {}, alOcupado = () => {}, alIA = null }) {
+    this.alIA = alIA;
     Object.assign(this, { raiz, shell, proyecto, claveHistorial, storage, alCambiar });
     this.alOcupado = () => alOcupado(this.hayProgramaCorriendo);
     this.terminales = [];

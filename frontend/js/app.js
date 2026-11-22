@@ -49,7 +49,7 @@ const chips = (pr) => {
   return `<span class="chip mineral-diamante" title="Diamantes: se ganan en Recompensas y se gastan en la tienda">${iconoSVG("diamante", "stat-icon")} <b data-s="diamante">${p.diamante}</b></span>
     <span class="chip" title="Experiencia total, no se gasta">${iconoSVG("moneda_xp", "stat-icon")} <b data-s="xp_total">${p.xp_total}</b></span>
     <span class="chip" title="Racha de días">${iconoSVG("racha", "stat-icon")} <b data-s="racha_actual">${p.racha_actual}</b></span>
-    <a class="chip chip-salva" href="/pages/tienda.html#potenciador" title="Salvarrachas: si un día no practicas, se gasta uno solo y tu racha no se pierde. Tienes ${p.salvarrachas} de 2. Se consiguen en la tienda y en los cofres.">${iconoSVG("salvarrachas", "stat-icon")} <b data-s="salvarrachas">${p.salvarrachas}</b><small>/2</small></a>
+    <a class="chip chip-salva" href="/pages/tienda.html#potenciador" title="Salvarrachas: si un día no practicas, se gasta uno solo y tu racha no se pierde. Tienes ${p.salvarrachas}. En la tienda puedes tener hasta 2; cada 10 días de racha ganas uno más (aunque pases de 2).">${iconoSVG("salvarrachas", "stat-icon")} <b data-s="salvarrachas">${p.salvarrachas}</b></a>
     <span class="chip" title="Vidas">${iconoSVG("vidas", "stat-icon")} <b data-s="vidas">${p.vidas}</b></span>`;
 };
 
@@ -94,12 +94,41 @@ export async function iniciar(activa) {
     ${m ? `<div class="tarjeta"><h3>${iconoSVG(m.clave, "mini-mission-icon")} ${esc(m.titulo)}</h3><div class="barra"><i style="width:${m.progreso / m.meta * 100}%"></i></div>
       <small>${m.progreso}/${m.meta} · Premio: ${esc(m.premio)}</small><p><a href="${url("recompensas")}">Ver desafíos</a></p></div>` : ""}`;
 
-  // Widget de racha de la semana (como el de Duolingo), en la columna derecha de todas las páginas.
-  if (der) api("/api/widget/").then((w) => {
-    der.insertAdjacentHTML("afterbegin", `<a class="tarjeta widget-racha${w.practicado_hoy ? " hecho" : w.racha ? " peligro" : ""}" href="${url("perfil")}#calendario" title="Calendario de racha">
-      <div class="wr-cab"><span class="wr-fuego" aria-hidden="true">${iconoSVG("racha", "wr-svg")}</span><div><b>${w.racha}</b><small>día${w.racha === 1 ? "" : "s"} de racha</small></div><span class="wr-hielo" title="Salvarrachas: protegen tu racha si un día no practicas">${iconoSVG("salvarrachas", "wr-mini")} ${w.salvarrachas ?? 0}/2</span></div>
+  // Widget de racha de la semana (como el de Duolingo), con Codi y el reloj del día, en la columna derecha de todas las páginas.
+  api("/api/widget/").then(async (w) => {
+    const { codiSVG, fraseDe } = await import("/js/codi.js");
+    const fin = Date.now() + (w.segundos_restantes || 0) * 1000;
+    // Codi, el compañero, en todas las páginas: en el menú (computador) y arriba (celular). Tocarlo abre el tutor de IA.
+    const animo = w.animo || "saludo";
+    document.querySelector(".yo-chip")?.insertAdjacentHTML("beforebegin", `<a class="codi-lado" href="${url("ia")}" title="Codi · pregúntale al tutor de IA">
+      <span class="codi-lado-img">${codiSVG(animo, { tam: 64 })}</span><span class="codi-lado-globo">${esc(fraseDe(animo))}</span></a>`);
+    const lado = document.getElementById("lado");
+    const compacto = () => document.querySelector(".codi-lado")?.classList.toggle("compacto", (lado?.offsetWidth || 0) < 170);
+    compacto(); addEventListener("resize", compacto);
+    document.querySelector(".tope")?.insertAdjacentHTML("afterbegin", `<a class="codi-tope" href="${url("ia")}" title="Codi · pregúntale al tutor de IA" aria-label="Codi: pregúntale al tutor de IA">${codiSVG(animo, { tam: 36, animado: false })}</a>`);
+    if (der) der.insertAdjacentHTML("afterbegin", `<a class="tarjeta widget-racha${w.practicado_hoy ? " hecho" : w.racha ? " peligro" : ""}" href="${url("perfil")}#calendario" title="Calendario de racha">
+      <div class="wr-cab"><span class="wr-codi">${codiSVG(w.animo || "feliz", { tam: 58 })}</span><div><b>${w.racha}</b><small>día${w.racha === 1 ? "" : "s"} de racha</small></div><span class="wr-hielo" title="Salvarrachas: protegen tu racha si un día no practicas">${iconoSVG("salvarrachas", "wr-mini")} ${w.salvarrachas ?? 0}</span></div>
+      <div class="wr-reloj" data-reloj><span>${w.practicado_hoy ? "✅ Racha a salvo · el día termina en" : "⏳ Te quedan hoy"}</span><b data-reloj-num>--:--:--</b></div>
       <div class="wr-semana">${w.semana.map((d, i) => `<span class="${d.icono === "🔥" ? "si" : ""}${d.hoy ? " hoy" : ""}"><small>${window.CC_IDIOMA === "en" ? "MTWTFSS"[i] : d.letra}</small><i>${d.icono === "🔥" ? iconoSVG("racha", "wr-dia") : ""}</i></span>`).join("")}</div>
-      <small class="wr-estado">${esc(w.estado)}</small></a>`);
+      <small class="wr-estado">${esc(w.estado)}</small>
+      <div class="wr-metas"><span title="Cada 10 días seguidos de racha ganas un salvarrachas (puedes tener más de 2)">🎁 ${w.dias_para_salvarrachas ?? 10} día${w.dias_para_salvarrachas === 1 ? "" : "s"} para +1 salvarrachas</span>
+        <span title="Practica de lunes a domingo sin usar salvarrachas: cofre de oro. Todo el mes sin fallar: cofre legendario">⭐ Semana perfecta ${w.semana_dias ?? 0}/7</span></div></a>`);
+    if (!w.practicado_hoy) document.querySelector(".tope")?.insertAdjacentHTML("beforeend", `<a class="chip chip-reloj" data-reloj href="${url("inicio")}" title="Horas que te quedan hoy para practicar">⏳ <b data-reloj-num>--:--</b></a>`);
+    const tic = () => {
+      const seg = Math.max(0, Math.round((fin - Date.now()) / 1000));
+      const h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), x = seg % 60;
+      const dos = (n) => String(n).padStart(2, "0");
+      const rojo = !w.practicado_hoy && seg <= 3 * 3600;
+      for (const el of document.querySelectorAll("[data-reloj]")) {
+        el.classList.toggle("rojo", rojo);
+        const num = el.querySelector("[data-reloj-num]");
+        if (num) num.textContent = el.classList.contains("chip") ? `${h}h ${dos(m)}m` : `${dos(h)}:${dos(m)}:${dos(x)}`;
+      }
+      document.querySelector(".widget-racha")?.classList.toggle("urgente", rojo);
+      if (seg === 0) clearInterval(reloj);
+    };
+    const reloj = setInterval(tic, 1000);
+    tic();
   }).catch(() => {});
 
   $("inf").innerHTML = NAV.map(([k, ic, t]) => `<a class="inf-i${k === activa ? " on" : ""}" href="${url(k)}" aria-label="${t}">${iconoSVG(ic, "nav-icon")}</a>`).join("")

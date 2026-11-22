@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/raiz"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/fondo_widget"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <ImageView
+        android:id="@+id/codi"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:contentDescription="Codi"
+        android:scaleType="fitCenter"
+        android:src="@drawable/codi_saludo" />
+
+    <TextView
+        android:id="@+id/racha"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🔥 0"
+        android:textColor="#FFFF9F1C"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/frase"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="2"
+        android:text="¿Listo para programar?"
+        android:textColor="#FFE5EAFF"
+        android:textSize="11sp" />
+</LinearLayout>

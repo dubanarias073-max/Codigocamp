@@ -430,6 +430,17 @@ async function ejecutar() {
     out.className = 'err'; out.textContent = x.message;
   }
   b.disabled = false;
+  // ¿Error? Codi (el tutor de IA) lo explica con tu código y la salida
+  if (out.className === 'err') {
+    const L = LEC[lang];
+    const preg = `Estoy en la lección «${L.l[idx][0]}» de ${L.n}. Mi código da este error:\n\n${out.textContent.slice(0, 1500)}\n\nMi código:\n${ed.value.slice(0, 4000)}\n\nExplícame en palabras simples qué está mal y cómo arreglarlo.`;
+    const a = document.createElement('a');
+    a.className = 'btn-ia-error';
+    a.href = `/pages/ia.html?q=${encodeURIComponent(preg)}`;
+    a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = '✨ Explícame este error (IA)';
+    out.append(document.createElement('br'), a);
+  }
 }
 
 /* ===== Ocultar / mostrar el panel izquierdo (se recuerda la elección) ===== */

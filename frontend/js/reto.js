@@ -1,4 +1,8 @@
 // Lógica de reto.html
+import { codiSVG } from "/js/codi.js";
+import { aplicarCosmeticos } from "/js/cosmeticos.js";
+// El fondo y los cosméticos que compraste también se ven en los retos
+try { aplicarCosmeticos(JSON.parse(localStorage.getItem("cc_cosm") || "{}")); } catch { /* sin cosméticos guardados */ }
 import { sonar, vibrar } from "/js/sonidos.js";
 import { api, getUser } from "/js/auth.js";
 import { correr } from "/js/retos-motor.js";
@@ -52,6 +56,7 @@ function reproducirTono(frecuencia, inicio, duracion, forma, frecuenciaFinal = f
 }
 
 function reproducirRespuesta(correcta) {
+  if (sonar(correcta ? "correcto" : "incorrecto")) return;   // sonidos con temática de código (js/sonidos.js)
   if (!sonidoActivo || !audioContext || audioContext.state !== "running") return;
   const ahora = audioContext.currentTime;
   if (correcta) {
@@ -181,7 +186,13 @@ function mostrar() {
   progreso(false);
   $("pie").className = "r-pie"; $("mensaje").replaceChildren();
   $("accion").textContent = "Comprobar"; $("accion").className = "bj"; $("accion").disabled = true;
-  const cont = $("cuerpo"); cont.replaceChildren(el("p", TIPOS[q.tipo], "r-tipo"), el("h1", q.enunciado));
+  const cont = $("cuerpo");
+  // Como en Duolingo: Codi te «dice» la pregunta en un globo
+  const enunciado = document.createElement("div");
+  enunciado.className = "r-enunciado";
+  enunciado.innerHTML = `<span class="r-codi-preg">${codiSVG(hechas === 0 ? "saludo" : fallos > 2 ? "preocupado" : "pensando", { tam: 84 })}</span>`;
+  enunciado.append(el("h1", q.enunciado));
+  cont.replaceChildren(el("p", TIPOS[q.tipo], "r-tipo"), enunciado);
   cont.classList.remove("entra"); void cont.offsetWidth; cont.classList.add("entra");   // la pregunta entra con animación
   render = RENDER[q.tipo](q, cont, () => { $("accion").disabled = render.obtener() == null; }, item);
   window.scrollTo({ top: 0 });
@@ -190,15 +201,45 @@ function mostrar() {
 function feedback(ok, r, extra) {
   $("pie").className = "r-pie " + (ok ? "bien" : "mal");
   const m = $("mensaje"); m.replaceChildren();
+  const codi = document.createElement("span");
+  codi.className = "r-codi";
+  codi.innerHTML = codiSVG(ok ? "celebra" : (vidas <= 1 ? "alarma" : "triste"), { tam: 72 });
+  m.append(codi);
   m.append(el("h2", ok ? "✅ ¡Muy bien!" : (r.correcta ? "❌ Casi. Respuesta correcta: " + r.correcta : "❌ Todavía no")));
   if (extra?.titulo) m.append(el("p", extra.titulo));
   (extra?.detalle || []).forEach((d) => m.append(el("p", (d.ok ? "✓ " : "✗ ") + d.texto, "det")));
-  if (r.explicacion) m.append(el("p", r.explicacion));
+  if (r.explicacion) { const ex = el("p", "", "r-porque"); ex.append(el("b", "Por qué: "), document.createTextNode(r.explicacion)); m.append(ex); }
+  // «¿Por qué?»: Codi (la IA) explica con más detalle, también por qué tu respuesta no era la correcta
+  const reto = cola[0]?.q;
+  if (reto?.id) {
+    const b = el("button", "🤖 ¿Por qué? Explícamelo mejor", "r-porque-btn");
+    b.type = "button";
+    b.onclick = async () => {
+      b.disabled = true;
+      const caja = el("div", "", "r-porque-ia");
+      caja.innerHTML = `<span class="r-porque-codi">${codiSVG("pensando", { tam: 44 })}</span><span>Codi está pensando…</span>`;
+      b.replaceWith(caja);
+      try {
+        const d = await api(`/api/reto/${reto.id}/porque/`, { respuesta: ultimaRespuesta });
+        caja.innerHTML = `<span class="r-porque-codi">${codiSVG(ok ? "feliz" : "saludo", { tam: 44 })}</span>`;
+        const t = el("p", "");
+        t.innerHTML = String(d.texto || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+        if (!d.ia) {   // sin IA en el servidor: se ofrece seguir la conversación con el tutor
+          const preg = `Explícame por qué en este reto la respuesta correcta es «${r.correcta}»${ultimaRespuesta != null && !ok ? ` y no «${Array.isArray(ultimaRespuesta) ? ultimaRespuesta.join(" ") : ultimaRespuesta}»` : ""}: ${reto.enunciado}`;
+          t.innerHTML = `<a href="/pages/ia.html?q=${encodeURIComponent(preg)}" target="_blank" rel="noopener">Pregúntale a Codi en el tutor de IA →</a>`;
+        }
+        caja.append(t);
+      } catch (x) { caja.lastChild.textContent = x.message; }
+    };
+    m.append(b);
+  }
 }
 
+let ultimaRespuesta = null;
 async function comprobar() {
   const valor = render.obtener();
   if (valor == null) return;
+  ultimaRespuesta = valor;
   $("accion").disabled = true;
   prepararAudio();
   try {
@@ -234,11 +275,11 @@ async function continuar() {
     const r = await api(`/api/nivel/${datos.nivel.id}/completar/`, { fallos });
     const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     sonar("leccion"); vibrar([30, 60, 30]);
-    $("cuerpo").innerHTML = `<div class="fin"><div class="grande">${"⭐".repeat(r.estrellas)}</div><h1>¡Nivel completado!</h1>
-      ${r.racha_hoy ? `<div class="racha-hoy" role="status"><div class="racha-fuego" aria-hidden="true">🔥</div><div class="racha-num"><b>${r.perfil.racha_actual}</b><span>${r.perfil.racha_actual === 1 ? "día de racha" : "días de racha"}</span></div><p>${r.perfil.racha_actual > (r.racha_antes || 0) ? "¡Hiciste la racha de hoy!" : "¡Empezaste una racha nueva!"}</p></div>` : ""}
+    $("cuerpo").innerHTML = `<div class="fin"><div class="fin-codi">${codiSVG("celebra", { tam: 150 })}</div><div class="grande">${"⭐".repeat(r.estrellas)}</div><h1>¡Nivel completado!</h1>
+      ${r.racha_hoy ? `<div class="racha-hoy" role="status"><div class="racha-fuego racha-codi" aria-hidden="true">${codiSVG("fuego", { tam: 76 })}</div><div class="racha-num"><b>${r.perfil.racha_actual}</b><span>${r.perfil.racha_actual === 1 ? "día de racha" : "días de racha"}</span></div><p>${r.perfil.racha_actual > (r.racha_antes || 0) ? "¡Hiciste la racha de hoy!" : "¡Empezaste una racha nueva!"}</p></div>` : ""}
       <div class="botin"><div>✨ +${r.xp_ganado} XP</div>${r.minerales_ganados.diamante ? `<div>💎 +${r.minerales_ganados.diamante} diamante</div>` : ""}
         <div>🔥 Racha: ${r.perfil.racha_actual}</div></div>
-      ${r.desafios_completados.map((d) => `<div class="tarjeta" style="margin-bottom:12px">🎁 <b>¡Desafío superado!</b> ${esc(d.titulo)}<br><small>Premio: ${esc(d.premio)}</small></div>`).join("")}
+      ${r.desafios_completados.map((d) => `<div class="tarjeta" style="margin-bottom:12px">🎁 <b>${esc(d.encabezado || "¡Desafío superado!")}</b> ${esc(d.titulo)}<br><small>Premio: ${esc(d.premio)}</small></div>`).join("")}
       <a class="bj" href="/pages/inicio.html?curso=${datos.curso.slug}">Continuar</a></div>`;
     // Como en Duolingo: los cofres de lo que acabas de cumplir se abren aquí mismo.
     if (r.racha_hoy) { sonar("racha", 0.85); setTimeout(() => vibrar([20, 40, 60]), 850); }

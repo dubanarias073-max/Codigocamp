@@ -5,7 +5,7 @@ import { vistaPrevia } from "/js/cosmeticos.js";
 const { user } = await iniciar("tienda");
 const $ = (id) => document.getElementById(id);
 const RAREZA = { comun: "Común", raro: "Raro", epico: "Épico", legendario: "Legendario" };
-const COSMETICO = new Set(["fondo", "cursor", "tema", "marco", "efecto", "dedo"]);
+const COSMETICO = new Set(["fondo", "cursor", "tema", "marco", "efecto", "dedo", "codi"]);
 const TACTIL = matchMedia("(pointer: coarse)").matches;
 const AYUDA = {
   fondo: "El fondo se ve detrás de todas las páginas. Prueba cómo queda con «Probar».",
@@ -14,6 +14,7 @@ const AYUDA = {
   marco: "Un aro alrededor de tu foto de perfil: se ve en tu perfil, en los chats y en la barra lateral.",
   efecto: "Haz clic en la vista previa para ver el efecto.",
   dedo: "Rastros: siguen tu mouse en el computador y tu dedo en el celular (también mientras desplazas la pantalla). Pruébalos moviendo el mouse o deslizando el dedo sobre cada tarjeta.",
+  codi: "Viste a Codi, la mascota: el accesorio que te pongas lo lleva en el menú, en los retos, en el ícono de IA y en toda la página. Pulsa «Probar» para verlo en vivo.",
   potenciador: "Vidas, salvarrachas, XP y cofres sorpresa.",
   coleccion: "Todo lo que tienes. Ponte o quítate cada cosmético cuando quieras. Los exclusivos salen de los cofres de Recompensas.",
 };
@@ -127,6 +128,7 @@ $("items").onclick = async (e) => {
   const nombre = card?.querySelector("h3")?.textContent || "";
   try {
     const r = await api("/api/tienda/comprar/", { clave: b.dataset.c });
+    import("/js/sonidos.js").then(({ sonar }) => sonar("moneda")).catch(() => {});
     confeti();
     const tipo = card?.dataset.tipo;
     if (COSMETICO.has(tipo)) mostrarCofre(b.dataset.c, nombre, "¡Nuevo cosmético en tu colección!", tipo);

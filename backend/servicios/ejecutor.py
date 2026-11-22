@@ -262,6 +262,17 @@ def _interprete(nombres, ext, args=()):
     return f
 
 
+def _nativo_fpc(codigo, d, entrada):
+    fpc = _hay("fpc")
+    if not fpc:
+        return None, "fpc"
+    open(os.path.join(d, "main.pas"), "w", encoding="utf-8").write(codigo)
+    rc, o = _correr([fpc, "-v0", "main.pas", "-omain" + EXE], d, TIEMPO_LENTO, compilar=True)
+    if rc:
+        return (rc, o), None
+    return _correr([os.path.join(d, "main" + EXE)], d, entrada=entrada), None
+
+
 def _swift(codigo, d, entrada):
     p = _hay("swiftc", "swift")
     if not p:
@@ -322,10 +333,30 @@ LENGUAJES = {
     "swift":  {"f": _swift, "piston": ("swift", "main.swift")},
     "kotlin": {"f": _kotlin, "piston": ("kotlin", "main.kt")},
     "ruby":   {"f": _interprete(("ruby",), ".rb"), "piston": ("ruby", "main.rb")},
+    # Más lenguajes: se usan si están instalados en el servidor y, si no, en línea (Wandbox / Compiler Explorer).
+    "lua":     {"f": _interprete(("lua", "lua5.4", "lua54", "luajit"), ".lua"), "piston": ("lua", "main.lua")},
+    "perl":    {"f": _interprete(("perl",), ".pl"), "piston": ("perl", "main.pl")},
+    "r":       {"f": _interprete(("Rscript",), ".R"), "piston": ("rscript", "main.R")},
+    "scala":   {"f": _interprete(("scala-cli",), ".scala", ("run", "--server=false")), "piston": ("scala", "Main.scala")},
+    "haskell": {"f": _interprete(("runghc", "runhaskell"), ".hs"), "piston": ("haskell", "main.hs")},
+    "elixir":  {"f": _interprete(("elixir",), ".exs"), "piston": ("elixir", "main.exs")},
+    "julia":   {"f": _interprete(("julia",), ".jl"), "piston": ("julia", "main.jl")},
+    "groovy":  {"f": _interprete(("groovy",), ".groovy"), "piston": ("groovy", "main.groovy")},
+    "crystal": {"f": _interprete(("crystal",), ".cr", ("run",)), "piston": ("crystal", "main.cr")},
+    "nim":     {"f": _interprete(("nim",), ".nim", ("r", "--hints:off")), "piston": ("nim", "main.nim")},
+    "ocaml":   {"f": _interprete(("ocaml",), ".ml"), "piston": ("ocaml", "main.ml")},
+    "d":       {"f": _interprete(("rdmd", "ldc2"), ".d", ()), "piston": ("d", "main.d")},
+    "pascal":  {"f": _nativo_fpc, "piston": ("pascal", "main.pas")},
+    "zig":     {"f": _interprete(("zig",), ".zig", ("run",)), "piston": ("zig", "main.zig")},
+    "lisp":    {"f": _interprete(("sbcl", "clisp"), ".lisp", ("--script",)), "piston": ("commonlisp", "main.lisp")},
+    "bash":    {"f": _interprete(("bash",), ".sh"), "piston": ("bash", "main.sh")},
 }
 
 NOMBRES = {"java": "Java", "c": "C", "cpp": "C++", "csharp": "C#", "php": "PHP", "go": "Go", "rust": "Rust",
-           "swift": "Swift", "kotlin": "Kotlin", "ruby": "Ruby"}
+           "swift": "Swift", "kotlin": "Kotlin", "ruby": "Ruby",
+           "lua": "Lua", "perl": "Perl", "r": "R", "scala": "Scala", "haskell": "Haskell", "elixir": "Elixir", "julia": "Julia",
+           "groovy": "Groovy", "crystal": "Crystal", "nim": "Nim", "ocaml": "OCaml", "d": "D", "pascal": "Pascal", "zig": "Zig",
+           "lisp": "Common Lisp", "bash": "Bash"}
 
 
 # ------------------------------------------------------------------ Piston ----
@@ -384,11 +415,18 @@ WANDBOX_PREFERIDOS = {
     "go": ["go-1.23.12", "go-1.22.8"],
     "rust": ["rust-1.82.0", "rust-1.80.1"],
     "swift": ["swift-6.0.1", "swift-5.10.1"],
+    "lua": ["lua-5.4.7"], "perl": ["perl-5.40.0"], "r": ["r-4.4.1"], "scala": ["scala-3.5.1", "scala-3.3.4"],
+    "haskell": ["ghc-9.10.1"], "elixir": ["elixir-1.17.3"], "julia": ["julia-1.10.5"], "groovy": ["groovy-4.0.23"],
+    "crystal": ["crystal-1.13.3"], "nim": ["nim-2.2.0"], "ocaml": ["ocaml-5.2.0"], "d": ["ldc-1.39.0", "dmd-2.109.1"],
+    "pascal": ["fpc-3.2.2"], "zig": ["zig-0.13.0"], "lisp": ["sbcl-2.4.9", "clisp-2.49"], "bash": ["bash"],
 }
 _WANDBOX_PATRON = {
     "java": r"^openjdk-jdk-\d", "c": r"^(gcc|clang)-\d[\d.]*-c$", "cpp": r"^(gcc|clang)-\d[\d.]*$",
     "csharp": r"^(dotnetcore|mono)-\d", "php": r"^php-8", "ruby": r"^ruby-3", "go": r"^go-1\.", "rust": r"^rust-1\.",
     "swift": r"^swift-\d",
+    "lua": r"^lua-5", "perl": r"^perl-5", "r": r"^r-\d", "scala": r"^scala-3", "haskell": r"^ghc-\d", "elixir": r"^elixir-",
+    "julia": r"^julia-1", "groovy": r"^groovy-", "crystal": r"^crystal-", "nim": r"^nim-2", "ocaml": r"^ocaml-", "d": r"^(ldc|dmd)-",
+    "pascal": r"^fpc-", "zig": r"^zig-0\.1[3-9]", "lisp": r"^(sbcl|clisp)-", "bash": r"^bash$",
 }
 _lista = {"cuando": 0.0, "nombres": set()}
 _candado = threading.Lock()
@@ -492,16 +530,76 @@ def _kotlin_playground(codigo, entrada):
     return 0, salida
 
 
+# ---------------------------------------------------- segundo servicio: Compiler Explorer (godbolt.org) ----
+GODBOLT = os.getenv("GODBOLT_URL", "https://godbolt.org").rstrip("/")
+GODBOLT_LENGUAJE = {"c": "c", "cpp": "c++", "rust": "rust", "go": "go", "swift": "swift", "kotlin": "kotlin",
+                    "csharp": "csharp", "java": "java", "ruby": "ruby", "scala": "scala", "haskell": "haskell", "d": "d",
+                    "nim": "nim", "zig": "zig", "ocaml": "ocaml", "pascal": "pascal", "crystal": "crystal"}
+_godbolt_lista = {}
+
+
+def _compiladores_godbolt(lenguaje):
+    lang = GODBOLT_LENGUAJE.get(lenguaje)
+    if not lang:
+        return []
+    with _candado:
+        guardado = _godbolt_lista.get(lang)
+        if guardado and time.time() - guardado[0] < 6 * 3600:
+            return guardado[1]
+    datos = _pedir_json(f"{GODBOLT}/api/compilers/{lang}?fields=id,name,semver,supportsExecute", None,
+                        {"Accept": "application/json"}, tiempo=15)
+    candidatos = [c for c in datos if isinstance(c, dict) and c.get("supportsExecute", True) is not False
+                  and not re.search(r"trunk|nightly|snapshot|beta|rc\d|assert|clang-tidy|mrustc|gccrs", f"{c.get('id')} {c.get('name')}", re.I)]
+    clave = lambda c: [int(x) for x in re.findall(r"\d+", str(c.get("semver") or c.get("name") or ""))[:4]]
+    ids = [c["id"] for c in sorted(candidatos, key=clave, reverse=True)][:2]
+    with _candado:
+        _godbolt_lista[lang] = (time.time(), ids)
+    return ids
+
+
+def _texto_godbolt(partes):
+    return "\n".join(str(x.get("text", "")) for x in (partes or []) if isinstance(x, dict))
+
+
+def _godbolt(lenguaje, codigo, entrada):
+    ultimo = None
+    for cid in _compiladores_godbolt(lenguaje):
+        cuerpo = json.dumps({"source": codigo, "lang": GODBOLT_LENGUAJE[lenguaje], "allowStoreCodeDebug": False, "options": {
+            "userArguments": "", "executeParameters": {"args": [], "stdin": entrada or "", "runtimeTools": []},
+            "compilerOptions": {"executorRequest": True}, "filters": {"execute": True}, "tools": [], "libraries": []}}).encode()
+        d = _pedir_json(f"{GODBOLT}/api/compiler/{cid}/compile", cuerpo, {"Content-Type": "application/json", "Accept": "application/json"})
+        r = d.get("execResult") if isinstance(d.get("execResult"), dict) else d
+        build = r.get("buildResult") or {}
+        if build and build.get("code", 0) != 0:
+            return 1, (_texto_godbolt(build.get("stderr")) or _texto_godbolt(build.get("stdout")) or "Error de compilación").rstrip() + "\n"
+        if r.get("didExecute") is False and not r.get("stdout"):
+            ultimo = (1, _texto_godbolt(r.get("stderr")) or "No se pudo ejecutar.")
+            continue
+        salida = _texto_godbolt(r.get("stdout"))
+        err = _texto_godbolt(r.get("stderr"))
+        texto = (salida + ("\n" if salida else "")) + (err + "\n" if err else "")
+        return int(r.get("code", 0) or 0), texto
+    if ultimo:
+        return ultimo
+    raise _FalloServicio("Compiler Explorer no tiene compilador para este lenguaje")
+
+
 def _en_linea(lenguaje, codigo, entrada):
-    """Ejecuta en un servicio público. Devuelve (rc, texto) o None si ninguno respondió."""
+    """Ejecuta en un servicio público: primero Wandbox (o Kotlin Playground) y, si falla, Compiler Explorer.
+    Devuelve (rc, texto) o None si ninguno respondió."""
     if not en_linea_activo():
         return None
-    try:
-        if lenguaje == "kotlin":
-            return _kotlin_playground(codigo, entrada)
-        return _wandbox(lenguaje, codigo, entrada)
-    except _FalloServicio:
-        return None
+    servicios = [_kotlin_playground] if lenguaje == "kotlin" else [lambda c, e: _wandbox(lenguaje, c, e)]
+    if lenguaje in GODBOLT_LENGUAJE:
+        servicios.append(lambda c, e: _godbolt(lenguaje, c, e))
+    for servicio in servicios:
+        try:
+            return servicio(codigo, entrada)
+        except _FalloServicio:
+            continue
+        except Exception:   # respuesta rara de un servicio: se prueba el siguiente
+            continue
+    return None
 
 
 # ---------------------------------------------------------------- principal ----
@@ -516,6 +614,14 @@ INSTALAR = {
     "swift": "Instala el toolchain de Swift desde swift.org.",
     "kotlinc": "Instala Kotlin (kotlinc) y un JDK.",
     "ruby": "Instala Ruby (rubyinstaller.org en Windows).",
+    "lua": "Instala Lua (luabinaries.sourceforge.net en Windows, `apt install lua5.4` en Linux).",
+    "perl": "Instala Perl (strawberryperl.com en Windows).", "Rscript": "Instala R desde cran.r-project.org.",
+    "scala-cli": "Instala Scala desde scala-lang.org (trae scala-cli).", "runghc": "Instala Haskell con GHCup (haskell.org/ghcup).",
+    "elixir": "Instala Elixir desde elixir-lang.org.", "julia": "Instala Julia desde julialang.org.",
+    "groovy": "Instala Groovy (groovy-lang.org) y un JDK.", "crystal": "Instala Crystal desde crystal-lang.org.",
+    "nim": "Instala Nim desde nim-lang.org.", "ocaml": "Instala OCaml desde ocaml.org.", "rdmd": "Instala D (dlang.org).",
+    "fpc": "Instala Free Pascal desde freepascal.org.", "zig": "Instala Zig desde ziglang.org.",
+    "sbcl": "Instala SBCL desde sbcl.org.", "bash": "Instala Git for Windows (trae bash) o usa WSL.",
 }
 
 
@@ -573,8 +679,9 @@ def ejecutar(lenguaje, codigo, entrada="", archivos=None):
             texto = texto.replace("prog.java", f"{_clase_java(codigo)}.java")
         elif donde == "en_linea":
             ext = {"c": "c", "cpp": "cpp", "csharp": "cs", "php": "php", "go": "go", "rust": "rs", "swift": "swift",
-                   "ruby": "rb"}.get(lenguaje)
-            texto = re.sub(r"\bprog\.(?:cc|c|cs|php|go|rs|swift|rb)\b", f"main.{ext}", texto) if ext else texto
+                   "ruby": "rb", "lua": "lua", "perl": "pl", "haskell": "hs", "nim": "nim", "zig": "zig", "d": "d",
+                   "ocaml": "ml", "pascal": "pas", "crystal": "cr", "scala": "scala", "julia": "jl"}.get(lenguaje)
+            texto = re.sub(r"\bprog\.(?:cc|c|cs|php|go|rs|swift|rb|lua|pl|hs|nim|zig|d|ml|pas|cr|scala|jl)\b", f"main.{ext}", texto) if ext else texto
         if len(texto) > MAX_SALIDA:
             texto = texto[:MAX_SALIDA] + "\n… (salida recortada)"
         return {"salida": texto, "error": rc != 0, "donde": donde}

@@ -10,6 +10,7 @@ conceptos de la misma etapa.
     flask --app app check-retos                    -> revisa los retos
     python herramientas/generar_aprende.py         -> vuelve a crear frontend/js/lecciones/<lenguaje>.js
 """
+import re
 from .base import C, E, O, ORD, etapa, leccion
 
 
@@ -90,7 +91,7 @@ _FRASES_CIERTA = ("¿Cuál de estas ideas es cierta sobre «{t}»?", "Elige la a
 def q_cierta(c, vs, n=1):
     """Una idea cierta de c (k[n]) frente a ideas de otros conceptos."""
     return O(_FRASES_CIERTA[n].format(t=c["t"]), c["k"][n], *[v["k"][(n + 1) % 3] for v in vs],
-             explicacion=c["k"][n])
+             explicacion=f"{_nombre(c['t'])}: {c['d'].rstrip('.')}. Las otras frases son de otros temas.")
 
 
 def q_situacion(c, vs):
@@ -123,9 +124,25 @@ def q_codigo_lee(c, vs):
              codigo=c["cod"], explicacion=f"El código {c['h']}.")
 
 
+def _nombre(t):
+    """«Qué es Python» → «Python» (algunos conceptos se titulan como pregunta)."""
+    t = re.sub(r"^\s*¿?\s*(qu[ée] es|qu[ée] son|para qu[ée] sirve[n]?)\s+", "", t, flags=re.I).rstrip("?").strip()
+    return t[:1].upper() + t[1:]
+
+
+def _frase_completa(frase, palabra):
+    completa = re.sub(r"\s*\([^()]*\)\s*$", "", frase)
+    completa = re.sub(r"_{2,}", lambda _m: palabra, completa, count=1)
+    return completa.strip()
+
+
 def q_completar(c, segunda=False):
     p = c["pr2"] if segunda else c["pr"]
-    return C(p[0], *p[1:], explicacion=f"Respuesta: {p[1]}.") if p else None
+    if not p:
+        return None
+    # Simple y sin repetir la respuesta (ya se ve arriba): solo la razón.
+    porque = f"{_nombre(c['t'])}: {c['d'].rstrip('.')}." if c.get("d") else f"La frase completa es: «{_frase_completa(p[0], p[1]).rstrip('.')}»."
+    return C(p[0], *p[1:], explicacion=porque)
 
 
 def q_error(c):

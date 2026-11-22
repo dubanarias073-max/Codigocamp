@@ -57,7 +57,7 @@ def tienda_comprar():
         return api_error("Tus vidas ya están llenas.")
     if item.clave == "salvarracha" and profile.salvarrachas >= MAX_SALVARRACHAS:
         return api_error("Ya tienes el máximo de salvarrachas.")
-    if item.clave == "kit_experto" and (profile.vidas >= MAX_VIDAS and profile.salvarrachas >= MAX_SALVARRACHAS):
+    if item.clave == "kit_experto" and (profile.vidas >= MAX_VIDAS and profile.salvarrachas >= MAX_SALVARRACHAS):   # en la tienda el tope es 2
         return api_error("Ya tienes el máximo de vidas y salvarrachas.")
     if item.clave in COSMETICOS and OwnedCosmetic.query.filter_by(usuario_id=current_user.id, clave=item.clave).first():
         return api_error("Ya tienes este artículo en tu colección.")
@@ -87,7 +87,7 @@ def tienda_comprar():
         profile.salvarrachas += 1
     elif item.clave == "kit_experto":
         profile.vidas = min(MAX_VIDAS, profile.vidas + 3)
-        profile.salvarrachas = min(MAX_SALVARRACHAS, profile.salvarrachas + 1)
+        profile.salvarrachas = max(profile.salvarrachas, min(MAX_SALVARRACHAS, profile.salvarrachas + 1))
     db.session.add(Purchase(usuario_id=current_user.id, articulo=item, precio=item.precio, moneda="diamante"))
     if item.clave in COSMETICOS:
         db.session.add(OwnedCosmetic(usuario_id=current_user.id, clave=item.clave, origen="tienda"))

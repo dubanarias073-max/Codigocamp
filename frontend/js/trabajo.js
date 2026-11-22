@@ -3,7 +3,9 @@
 import { api, aviso as avisoSimple, iniciar } from "/js/app.js";
 import { Almacen } from "/js/trabajo/almacen.js";
 import { crearAlmacenamiento } from "/js/trabajo/almacenamiento.js";
-import { dialogo, aviso } from "/js/trabajo/dialogos.js";
+import { dialogo, aviso, menuContextual } from "/js/trabajo/dialogos.js";
+import { abrirChatEnLinea } from "/js/trabajo/chatlinea.js";
+import { TEMAS, temaElegido } from "/js/trabajo/temas.js";
 import { Editor, unidadDeIndentacion } from "/js/trabajo/editor.js";
 import { cargarPyodide, crearEjecutores, transpilarModulo } from "/js/trabajo/ejecucion.js";
 import { modulosDePagina, proxyDeVite, usaModulos } from "/js/trabajo/modulos.js";
@@ -15,8 +17,9 @@ import { importarEn } from "/js/trabajo/importar.js";
 import { Entradas } from "/js/trabajo/entradas.js";
 import { VisorArchivo } from "/js/trabajo/visor.js";
 import { registrarEnMonaco } from "/js/trabajo/autocompletar.js";
-import { EditorMonaco, alCambiarProblemas, cargarMonaco, crearDiff, monaco as monacoVivo, problemas, sincronizarModelos } from "/js/trabajo/monaco.js";
+import { EditorMonaco, alCambiarProblemas, cambiarTema, cargarMonaco, crearDiff, monaco as monacoVivo, problemas, sincronizarModelos } from "/js/trabajo/monaco.js";
 import { abrirPaleta } from "/js/trabajo/paleta.js";
+import { abrirDialogoAjustes, abrirDialogoAtajos, guardarAjustes, leerAjustes, opcionesMonaco } from "/js/trabajo/ajustes.js";
 import { abrirBuscador } from "/js/trabajo/buscar.js";
 import { PanelGit } from "/js/trabajo/gitpanel.js";
 import { iconoArchivo } from "/js/trabajo/iconos.js";
@@ -192,6 +195,7 @@ document.getElementById("movilTabs").addEventListener("click", (e) => {
 const panel = new PanelInferior({
   raiz: $("terminalPanel"), shell, proyecto, claveHistorial: HIST_STORAGE,
   alOcupado: (corriendo) => pintarEjecutar(corriendo),
+  alIA: (linea) => preguntarIA(`Este comando falló en la terminal: \`${linea}\`. Explícame el error en palabras simples y arréglalo (si hay que cambiar archivos, propón los cambios; si falta instalar algo, dime el comando exacto).`, { editar: true }),
   alCambiar: (abierto) => {
     ui.panel = abierto;
     $("terminalPanel").hidden = !abierto;
@@ -211,6 +215,28 @@ const editores = new Map();
 const usarMonaco = await monacoListo;
 // Sugerencias mientras escribes (Python, Java, SQL, PHP, C…, fragmentos y Emmet), con lo que hay en tu proyecto.
 if (usarMonaco) registrarEnMonaco(monacoVivo, () => proyecto().files);
+// 💡 «Arreglar con IA» en cada error subrayado (Ctrl+. o la bombilla), como el arreglo rápido de Copilot
+if (usarMonaco && typeof monacoVivo.editor.registerCommand === "function") {
+  monacoVivo.editor.registerCommand("cc.arreglarConIA", (_acc, mensaje, linea) => {
+    preguntarIA(`Arregla este error de ${ui.activo} en la línea ${linea}: «${mensaje}». Explica en una frase qué estaba mal.`, { editar: true });
+  });
+  monacoVivo.editor.registerCommand("cc.explicarErrorIA", (_acc, mensaje, linea) => {
+    preguntarIA(`Explícame con palabras simples este error de ${ui.activo} (línea ${linea}): «${mensaje}». ¿Por qué pasa y cómo se arregla?`);
+  });
+  monacoVivo.languages.registerCodeActionProvider("*", {
+    provideCodeActions: (_modelo, _rango, contexto) => {
+      const m = contexto.markers.find((x) => x.severity >= monacoVivo.MarkerSeverity.Warning) ?? contexto.markers[0];
+      if (!m) return { actions: [], dispose() {} };
+      return {
+        actions: [
+          { title: "✨ Arreglar con IA", kind: "quickfix", diagnostics: [m], isPreferred: false, command: { id: "cc.arreglarConIA", title: "Arreglar con IA", arguments: [m.message, m.startLineNumber] } },
+          { title: "✨ Explicar este error con IA", kind: "quickfix", diagnostics: [m], command: { id: "cc.explicarErrorIA", title: "Explicar con IA", arguments: [m.message, m.startLineNumber] } },
+        ],
+        dispose() {},
+      };
+    },
+  });
+}
 // Copiloto: la IA sugiere el código que sigue en gris mientras escribes (Tab lo acepta), como GitHub Copilot.
 if (usarMonaco) {
   const { registrarCopilotoEnLinea, copilotoActivo, activarCopiloto, vecinos } = await import("/js/trabajo/copiloto-linea.js");
@@ -247,8 +273,78 @@ function editorPara(ruta) {
   });
   editores.set(ruta, ed);
   $("editores").appendChild(ed.raiz);
+  ed.editor?.updateOptions?.(opcionesMonaco(ajustes, ed.ext));
   return ed;
 }
+
+// ------------------------------------------------------ como VS Code: ajustes, zoom, dividir, zen ----
+let ajustes = leerAjustes();
+function aplicarAjustes(nuevos = ajustes) {
+  ajustes = nuevos;
+  guardarAjustes(ajustes);
+  for (const ed of editores.values()) ed.editor?.updateOptions?.(opcionesMonaco(ajustes, ed.ext));
+  division?.editor.updateOptions(opcionesMonaco(ajustes, FS.extension(division.ruta)));
+}
+function zoom(paso) {
+  const tam = paso === 0 ? 14 : Math.min(32, Math.max(9, ajustes.fontSize + paso));
+  aplicarAjustes({ ...ajustes, fontSize: tam });
+  avisoSimple(`Tamaño de letra: ${tam}`);
+}
+function alternarAjusteLinea() {
+  aplicarAjustes({ ...ajustes, wordWrap: ajustes.wordWrap === "on" ? "off" : "on" });
+  avisoSimple(`Ajuste de línea: ${ajustes.wordWrap === "on" ? "activado" : "desactivado"}`);
+}
+
+/** Editor dividido (Ctrl+\): el mismo archivo (u otro) a la derecha; los cambios se ven en los dos lados. */
+let division = null;
+function dividirEditor(ruta = ui.activo) {
+  const ed = ruta && editores.get(ruta);
+  if (!ed?.modelo || !monacoVivo) { avisoSimple("Abre un archivo de código para dividir el editor."); return; }
+  if (division) cerrarDivision();
+  const caja = document.createElement("div");
+  caja.className = "editor-dividido";
+  caja.innerHTML = `<div class="ed-div-cab"><span class="ed-div-nombre"></span><button type="button" class="icono-btn" title="Cerrar el editor dividido" aria-label="Cerrar el editor dividido">✕</button></div><div class="ed-div-cuerpo"></div>`;
+  caja.querySelector(".ed-div-nombre").textContent = FS.nombreBase(ruta);
+  caja.querySelector("button").onclick = cerrarDivision;
+  $("areaEditor").appendChild(caja);
+  $("areaEditor").classList.add("con-division");
+  const editor = monacoVivo.editor.create(caja.querySelector(".ed-div-cuerpo"), {
+    model: ed.modelo, automaticLayout: true, fontFamily: "'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace",
+    smoothScrolling: true, scrollBeyondLastLine: false, padding: { top: 8 }, ...opcionesMonaco(ajustes, FS.extension(ruta)),
+  });
+  const pos = ed.editor.getPosition();
+  if (pos) { editor.setPosition(pos); editor.revealLineInCenter(pos.lineNumber); }
+  editor.focus();
+  division = { ruta, editor, caja };
+}
+function cerrarDivision() {
+  if (!division) return;
+  division.editor.dispose();
+  division.caja.remove();
+  $("areaEditor").classList.remove("con-division");
+  division = null;
+}
+
+/** Modo zen: solo el editor (Esc o Ctrl+K Z para salir). */
+let zenAntes = null;
+function alternarZen() {
+  const ide = $("ide");
+  if (zenAntes) {
+    document.body.classList.remove("zen");
+    ide.classList.toggle("sin-explorador", zenAntes.exp);
+    ide.classList.toggle("sin-asistente", zenAntes.asis);
+    zenAntes = null;
+    return;
+  }
+  zenAntes = { exp: ide.classList.contains("sin-explorador"), asis: ide.classList.contains("sin-asistente") };
+  ide.classList.add("sin-explorador", "sin-asistente");
+  document.body.classList.add("zen");
+  if (panel.abierto) panel.cerrar();
+  avisoSimple("Modo zen · Esc para salir");
+}
+
+/** Pestañas cerradas (para Ctrl+Shift+T / «Reabrir el editor cerrado»). */
+const cerradas = [];
 
 function pintarCursor(pos) {
   const ed = editores.get(ui.activo);
@@ -336,6 +432,9 @@ async function cerrarPestana(ruta) {
   const j = ui.abiertos.indexOf(ruta);
   if (j < 0) return;
   ui.abiertos.splice(j, 1);
+  cerradas.push(ruta);
+  if (cerradas.length > 20) cerradas.shift();
+  if (division?.ruta === ruta) cerrarDivision();
   const ed = editores.get(ruta);
   if (ed) { ed.destruir(); editores.delete(ruta); }
   if (ui.activo === ruta) activar(ui.abiertos[Math.min(j, ui.abiertos.length - 1)] ?? null);
@@ -1062,6 +1161,10 @@ function guardarArchivos(rutas = [...sucios]) {
 }
 
 async function guardarAhora() {
+  const ed = editores.get(ui.activo);
+  if (ajustes.formatOnSave && ed?.editor && /^(js|mjs|cjs|jsx|ts|tsx|html|htm|css|scss|less|json)$/.test(ed.ext)) {
+    try { await ed.editor.getAction("editor.action.formatDocument")?.run(); } catch { /* sin formateador */ }
+  }
   guardarArchivos();
   const ok = await almacen.guardarAhora();
   if (ok) aviso("Proyecto guardado en tu cuenta.", { ms: 2200 });
@@ -1175,7 +1278,27 @@ document.addEventListener("keydown", (e) => {
   if (ctrl && e.shiftKey && k === "f") { e.preventDefault(); manejarAtajo("buscar-archivos"); return; }
   if (ctrl && e.shiftKey && k === "g") { e.preventDefault(); manejarAtajo("git"); return; }
   if (ctrl && e.shiftKey && k === "x") { e.preventDefault(); alternarExt(); return; }
-  if (ctrl && (e.key === "`" || e.key.toLowerCase() === "j")) { e.preventDefault(); panel.alternar(); }
+  if (ctrl && !e.shiftKey && (k === "," )) { e.preventDefault(); manejarAtajo("ajustes"); return; }
+  if (ctrl && k === "i" && !e.altKey && !e.target.closest?.("input,textarea,.monaco-editor")) { e.preventDefault(); manejarAtajo(e.shiftKey ? "ia-chat" : "ia-linea"); return; }
+  if (ctrl && e.shiftKey && k === "v" && !e.target.closest?.("input,textarea,.monaco-editor")) { e.preventDefault(); manejarAtajo("markdown"); return; }
+  if (ctrl && !e.shiftKey && (k === "+" || k === "=")) { e.preventDefault(); zoom(1); return; }
+  if (ctrl && !e.shiftKey && (k === "-" || k === "_")) { e.preventDefault(); zoom(-1); return; }
+  if (ctrl && !e.shiftKey && k === "0" && !e.altKey) { e.preventDefault(); zoom(0); return; }
+  if (ctrl && !e.shiftKey && (k === "\\" || e.code === "Backslash" || e.code === "IntlBackslash")) { e.preventDefault(); manejarAtajo("dividir"); return; }
+  if (ctrl && e.shiftKey && k === "t") { e.preventDefault(); manejarAtajo("reabrir"); return; }
+  if (e.altKey && !ctrl && k === "z") { e.preventDefault(); alternarAjusteLinea(); return; }
+  if (e.key === "Escape" && zenAntes) { alternarZen(); return; }
+  // Acordes Ctrl+K … (como VS Code): Ctrl+K Z modo zen, Ctrl+K Ctrl+S atajos
+  if (ctrl && k === "k" && !e.shiftKey) { e.preventDefault(); manejarAtajo.acorde = Date.now(); return; }
+  if (manejarAtajo.acorde && Date.now() - manejarAtajo.acorde < 1500) {
+    if (k === "z" && !ctrl) { e.preventDefault(); manejarAtajo.acorde = 0; manejarAtajo("zen"); return; }
+    if (k === "s" && ctrl) { e.preventDefault(); manejarAtajo.acorde = 0; manejarAtajo("atajos"); return; }
+    if (k === "t" && ctrl) { e.preventDefault(); manejarAtajo.acorde = 0; manejarAtajo("tema"); return; }
+  }
+  // Terminal: Ctrl+Ñ (teclado en español, como VS Code), Ctrl+` o Ctrl+J. Con Shift: terminal nueva.
+  const esEnye = k === "ñ" || e.code === "Semicolon" || e.key === "`" || e.code === "Backquote";
+  if (ctrl && e.shiftKey && esEnye) { e.preventDefault(); manejarAtajo("nueva-terminal"); }
+  else if (ctrl && !e.altKey && (esEnye || k === "j")) { e.preventDefault(); manejarAtajo("terminal"); }
   else if (ctrl && e.key.toLowerCase() === "b") { e.preventDefault(); alternarExplorador(); }
   else if (ctrl && e.key.toLowerCase() === "s") { e.preventDefault(); guardarAhora(); }
 });
@@ -1334,6 +1457,89 @@ $("preguntar").onsubmit = async (event) => {
   $("pregunta").focus();
 };
 
+/** Le pregunta algo al asistente desde cualquier parte (editor, terminal, errores). editar=true activa «Editar con IA». */
+function preguntarIA(texto, { editar = false } = {}) {
+  alternarAsistente(true);
+  if (editar && !$("copiloto").checked) { $("copiloto").checked = true; $("copiloto").dispatchEvent(new Event("change")); }
+  $("pregunta").value = texto;
+  $("preguntar").requestSubmit();
+}
+
+function accionIA(id) {
+  const ed = editores.get(ui.activo);
+  const ruta = ui.activo && ui.activo !== VISTA ? ui.activo : null;
+  const sel = seleccionActual();
+  const que = sel ? "el código que seleccioné" : ruta ? `el archivo ${ruta}` : "mi código";
+  if (id === "ia-linea" || id === "ia-comentar") {
+    if (!ed?.editor || !monacoVivo) { avisoSimple("Abre un archivo de código para usar la IA aquí.", true); return; }
+    abrirChatEnLinea({ editor: ed.editor, monaco: monacoVivo, ruta, lenguaje: ed.lenguaje, pedir: (d) => api("/api/tutor/editar/", d),
+      instruccion: id === "ia-comentar" ? "Agrega comentarios claros en español que expliquen qué hace cada parte, y documentación (docstring/JSDoc) a las funciones. No cambies la lógica." : "" });
+    return;
+  }
+  if (id === "ia-chat") { alternarAsistente(true); $("pregunta").value = sel ? "Sobre el código seleccionado: " : ""; $("pregunta").focus(); return; }
+  const probs = (() => { try { return problemas().lista.filter((p) => !ruta || p.ruta === ruta).slice(0, 15).map((p) => `línea ${p.linea}: ${p.mensaje}`); } catch { return []; } })();
+  const textos = {
+    "ia-explicar": [`Explícame paso a paso y con palabras simples qué hace ${que}.`, false],
+    "ia-arreglar": [`Encuentra y arregla los errores de ${que}.${probs.length ? ` El editor marca: ${probs.join("; ")}.` : ""} Explica en pocas palabras qué estaba mal.`, true],
+    "ia-mejorar": [`Mejora y refactoriza ${que} (más claro, sin repetir código, buenas prácticas) sin cambiar lo que hace. Explica qué cambiaste.`, true],
+    "ia-pruebas": [`Escribe pruebas para ${que} en un archivo nuevo, con el framework de pruebas que corresponda a este lenguaje, y dime cómo ejecutarlas en la terminal.`, true],
+  };
+  const [t, editar] = textos[id] ?? [];
+  if (t) preguntarIA(t, { editar });
+}
+
+/** Menú del clic derecho en las pestañas (como VS Code). */
+$("pestanas").addEventListener("contextmenu", (e) => {
+  const tab = e.target.closest(".pestana");
+  if (!tab) return;
+  e.preventDefault();
+  const r = tab.dataset.ruta;
+  const i = ui.abiertos.indexOf(r);
+  const cerrarVarias = async (lista) => { for (const x of lista) await cerrarPestana(x); };
+  menuContextual(e.clientX, e.clientY, [
+    { texto: "Cerrar", fn: () => cerrarPestana(r) },
+    { texto: "Cerrar las demás", fn: () => cerrarVarias(ui.abiertos.filter((x) => x !== r)) },
+    { texto: "Cerrar las de la derecha", fn: () => cerrarVarias(ui.abiertos.slice(i + 1)) },
+    { texto: "Cerrar las guardadas", fn: () => cerrarVarias(ui.abiertos.filter((x) => !sucios.has(x))) },
+    { texto: "Cerrar todas", fn: () => cerrarVarias([...ui.abiertos]) },
+    "-",
+    ...(r !== VISTA ? [
+      { texto: "Copiar ruta", fn: () => navigator.clipboard?.writeText(`/workspace/${r}`).then(() => avisoSimple("Ruta copiada")) },
+      { texto: "Copiar ruta relativa", fn: () => navigator.clipboard?.writeText(r).then(() => avisoSimple("Ruta copiada")) },
+      { texto: "Mostrar en el explorador", fn: () => { alternarGit(false); alternarExplorador(true); const partes = r.split("/"); for (let k = 1; k < partes.length; k += 1) explorador.expandidas.add(partes.slice(0, k).join("/")); explorador.render(); explorador.seleccionar(r); } },
+      "-",
+      { texto: "Dividir a la derecha", atajo: "Ctrl+\\", fn: () => { activar(r); dividirEditor(r); } },
+      ...(/\.(md|markdown)$/i.test(r) ? [{ texto: "Abrir vista previa de Markdown", atajo: "Ctrl+Shift+V", fn: () => vistaMarkdown(r) }] : []),
+      { texto: "Ejecutar el archivo", atajo: "Ctrl+Enter", fn: () => { activar(r); ejecutarActual(); } },
+    ] : []),
+  ]);
+});
+
+/** Vista previa de Markdown al lado (Ctrl+Shift+V), se actualiza mientras escribes. */
+let vistaMd = null;
+function vistaMarkdown(ruta = ui.activo) {
+  if (!ruta || !/\.(md|markdown)$/i.test(ruta)) { avisoSimple("La vista previa de Markdown es para archivos .md", true); return; }
+  cerrarDivision();
+  vistaMd?.cerrar();
+  const caja = document.createElement("div");
+  caja.className = "editor-dividido vista-md";
+  caja.innerHTML = `<div class="ed-div-cab"><span>Vista previa · ${FS.nombreBase(ruta).replace(/</g, "&lt;")}</span><button type="button" class="icono-btn" aria-label="Cerrar la vista previa">✕</button></div><div class="ed-div-cuerpo md-cuerpo"></div>`;
+  $("areaEditor").appendChild(caja);
+  $("areaEditor").classList.add("con-division");
+  const cuerpo = caja.querySelector(".md-cuerpo");
+  const pintar = () => formato(cuerpo, editores.get(ruta)?.leer?.() ?? proyecto().files[ruta] ?? "");
+  pintar();
+  const t = setInterval(pintar, 700);
+  vistaMd = { cerrar: () => { clearInterval(t); caja.remove(); $("areaEditor").classList.remove("con-division"); vistaMd = null; } };
+  caja.querySelector("button").onclick = () => vistaMd?.cerrar();
+}
+
+/** Tema de color (Ctrl+K Ctrl+T). */
+function elegirTema() {
+  const actual = temaElegido();
+  abrirPaleta({ titulo: "Elige un tema de color", lista: Object.entries(TEMAS).map(([id, x]) => ({ etiqueta: `${id === actual ? "● " : ""}${x.nombre}`, accion: () => { cambiarTema(id); avisoSimple(`Tema: ${x.nombre}`); } })) });
+}
+
 // ------------------------------------------------ como VS Code: paleta, búsqueda, Git, problemas ----
 function programarModelos() { clearTimeout(tModelos); tModelos = setTimeout(() => sincronizarModelos(proyecto(), (t) => !esMarcador(t)), 400); }
 
@@ -1360,7 +1566,7 @@ const COMANDOS_PALETA = () => [
   { etiqueta: "Ver: control de código fuente (Git)", atajo: "Ctrl+Shift+G", accion: () => alternarGit(true) },
   { etiqueta: "Ver: extensiones (librerías y frameworks)", atajo: "Ctrl+Shift+X", accion: () => alternarExt(true) },
   { etiqueta: "Ver: explorador de archivos", atajo: "Ctrl+B", accion: () => { alternarGit(false); alternarExplorador(true); } },
-  { etiqueta: "Ver: terminal", atajo: "Ctrl+`", accion: () => panel.alternar() },
+  { etiqueta: "Ver: terminal", atajo: "Ctrl+Ñ", accion: () => panel.alternar() },
   { etiqueta: "Ver: problemas", accion: () => verProblemas() },
   { etiqueta: "Ver: asistente de IA", accion: () => alternarAsistente() },
   { etiqueta: "Ver: vista previa", accion: () => abrirVista(paginaVista) },
@@ -1370,6 +1576,39 @@ const COMANDOS_PALETA = () => [
   { etiqueta: "Git: estado", accion: () => panel.correr("git status") },
   { etiqueta: "Git: publicar (push)", accion: () => panel.correr("git push") },
   { etiqueta: `Preferencias: autoguardado (${ui.autoguardado ? "activado" : "desactivado"})`, accion: () => alternarAutoguardado() },
+  { etiqueta: "Preferencias: abrir ajustes del editor", atajo: "Ctrl+,", accion: () => manejarAtajo("ajustes") },
+  { etiqueta: "Preferencias: tema de color", atajo: "Ctrl+K Ctrl+T", accion: () => elegirTema() },
+  { etiqueta: "✨ IA: pedir un cambio en el código (chat en línea)", atajo: "Ctrl+I", accion: () => manejarAtajo("ia-linea") },
+  { etiqueta: "✨ IA: explicar este código", accion: () => manejarAtajo("ia-explicar") },
+  { etiqueta: "✨ IA: arreglar los errores del archivo", accion: () => manejarAtajo("ia-arreglar") },
+  { etiqueta: "✨ IA: mejorar / refactorizar", accion: () => manejarAtajo("ia-mejorar") },
+  { etiqueta: "✨ IA: agregar comentarios y documentación", accion: () => manejarAtajo("ia-comentar") },
+  { etiqueta: "✨ IA: escribir pruebas", accion: () => manejarAtajo("ia-pruebas") },
+  { etiqueta: "✨ IA: abrir el chat", atajo: "Ctrl+Shift+I", accion: () => manejarAtajo("ia-chat") },
+  { etiqueta: "Markdown: abrir vista previa al lado", atajo: "Ctrl+Shift+V", accion: () => vistaMarkdown() },
+  { etiqueta: "Preferencias: atajos de teclado", atajo: "Ctrl+K Ctrl+S", accion: () => manejarAtajo("atajos") },
+  { etiqueta: `Preferencias: formatear al guardar (${ajustes.formatOnSave ? "activado" : "desactivado"})`, accion: () => aplicarAjustes({ ...ajustes, formatOnSave: !ajustes.formatOnSave }) },
+  { etiqueta: `Preferencias: minimapa (${ajustes.minimap === true ? "siempre" : ajustes.minimap === false ? "nunca" : "automático"})`, accion: () => aplicarAjustes({ ...ajustes, minimap: ajustes.minimap === true ? false : true }) },
+  { etiqueta: "Ver: ajuste de línea", atajo: "Alt+Z", accion: () => alternarAjusteLinea() },
+  { etiqueta: "Ver: aumentar tamaño de letra", atajo: "Ctrl++", accion: () => zoom(1) },
+  { etiqueta: "Ver: reducir tamaño de letra", atajo: "Ctrl+-", accion: () => zoom(-1) },
+  { etiqueta: "Ver: restablecer tamaño de letra", atajo: "Ctrl+0", accion: () => zoom(0) },
+  { etiqueta: "Ver: dividir el editor", atajo: "Ctrl+\\", accion: () => dividirEditor() },
+  { etiqueta: "Ver: cerrar el editor dividido", accion: () => cerrarDivision() },
+  { etiqueta: "Ver: modo zen", atajo: "Ctrl+K Z", accion: () => alternarZen() },
+  { etiqueta: "Ver: terminal nueva", atajo: "Ctrl+Shift+Ñ", accion: () => manejarAtajo("nueva-terminal") },
+  { etiqueta: "Archivo: reabrir el editor cerrado", atajo: "Ctrl+Shift+T", accion: () => manejarAtajo("reabrir") },
+  { etiqueta: "Archivo: cerrar todos los editores", accion: async () => { for (const r of [...ui.abiertos]) await cerrarPestana(r); } },
+  { etiqueta: "Ir a símbolo en el archivo…", atajo: "Ctrl+Shift+O", accion: () => { const ed = editores.get(ui.activo); ed?.enfocar(); ed?.editor?.getAction("editor.action.quickOutline")?.run(); } },
+  { etiqueta: "Ir a la definición", atajo: "F12", accion: () => editores.get(ui.activo)?.editor?.getAction("editor.action.revealDefinition")?.run() },
+  { etiqueta: "Renombrar símbolo", atajo: "F2", accion: () => editores.get(ui.activo)?.editor?.getAction("editor.action.rename")?.run() },
+  { etiqueta: "Editor: comentar o descomentar línea", atajo: "Ctrl+/", accion: () => editores.get(ui.activo)?.editor?.getAction("editor.action.commentLine")?.run() },
+  { etiqueta: "Editor: plegar todo", accion: () => editores.get(ui.activo)?.editor?.getAction("editor.foldAll")?.run() },
+  { etiqueta: "Editor: desplegar todo", accion: () => editores.get(ui.activo)?.editor?.getAction("editor.unfoldAll")?.run() },
+  { etiqueta: "Editor: transformar a MAYÚSCULAS", accion: () => editores.get(ui.activo)?.editor?.getAction("editor.action.transformToUppercase")?.run() },
+  { etiqueta: "Editor: transformar a minúsculas", accion: () => editores.get(ui.activo)?.editor?.getAction("editor.action.transformToLowercase")?.run() },
+  { etiqueta: "Editor: ordenar líneas", accion: () => editores.get(ui.activo)?.editor?.getAction("editor.action.sortLinesAscending")?.run() },
+  { etiqueta: "Editor: borrar espacios al final de las líneas", accion: () => editores.get(ui.activo)?.editor?.getAction("editor.action.trimTrailingWhitespace")?.run() },
   ...(usarMonaco ? [{ etiqueta: "Editor: formatear documento", atajo: "Shift+Alt+F", accion: () => editores.get(ui.activo)?.editor?.getAction("editor.action.formatDocument")?.run() },
     { etiqueta: "Editor: todos los comandos del editor…", atajo: "F1 dentro del editor", accion: () => { const ed = editores.get(ui.activo); ed?.enfocar(); ed?.editor?.trigger("paleta", "editor.action.quickCommand", null); } }] : []),
 ];
@@ -1377,7 +1616,20 @@ const COMANDOS_PALETA = () => [
 function manejarAtajo(accion) {
   if (accion === "guardar") guardarAhora();
   else if (accion === "ejecutar") ejecutarActual();
-  else if (accion === "terminal") panel.alternar();
+  else if (accion === "terminal") { if (Date.now() - (manejarAtajo.ultimaTerminal ?? 0) > 250) { manejarAtajo.ultimaTerminal = Date.now(); panel.alternar(); } }
+  else if (accion === "nueva-terminal") { panel.abrir(); panel.mostrarPestana("terminal"); panel.nueva(); }
+  else if (accion.startsWith("ia-")) accionIA(accion);
+  else if (accion === "tema") elegirTema();
+  else if (accion === "markdown") vistaMarkdown();
+  else if (accion === "ajustes") abrirDialogoAjustes({ ...ajustes }, aplicarAjustes);
+  else if (accion === "atajos") abrirDialogoAtajos();
+  else if (accion === "zen") alternarZen();
+  else if (accion === "dividir") dividirEditor();
+  else if (accion === "reabrir") { const r = cerradas.pop(); if (r && FS.tieneArchivo(proyecto(), r)) abrir(r); }
+  else if (accion === "zoom+") zoom(1);
+  else if (accion === "zoom-") zoom(-1);
+  else if (accion === "zoom0") zoom(0);
+  else if (accion === "ajuste-linea") alternarAjusteLinea();
   else if (accion === "explorador") alternarExplorador();
   else if (accion === "git") alternarGit();
   else if (accion === "abrir-rapido" || accion === "paleta") {
@@ -1482,6 +1734,7 @@ panelGit = new PanelGit({
   alCambiar: (info) => proyectoCambio(info),
   correr: (c) => { panel.abrir(); panel.correr(c); },
   verDiff, abrir: (r) => abrir(r),
+  pedirIA: async (diff) => (await api("/api/tutor/commit/", { diff })).texto,
   pedir: async (titulo, ejemplo) => { const v = prompt(`${titulo}\nEjemplo: ${ejemplo}`); return v ? v.trim() : null; },
 });
 panelExt = new PanelExtensiones({

@@ -150,7 +150,7 @@ export function abrirCofreLogro(c) {
 export async function abrirPremiosNuevos(desafios = []) {
   let n = 0;
   for (const d of desafios) {
-    await mostrarCofre({ tipo: d.cofre || "madera", titulo: "¡Encargo cumplido!", subtitulo: d.titulo, obtener: async () => d.datos || {} });
+    await mostrarCofre({ tipo: d.cofre || "madera", titulo: d.encabezado || "¡Encargo cumplido!", subtitulo: d.titulo, obtener: async () => d.datos || {} });
     n += 1;
   }
   try {

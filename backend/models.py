@@ -235,6 +235,18 @@ class DailyActivity(db.Model):
     mensajes = db.Column(db.SmallInteger, nullable=False, default=0)       # mensajes en Chats
     ia = db.Column(db.SmallInteger, nullable=False, default=0)             # preguntas al tutor de IA
     ejecuciones = db.Column(db.SmallInteger, nullable=False, default=0)    # veces que ejecutó código en Trabajo
+    salvada = db.Column(db.Boolean, nullable=False, default=False)         # día sin práctica que cubrió un salvarrachas
+
+
+class StreakReward(db.Model):
+    """Premios de racha ya entregados (cada 10 días, semana perfecta, mes perfecto): así no se dan dos veces."""
+    __tablename__ = "premios_racha"
+    __table_args__ = (db.UniqueConstraint("usuario_id", "clave", name="uq_premio_racha"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    clave = db.Column(db.String(40), nullable=False)
+    creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
 
 
 class DailyChallenge(db.Model):
@@ -375,6 +387,7 @@ class EquippedCosmetics(db.Model):
     marco = db.Column(db.String(30), nullable=True)
     efecto = db.Column(db.String(30), nullable=True)
     dedo = db.Column(db.String(30), nullable=True)  # estela del dedo (celular)
+    codi = db.Column(db.String(30), nullable=True)  # accesorio de Codi, la mascota
 
 
 class OpenedChest(db.Model):

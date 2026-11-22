@@ -9,10 +9,13 @@
 // Si Monaco no carga (navegador muy viejo), trabajo.js usa el editor simple de siempre.
 import { extension } from "./fs.js";
 import { OPCIONES_MONACO } from "./autocompletar.js";
+import { definirTemas, guardarTema, temaMonaco } from "./temas.js";
 
 const BASE = "/vendor/monaco/vs";
 let promesa = null;
 export let monaco = null;
+/** Cambia el tema de color de todos los editores (Ctrl+K Ctrl+T). */
+export function cambiarTema(id) { guardarTema(id); monaco?.editor.setTheme(temaActual()); }
 
 const LENGUAJES = {
   js: "javascript", mjs: "javascript", cjs: "javascript", jsx: "javascript", ts: "typescript", mts: "typescript", tsx: "typescript",
@@ -20,10 +23,13 @@ const LENGUAJES = {
   c: "c", h: "c", cpp: "cpp", cc: "cpp", hpp: "cpp", cs: "csharp", go: "go", rs: "rust", php: "php", rb: "ruby", sql: "sql",
   kt: "kotlin", swift: "swift", sh: "shell", bash: "shell", yml: "yaml", yaml: "yaml", xml: "xml", svg: "xml", ini: "ini",
   toml: "ini", dockerfile: "dockerfile", bat: "bat", ps1: "powershell", r: "r", lua: "lua", dart: "dart", vue: "html",
+  pl: "perl", pm: "perl", scala: "scala", exs: "elixir", ex: "elixir", jl: "julia", groovy: "java", cr: "ruby", d: "cpp", pas: "pascal",
+  zig: "rust", lisp: "clojure", clj: "clojure", fs: "fsharp", ml: "fsharp", hs: "plaintext", nim: "python", R: "r",
 };
 const NOMBRES = { javascript: "JavaScript", typescript: "TypeScript", html: "HTML", css: "CSS", scss: "SCSS", json: "JSON", markdown: "Markdown", python: "Python",
   java: "Java", c: "C", cpp: "C++", csharp: "C#", go: "Go", rust: "Rust", php: "PHP", ruby: "Ruby", sql: "SQL", kotlin: "Kotlin", swift: "Swift",
-  shell: "Shell", yaml: "YAML", xml: "XML", plaintext: "Texto sin formato" };
+  shell: "Shell", yaml: "YAML", xml: "XML", plaintext: "Texto sin formato", lua: "Lua", perl: "Perl", r: "R", scala: "Scala",
+  elixir: "Elixir", julia: "Julia", pascal: "Pascal", clojure: "Lisp", fsharp: "OCaml/F#", dockerfile: "Dockerfile" };
 
 export const lenguajeDe = (ruta) => (/(^|\/)Dockerfile$/i.test(ruta) ? "dockerfile" : LENGUAJES[extension(ruta)] ?? "plaintext");
 const CODIGO = new Set(["js", "mjs", "cjs", "jsx", "ts", "mts", "tsx", "json"]);
@@ -41,6 +47,8 @@ function cargarScript(src) {
 }
 
 const temaActual = () => {
+  const elegido = temaMonaco();
+  if (elegido) return elegido;
   const t = document.documentElement.dataset.tema;
   const oscuro = t === "oscuro" || (t !== "claro" && matchMedia("(prefers-color-scheme: dark)").matches);
   return oscuro ? "codigocamp-oscuro" : "codigocamp-claro";
@@ -68,6 +76,7 @@ export function cargarMonaco({ limite = 20000 } = {}) {
 function configurar(m) {
   m.editor.defineTheme("codigocamp-oscuro", { base: "vs-dark", inherit: true, rules: [], colors: { "editor.background": "#0f1424", "editorGutter.background": "#0f1424" } });
   m.editor.defineTheme("codigocamp-claro", { base: "vs", inherit: true, rules: [], colors: {} });
+  definirTemas(m);
   m.editor.setTheme(temaActual());
   new MutationObserver(() => m.editor.setTheme(temaActual())).observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => m.editor.setTheme(temaActual()));
@@ -167,8 +176,40 @@ export class EditorMonaco {
     this.editor.addCommand(K.CtrlCmd | K.Shift | C.KeyP, () => this.alAtajo("paleta"));
     this.editor.addCommand(K.CtrlCmd | C.Backquote, () => this.alAtajo("terminal"));
     this.editor.addCommand(K.CtrlCmd | C.KeyJ, () => this.alAtajo("terminal"));
+    this.editor.addCommand(K.CtrlCmd | K.Shift | C.Backquote, () => this.alAtajo("nueva-terminal"));
+    // Ctrl+Ñ (teclado en español): Monaco no siempre la reconoce como tecla propia, así que se mira la tecla escrita
+    this.editor.onKeyDown((ev) => {
+      const b = ev.browserEvent;
+      if ((b.ctrlKey || b.metaKey) && !b.altKey && (b.key.toLowerCase() === "ñ" || b.code === "Semicolon")) {
+        ev.preventDefault(); ev.stopPropagation();
+        this.alAtajo(b.shiftKey ? "nueva-terminal" : "terminal");
+      }
+    });
     this.editor.addCommand(K.CtrlCmd | C.KeyB, () => this.alAtajo("explorador"));
     this.editor.addCommand(K.CtrlCmd | K.Shift | C.KeyG, () => this.alAtajo("git"));
+    // Como VS Code: ajustes, dividir, zen, atajos, zoom, ajuste de línea, reabrir pestaña
+    this.editor.addCommand(K.CtrlCmd | C.Comma, () => this.alAtajo("ajustes"));
+    this.editor.addCommand(K.CtrlCmd | C.Backslash, () => this.alAtajo("dividir"));
+    this.editor.addCommand(monaco.KeyMod.chord(K.CtrlCmd | C.KeyK, C.KeyZ), () => this.alAtajo("zen"));
+    this.editor.addCommand(monaco.KeyMod.chord(K.CtrlCmd | C.KeyK, K.CtrlCmd | C.KeyS), () => this.alAtajo("atajos"));
+    this.editor.addCommand(K.CtrlCmd | C.Equal, () => this.alAtajo("zoom+"));
+    this.editor.addCommand(K.CtrlCmd | C.Minus, () => this.alAtajo("zoom-"));
+    this.editor.addCommand(K.CtrlCmd | C.Digit0, () => this.alAtajo("zoom0"));
+    this.editor.addCommand(K.Alt | C.KeyZ, () => this.alAtajo("ajuste-linea"));
+    this.editor.addCommand(K.CtrlCmd | K.Shift | C.KeyT, () => this.alAtajo("reabrir"));
+    this.editor.addCommand(monaco.KeyMod.chord(K.CtrlCmd | C.KeyK, K.CtrlCmd | C.KeyT), () => this.alAtajo("tema"));
+    this.editor.addCommand(K.CtrlCmd | K.Shift | C.KeyV, () => this.alAtajo("markdown"));
+    // IA como Copilot: Ctrl+I en el código y opciones en el menú del clic derecho
+    const ia = [
+      ["ia-linea", "✨ IA: pedir un cambio aquí…", [K.CtrlCmd | C.KeyI]],
+      ["ia-explicar", "✨ IA: explicar este código", []],
+      ["ia-arreglar", "✨ IA: arreglar errores", []],
+      ["ia-mejorar", "✨ IA: mejorar / refactorizar", []],
+      ["ia-comentar", "✨ IA: agregar comentarios y documentación", []],
+      ["ia-pruebas", "✨ IA: escribir pruebas", []],
+      ["ia-chat", "✨ IA: preguntar en el chat sobre esto", [K.CtrlCmd | K.Shift | C.KeyI]],
+    ];
+    ia.forEach(([id, label, keybindings], i) => this.editor.addAction({ id: `cc.${id}`, label, keybindings, contextMenuGroupId: "0_ia", contextMenuOrder: i + 1, run: () => this.alAtajo(id) }));
   }
 
   get lenguaje() { return NOMBRES[lenguajeDe(this.ruta)] ?? lenguajeDe(this.ruta); }

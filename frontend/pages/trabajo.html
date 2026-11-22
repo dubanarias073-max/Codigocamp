@@ -73,8 +73,9 @@
           <div class="area-editor" id="areaEditor">
             <div class="editores" id="editores"></div>
             <section class="bienvenida" id="bienvenida" aria-label="Bienvenida">
-              <img class="bienvenida-logo" src="/img/logo-icon.png" alt="" width="92" height="92" onerror="this.remove()">
+              <img class="bienvenida-codi" src="/img/codi/saludo.svg" alt="Codi" width="120" height="120" onerror="this.src='/img/logo-icon.png'">
               <h1>¡Manos a la obra!</h1>
+              <p class="bienvenida-atajos"><kbd>Ctrl</kbd>+<kbd>P</kbd> ir a archivo · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> comandos · <kbd>Ctrl</kbd>+<kbd>Ñ</kbd> terminal · <kbd>Ctrl</kbd>+<kbd>,</kbd> ajustes</p>
               <p>Crea tus archivos, escribe código y ejecútalo desde la terminal. Todo se guarda en tu cuenta. También puedes soltar archivos (imágenes, videos, PDF…) sobre la lista de archivos.</p>
               <ul>
                 <li><button type="button" class="btn pri sm" data-accion="nuevo-archivo">Nuevo archivo</button></li>
@@ -158,7 +159,7 @@
           <span class="estado-item estado-menor">UTF-8</span>
           <span class="estado-item estado-menor">LF</span>
           <span class="estado-item" id="lenguajeArchivo">Texto sin formato</span>
-          <button type="button" class="estado-item" id="terminalToggle" aria-expanded="false" aria-controls="terminalPanel" title="Mostrar u ocultar la terminal (Ctrl+`)">Terminal</button>
+          <button type="button" class="estado-item" id="terminalToggle" aria-expanded="false" aria-controls="terminalPanel" title="Mostrar u ocultar la terminal (Ctrl+Ñ o Ctrl+`)">Terminal</button>
           <button type="button" class="estado-item" id="asistenteToggle" aria-expanded="true" aria-controls="asistente" title="Mostrar u ocultar el asistente">Asistente</button>
         </div>
       </footer>

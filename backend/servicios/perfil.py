@@ -67,6 +67,7 @@ def progress(user):
             "xp_nivel": profile.xp_total % 100,
             "diamante": profile.diamante, "vidas": profile.vidas,
             "segundos_vida": seconds_to_next_life(profile), "salvarrachas": profile.salvarrachas,
+            "dias_para_salvarrachas": 10 - (profile.racha_actual % 10),
             "racha_actual": profile.racha_actual, "racha_maxima": profile.racha_maxima,
             "meta_minutos": profile.meta_minutos,
         },
@@ -105,25 +106,83 @@ def lose_life(profile):
     profile.vidas = max(0, profile.vidas - 1)
 
 
+def dar_salvarrachas(profile, cantidad, tope=None):
+    """Suma salvarrachas sin pasar del tope (y sin quitar los que ya tenga por encima de él)."""
+    from constantes import MAX_SALVARRACHAS_PREMIO
+    tope = MAX_SALVARRACHAS_PREMIO if tope is None else tope
+    profile.salvarrachas = max(profile.salvarrachas, min(tope, profile.salvarrachas + int(cantidad)))
+
+
 def update_streak(profile):
+    """Actualiza la racha del día y devuelve los premios de racha que se acaban de ganar."""
     from servicios.zona import hoy_de
     today = hoy_de(profile)   # el día donde está la persona (su dispositivo), no el del servidor
     if profile.ultima_actividad == today:
-        return
+        return []
     days = (today - profile.ultima_actividad).days if profile.ultima_actividad else None
     if days == 1:
         profile.racha_actual += 1
     elif days == 2 and profile.salvarrachas > 0:
         profile.salvarrachas -= 1
         profile.racha_actual += 1
+        ayer = today - timedelta(days=1)
+        fila = DailyActivity.query.filter_by(usuario_id=profile.usuario_id, fecha=ayer).first()
+        if not fila:
+            fila = DailyActivity(usuario_id=profile.usuario_id, fecha=ayer, xp=0, niveles=0, perfectos=0, lecciones=0, mensajes=0, ia=0, ejecuciones=0)
+            db.session.add(fila)
+        fila.salvada = True
     else:
         profile.racha_actual = 1
     profile.racha_maxima = max(profile.racha_maxima, profile.racha_actual)
     profile.ultima_actividad = today
+    db.session.flush()
+    return premios_de_racha(profile, today)
+
+
+def _uso_salvarrachas(usuario_id, desde, hasta):
+    return DailyActivity.query.filter(DailyActivity.usuario_id == usuario_id, DailyActivity.fecha >= desde,
+                                      DailyActivity.fecha <= hasta, DailyActivity.salvada.is_(True)).count() > 0
+
+
+def premios_de_racha(profile, today):
+    """Premios por mantener la racha:
+    · cada 10 días seguidos, +1 salvarrachas (puede pasar de 2);
+    · semana perfecta: practicaste de lunes a domingo sin usar salvarrachas;
+    · mes perfecto: todos los días del mes sin perder la racha ni usar salvarrachas."""
+    import calendar as _cal
+    from constantes import PREMIO_MES_PERFECTO, PREMIO_SEMANA_PERFECTA, SALVARRACHAS_CADA
+    from models import StreakReward
+    racha = profile.racha_actual
+    ganados = []
+
+    def entregar(clave, premio, titulo, encabezado, cofre):
+        if StreakReward.query.filter_by(usuario_id=profile.usuario_id, clave=clave).first():
+            return
+        db.session.add(StreakReward(usuario_id=profile.usuario_id, clave=clave))
+        apply_reward(profile, {k: v for k, v in premio.items() if k in ("xp", "diamante", "vidas")})
+        if premio.get("salvarrachas"):
+            dar_salvarrachas(profile, premio["salvarrachas"])
+        ganados.append({"clave": clave, "titulo": titulo, "encabezado": encabezado, "premio": reward_text(premio),
+                        "datos": dict(premio), "cofre": cofre})
+
+    if racha and racha % SALVARRACHAS_CADA == 0:
+        inicio = today - timedelta(days=racha - 1)
+        entregar(f"racha{racha}-{inicio.isoformat()}", {"salvarrachas": 1}, f"¡{racha} días seguidos! Te ganaste un salvarrachas",
+                 f"🔥 {racha} días de racha", "plata")
+    if today.weekday() == 6 and racha >= 7 and not _uso_salvarrachas(profile.usuario_id, today - timedelta(days=6), today):
+        anio, semana, _ = today.isocalendar()
+        entregar(f"semana-{anio}-{semana:02d}", PREMIO_SEMANA_PERFECTA, "Practicaste todos los días de la semana sin usar salvarrachas",
+                 "⭐ ¡Semana perfecta!", "oro")
+    ultimo = _cal.monthrange(today.year, today.month)[1]
+    primero = today.replace(day=1)
+    if today.day == ultimo and racha >= ultimo and not _uso_salvarrachas(profile.usuario_id, primero, today):
+        entregar(f"mes-{today:%Y-%m}", PREMIO_MES_PERFECTO,
+                 f"Todo {MESES[today.month - 1]} sin perder la racha ni usar salvarrachas", "👑 ¡Mes perfecto!", "legendario")
+    return ganados
 
 
 def reward_text(reward):
-    labels = {"diamante": ("diamante", "diamantes"), "xp": ("XP", "XP"), "vidas": ("vida", "vidas")}
+    labels = {"diamante": ("diamante", "diamantes"), "xp": ("XP", "XP"), "vidas": ("vida", "vidas"), "salvarrachas": ("salvarrachas", "salvarrachas")}
     return " y ".join(f"+{amount} {labels[key][0 if amount == 1 else 1]}" for key, amount in reward.items())
 
 
@@ -205,7 +264,7 @@ def review_challenges(profile, activity):
 
 
 def award_xp(profile, amount, levels=0, perfect=False):
-    update_streak(profile)
+    logros_racha = update_streak(profile)
     profile.xp += amount
     profile.xp_total += amount
     from servicios.zona import hoy_de
@@ -215,7 +274,7 @@ def award_xp(profile, amount, levels=0, perfect=False):
     activity.niveles += levels
     activity.perfectos += int(perfect)
     db.session.flush()
-    return review_challenges(profile, activity)
+    return logros_racha + review_challenges(profile, activity)
 
 
 def actividad_de_hoy(profile):

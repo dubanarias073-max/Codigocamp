@@ -1,5 +1,6 @@
 """Ejecutor de Java, C, C++, C#, PHP, Go, Rust, Swift, Kotlin y Ruby: local, Piston y en línea (Wandbox / Kotlin)."""
 import json
+import os
 import shutil
 import subprocess
 import unittest
@@ -12,7 +13,7 @@ def sin_locales():
     """Simula un PC sin compiladores instalados."""
     falta = {"java": "Java (JDK)", "c": "gcc", "cpp": "g++", "csharp": ".NET SDK (dotnet)", "php": "php", "go": "go",
              "rust": "rustc", "swift": "swift", "kotlin": "kotlinc", "ruby": "ruby"}
-    return mock.patch.dict(E.LENGUAJES, {k: {**v, "f": (lambda n: lambda c, d, e: (None, n))(falta[k])} for k, v in E.LENGUAJES.items()})
+    return mock.patch.dict(E.LENGUAJES, {k: {**v, "f": (lambda n: lambda c, d, e: (None, n))(falta.get(k, k))} for k, v in E.LENGUAJES.items()})
 
 
 class PrepararCodigo(unittest.TestCase):
@@ -153,3 +154,30 @@ class GoLocal(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SegundoServicio(unittest.TestCase):
+    def test_si_wandbox_falla_usa_compiler_explorer(self):
+        llamadas = []
+
+        def falso(url, cuerpo=None, cab=None, tiempo=None):
+            llamadas.append(url)
+            if "wandbox" in url:
+                raise E._FalloServicio("caído")
+            if "/api/compilers/" in url:
+                return [{"id": "dotnet80csharp", "name": ".NET 8.0", "semver": "8.0", "supportsExecute": True},
+                        {"id": "csharptrunk", "name": "trunk", "semver": "trunk"}]
+            datos = json.loads(cuerpo)
+            self.assertEqual(datos["options"]["executeParameters"]["stdin"], "Ana\n")
+            return {"code": 0, "didExecute": True, "stdout": [{"text": "Hola Ana"}], "stderr": [], "buildResult": {"code": 0}}
+        E._godbolt_lista.clear()
+        with sin_locales(), mock.patch.object(E, "_pedir_json", falso), mock.patch.dict(os.environ, {"EJECUCION_EN_LINEA": "1"}):
+            r = E.ejecutar("csharp", 'System.Console.WriteLine("Hola " + System.Console.ReadLine());', "Ana")
+        self.assertEqual(r["donde"], "en_linea")
+        self.assertIn("Hola Ana", r["salida"])
+        self.assertTrue(any("/api/compiler/dotnet80csharp/compile" in u for u in llamadas))
+
+    def test_lenguajes_nuevos_tienen_nombre_y_servicio(self):
+        for l in ("lua", "perl", "r", "scala", "haskell", "elixir", "julia", "groovy", "crystal", "nim", "ocaml", "d", "pascal", "zig", "lisp", "bash"):
+            self.assertIn(l, E.NOMBRES)
+            self.assertIn(l, E._WANDBOX_PATRON)

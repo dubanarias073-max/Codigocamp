@@ -9,6 +9,8 @@ import * as FS from "./fs.js";
 import { ejecutarGit } from "./git.js";
 import { esMarcador, leerMarcador, formatoBytes } from "./archivos.js";
 import { LEE_ENTRADA } from "./entradateclado.js";
+import * as BASH from "./bash.js";
+import { instalarComandos } from "./comandos-extra.js";
 import { archivosParaServidor, necesitaServidor } from "./pyservidor.js";
 import { importarEn } from "./importar.js";
 import { comandoSqlite } from "./sqlite.js";
@@ -185,16 +187,34 @@ export function comandoParaArchivo(ruta, cwd = "") {
     case "kt": return `kotlinc ${r} -include-runtime -d ${salida}.jar && java -jar ${salida}.jar`;
     case "rb": return `ruby ${r}`;
     case "sql": return `sqlite3 ${r}`;
+    case "sh": case "bash": return `bash ${r}`;
+    case "lua": return `lua ${r}`;
+    case "pl": return `perl ${r}`;
+    case "r": return `Rscript ${r}`;
+    case "scala": return `scala ${r}`;
+    case "hs": return `runghc ${r}`;
+    case "exs": return `elixir ${r}`;
+    case "jl": return `julia ${r}`;
+    case "groovy": return `groovy ${r}`;
+    case "cr": return `crystal ${r}`;
+    case "nim": return `nim ${r}`;
+    case "ml": return `ocaml ${r}`;
+    case "d": return `rdmd ${r}`;
+    case "pas": return `fpc ${r}`;
+    case "zig": return `zig ${r}`;
+    case "lisp": return `sbcl ${r}`;
+    case "ex": return `elixir ${r}`;
     default: return null;
   }
 }
 
-const LENGUAJE_SERVIDOR = { java: "java", c: "c", cpp: "cpp", cc: "cpp", cs: "csharp", php: "php", go: "go", rs: "rust", swift: "swift", kt: "kotlin", rb: "ruby" };
-const NO_DISPONIBLE = ["pnpm", "yarn", "apt", "apt-get", "brew", "sudo", "curl", "wget", "ssh", "make", "cmake", "cargo", "composer", "gem", "bundle", "vim", "nano", "vi", "emacs", "chmod", "chown", "kill", "ps", "top", "man"];
+const LENGUAJE_SERVIDOR = { java: "java", c: "c", cpp: "cpp", cc: "cpp", cs: "csharp", php: "php", go: "go", rs: "rust", swift: "swift", kt: "kotlin", rb: "ruby",
+lua: "lua", pl: "perl", r: "r", scala: "scala", hs: "haskell", exs: "elixir", ex: "elixir", jl: "julia", groovy: "groovy", cr: "crystal", nim: "nim", ml: "ocaml", d: "d", pas: "pascal", zig: "zig", lisp: "lisp" };
+const NO_DISPONIBLE = ["pnpm", "yarn", "apt", "apt-get", "brew", "sudo", "curl", "wget", "ssh", "make", "cmake", "composer", "gem", "bundle", "chown", "top"];
 
 export const NOMBRES_COMANDOS = [
   "cat", "cd", "clear", "cls", "code", "cp", "date", "echo", "env", "exit", "export", "find", "gcc", "g++", "gh", "git", "go", "grep", "head", "help",
-  "history", "true", "false", "printf", "docker", "docker-compose", "java", "javac", "kotlinc", "ls", "vite", "mkdir", "mv", "node", "npm", "npx", "php", "pip", "pip3", "pwd", "python", "python3", "rm", "rmdir", "ruby", "run", "rustc", "sqlite3", "mysql", "mariadb", "psql", "mongosh", "mongo", "redis-cli", "bd-puente",
+  "history", "true", "false", "printf", "docker", "docker-compose", "test", "read", "alias", "unalias", "unset", "let", "expr", "shift", "local", "break", "continue", "return", "seq", "sleep", "sort", "uniq", "cut", "tr", "sed", "awk", "rev", "tac", "nl", "basename", "dirname", "tee", "diff", "xargs", "time", "du", "stat", "chmod", "bash", "sh", "nano", "vim", "less", "more", "man", "cal", "uname", "lua", "lua5.4", "luajit", "perl", "Rscript", "scala", "scala-cli", "runghc", "runhaskell", "ghc", "elixir", "julia", "groovy", "crystal", "nim", "ocaml", "rdmd", "dmd", "ldc2", "fpc", "zig", "sbcl", "clisp", "java", "javac", "kotlinc", "ls", "vite", "mkdir", "mv", "node", "npm", "npx", "php", "pip", "pip3", "pwd", "python", "python3", "rm", "rmdir", "ruby", "run", "rustc", "sqlite3", "mysql", "mariadb", "psql", "mongosh", "mongo", "redis-cli", "bd-puente",
   "swift", "tail", "tree", "touch", "ts-node", "wc", "whoami", "dotnet", "py", "dir", "type", "ll", "virtualenv", "deactivate", "source", "which", "where", "fastapi", "uvicorn", "flask",
 ];
 
@@ -214,7 +234,9 @@ const AYUDA = [
   "            go run · php · ruby · swift · java Archivo.java · gcc/g++ archivo -o prog && ./prog · rustc · kotlinc   (se ejecutan en el servidor)",
   color.azul("Docker") + "     docker build -t app . · docker run --rm app · docker run -d -p 8080:80 app · docker ps · logs · exec · stop · rm · docker compose up -d | ps | logs | down",
   color.azul("Varios") + "     pega varias líneas y se ejecutan en orden · printf 'Ana\\n17\\n' | python pide.py",
-  color.azul("Atajos") + "     ↑/↓ historial · Tab completar · Ctrl+C cancelar · Ctrl+L limpiar · Ctrl+D salir",
+  color.azul("Atajos") + "     Ctrl+Ñ abrir/cerrar · Ctrl+Shift+Ñ terminal nueva · ↑/↓ historial · Ctrl+R buscar en el historial · Tab completar · Ctrl+C cancelar · Ctrl+L limpiar · Ctrl+A/E inicio/fin · Ctrl+U/K/W borrar · Ctrl+D salir",
+  color.azul("Bash") + "       for/while/until/if/case, funciones f() { … }, $((2+3)), $(comando), $1 $# $@, ${var^^}, [ -f x ], read, alias, bash script.sh, ./script.sh",
+  color.azul("Filtros") + "    sort · uniq · cut · tr · sed · awk · seq · rev · tac · nl · tee · diff · xargs · basename · dirname · du · time · sleep",
   "",
   color.gris("No es un sistema operativo real: sudo, curl, ssh y editores de terminal no están disponibles (Docker sí: corre en el servidor)."),
 ].join("\n");
@@ -242,8 +264,129 @@ export class Shell {
       out: () => {}, err: () => {}, leerLinea: async () => null, limpiar: () => {}, cerrar: () => {}, ...extra };
   }
 
-  /** Ejecuta una línea completa. Devuelve el código de salida. */
+  /** ¿Falta texto para completar la línea? (for sin done, comillas abiertas…): la terminal pide más con «>». */
+  incompleta(texto) { return BASH.incompleta(texto); }
+
+  /** Ejecuta una línea (o un script) completa: bloques for/while/if/case, funciones y expansiones como bash. */
   async ejecutar(linea, sesion) {
+    sesion.funciones ??= {};
+    sesion.nivel = (sesion.nivel ?? 0) + 1;
+    try {
+      if (sesion.nivel > 60) { sesion.err("bash: demasiada recursión (¿una función que se llama a sí misma sin parar?)\n"); return (sesion.vars["?"] = 1); }
+      let codigo = sesion.vars["?"] ?? 0;
+      for (const s of BASH.sentencias(linea)) {
+        if (sesion.senal?.aborted || sesion.control) break;
+        codigo = await this.#sentencia(s, sesion);
+        sesion.vars["?"] = codigo;
+      }
+      return codigo;
+    } finally { sesion.nivel -= 1; }
+  }
+
+  /** Salida de un comando como texto (para $(…) y `…`): corre en una subshell. */
+  async capturar(cmd, sesion) {
+    let buffer = "";
+    const sub = Object.create(sesion);
+    sub.vars = { ...sesion.vars };
+    sub.out = (t) => { buffer += t; };
+    sub.control = null;
+    await this.ejecutar(cmd, sub);
+    return buffer;
+  }
+
+  async #bucle(sesion, cuerpo, paso) {
+    // Devuelve "romper" para salir del bucle. break/continue N se propagan a los bucles de afuera.
+    const codigo = await this.ejecutar(cuerpo, sesion);
+    paso.codigo = codigo;
+    const c = sesion.control;
+    if (c && (c.tipo === "break" || c.tipo === "continue")) {
+      if (c.n > 1) { c.n -= 1; return "romper"; }
+      sesion.control = null;
+      return c.tipo === "break" ? "romper" : "seguir";
+    }
+    if (c) return "romper";   // return / exit
+    if (++paso.vueltas % 200 === 0) await new Promise((r) => setTimeout(r, 0));   // la página no se congela
+    if (paso.vueltas > 100000) { sesion.err("bash: el bucle dio más de 100 000 vueltas: se detuvo (¿falta cambiar la condición?)\n"); return "romper"; }
+    return sesion.senal?.aborted ? "romper" : "seguir";
+  }
+
+  async #palabras(texto, sesion) {
+    const exp = await BASH.expandirLinea(texto, sesion.vars, (c) => this.capturar(c, sesion));
+    const vars = { ...sesion.vars, PWD: FS.rutaAbsoluta(sesion.cwd), HOME: FS.RAIZ, USER: this.usuario };
+    const lex = tokenizar(exp, vars);
+    if (lex.error) throw new Error(lex.error);
+    return this.#expandir(lex.tokens.filter((t) => t.t === "w"), sesion);
+  }
+
+  async #sentencia(texto, sesion) {
+    const a = BASH.analizar(texto);
+    const paso = { codigo: 0, vueltas: 0 };
+    try {
+      switch (a.tipo) {
+        case "error": sesion.err(`bash: ${a.error}\n`); return 2;
+        case "funcion": sesion.funciones[a.nombre] = a.cuerpo; return 0;
+        case "grupo": return await this.ejecutar(a.cuerpo, sesion);
+        case "aritmetica": {
+          const exp = await BASH.expandirLinea(a.expr, sesion.vars, (c) => this.capturar(c, sesion));
+          return BASH.aritmetica(exp.replace(/\$\{?([A-Za-z_]\w*)\}?/g, (_, n) => sesion.vars[n] ?? "0"), sesion.vars) !== "0" ? 0 : 1;
+        }
+        case "for": {
+          const lista = await this.#palabras(a.lista, sesion);
+          for (const w of lista) {
+            sesion.vars[a.variable] = w;
+            if ((await this.#bucle(sesion, a.cuerpo, paso)) === "romper") break;
+          }
+          return paso.codigo;
+        }
+        case "forc": {
+          const v = sesion.vars;
+          if (a.ini) BASH.aritmetica(a.ini, v);
+          while (!a.cond || BASH.aritmetica(a.cond, v) !== "0") {
+            if ((await this.#bucle(sesion, a.cuerpo, paso)) === "romper") break;
+            if (a.paso) BASH.aritmetica(a.paso, v);
+          }
+          return paso.codigo;
+        }
+        case "while": case "until": {
+          for (;;) {
+            const c = await this.ejecutar(a.cond, sesion);
+            if (sesion.control || sesion.senal?.aborted) break;
+            if ((c === 0) !== (a.tipo === "while")) break;
+            if ((await this.#bucle(sesion, a.cuerpo, paso)) === "romper") break;
+          }
+          return paso.codigo;
+        }
+        case "if": {
+          for (const r of a.ramas) {
+            const c = await this.ejecutar(r.cond, sesion);
+            if (sesion.control) return c;
+            if (c === 0) return await this.ejecutar(r.cuerpo, sesion);
+          }
+          return a.otro !== null ? await this.ejecutar(a.otro, sesion) : 0;
+        }
+        case "case": {
+          const [w = ""] = await this.#palabras(a.palabra, sesion);
+          for (const c of a.casos) {
+            for (const p of c.patrones) {
+              const [pat = ""] = (await BASH.expandirLinea(p, sesion.vars, (x) => this.capturar(x, sesion))).split(/\s+/);
+              if (BASH.coincidePatron(w, pat.replace(/^["']|["']$/g, ""))) return await this.ejecutar(c.cuerpo, sesion);
+            }
+          }
+          return 0;
+        }
+        default: {
+          const exp = await BASH.expandirLinea(a.texto, sesion.vars, (c) => this.capturar(c, sesion));
+          return await this.#simple(exp, sesion);
+        }
+      }
+    } catch (e) {
+      sesion.err(`bash: ${e.message}\n`);
+      return 1;
+    }
+  }
+
+  /** Una sentencia sin bloques: comandos con | && || y redirecciones. */
+  async #simple(linea, sesion) {
     const vars = { ...sesion.vars, PWD: FS.rutaAbsoluta(sesion.cwd), HOME: FS.RAIZ, USER: this.usuario };
     const lex = tokenizar(linea, vars);
     if (lex.error) { sesion.err(`bash: ${lex.error}\n`); return (sesion.vars["?"] = 2); }
@@ -252,13 +395,66 @@ export class Shell {
     if (ast.error) { sesion.err(`bash: ${ast.error}\n`); return (sesion.vars["?"] = 2); }
     let codigo = 0;
     for (const { conector, etapas } of ast.lista) {
-      if (sesion.senal?.aborted) break;
+      if (sesion.senal?.aborted || sesion.control) break;
       if (conector === "&&" && codigo !== 0) continue;
       if (conector === "||" && codigo === 0) continue;
       codigo = await this.#tuberia(etapas, sesion);
       sesion.vars["?"] = codigo;
     }
     return codigo;
+  }
+
+  async #comandoTexto(texto, io) {
+    const sub = Object.create(io.sesion);
+    sub.out = io.out; sub.err = io.err;
+    const codigo = await this.ejecutar(texto, sub);
+    if (sub.cwd !== io.sesion.cwd) { io.sesion.anterior = io.sesion.cwd; io.sesion.cwd = sub.cwd; }
+    return codigo;
+  }
+
+  /** Llama una función de la shell con $1…$9, $#, $@ propios (el resto de variables se comparte, como en bash). */
+  async #llamarFuncion(cuerpo, args, io) {
+    const v = io.sesion.vars;
+    const guardados = {};
+    for (const n of ["#", ...Array.from({ length: 20 }, (_, i) => String(i + 1))]) guardados[n] = v[n];
+    for (let i = 0; i < 20; i += 1) { if (i < args.length) v[String(i + 1)] = args[i]; else delete v[String(i + 1)]; }
+    v["#"] = String(args.length);
+    const sub = Object.create(io.sesion);
+    sub.out = io.out; sub.err = io.err; sub.control = null;
+    try {
+      let codigo = await this.ejecutar(cuerpo, sub);
+      if (sub.control?.tipo === "return") codigo = sub.control.codigo;
+      else if (sub.control?.tipo === "exit") io.sesion.control = sub.control;
+      if (sub.cwd !== io.sesion.cwd) { io.sesion.anterior = io.sesion.cwd; io.sesion.cwd = sub.cwd; }
+      return codigo;
+    } finally {
+      for (const [n, x] of Object.entries(guardados)) { if (x === undefined) delete v[n]; else v[n] = x; }
+    }
+  }
+
+  /** Ejecuta un script .sh del proyecto: en una subshell (bash archivo.sh, ./archivo.sh) o en la actual (source). */
+  async correrScript(rutaScript, args, io, { mismaSesion = false } = {}) {
+    const py = io.py();
+    const texto = py.files[rutaScript];
+    if (texto === undefined || esMarcador(texto)) { io.err(`bash: ${relativa(io.sesion.cwd, rutaScript)}: ${NO_EXISTE}\n`); return 127; }
+    const sub = Object.create(io.sesion);
+    if (!mismaSesion) { sub.vars = { ...io.sesion.vars }; sub.funciones = { ...(io.sesion.funciones ?? {}) }; sub.alias = { ...(io.sesion.alias ?? {}) }; }
+    sub.out = io.out; sub.err = io.err; sub.control = null;
+    const v = sub.vars;
+    const guardados = mismaSesion ? Object.fromEntries(["0", "#", ...Array.from({ length: 20 }, (_, i) => String(i + 1))].map((n) => [n, v[n]])) : null;
+    v["0"] = relativa(io.sesion.cwd, rutaScript);
+    for (let i = 0; i < 20; i += 1) { if (i < args.length) v[String(i + 1)] = args[i]; else delete v[String(i + 1)]; }
+    v["#"] = String(args.length);
+    try {
+      let codigo = await this.ejecutar(texto.replace(/^#!.*\n/, ""), sub);
+      if (sub.control?.tipo === "exit" || sub.control?.tipo === "return") codigo = sub.control.codigo;
+      if (mismaSesion) {   // source: lo que cambió (cd, venv, variables nuevas…) queda en tu terminal
+        for (const k of Object.keys(sub)) if (!["out", "err", "control", "nivel"].includes(k)) io.sesion[k] = sub[k];
+      }
+      return codigo;
+    } finally {
+      if (guardados) for (const [n, x] of Object.entries(guardados)) { if (x === undefined) delete v[n]; else v[n] = x; }
+    }
   }
 
   #expandir(palabras, sesion) {
@@ -299,7 +495,7 @@ export class Shell {
       const alTerminal = ultima && !destino;
       const senal = sesion.senal; // la de ESTE comando: si se cancela, lo que llegue tarde se descarta
       const io = {
-        sesion, entrada, py: () => this.proyecto(),
+        sesion, entrada, py: () => this.proyecto(), aTerminal: alTerminal,
         out: (t) => { if (senal?.aborted) return; if (alTerminal) sesion.out(t); else buffer += t; },
         err: (t) => { if (!senal?.aborted) sesion.err(t); },
       };
@@ -316,14 +512,35 @@ export class Shell {
   }
 
   async #comando(argv, io) {
+    // X=5 (asignación) y X=5 comando (variable solo para ese comando)
+    let k = 0;
+    const asign = {};
+    while (k < argv.length && /^[A-Za-z_]\w*=/.test(argv[k])) { const i = argv[k].indexOf("="); asign[argv[k].slice(0, i)] = argv[k].slice(i + 1); k += 1; }
+    if (k === argv.length) { Object.assign(io.sesion.vars, asign); return 0; }
+    if (k) {
+      const viejos = {};
+      for (const n of Object.keys(asign)) viejos[n] = io.sesion.vars[n];
+      Object.assign(io.sesion.vars, asign);
+      try { return await this.#comando(argv.slice(k), io); }
+      finally { for (const [n, v] of Object.entries(viejos)) { if (v === undefined) delete io.sesion.vars[n]; else io.sesion.vars[n] = v; } }
+    }
+    // alias (alias ll='ls -la')
+    const al = io.sesion.alias?.[argv[0]];
+    if (al !== undefined && !io.enAlias) {
+      const extra = argv.slice(1).map((x) => `'${x.replace(/'/g, "'\\''")}'`).join(" ");
+      return this.#comandoTexto(`${al} ${extra}`, io);
+    }
     const [nombre, ...a] = argv;
     if (nombre === undefined) return 0;
+    // Funciones definidas con nombre() { … }
+    const cuerpo = io.sesion.funciones?.[nombre];
+    if (cuerpo !== undefined) return this.#llamarFuncion(cuerpo, a, io);
     const fn = COMANDOS[nombre];
     try {
       if (fn) return (await conCancelacion(fn.call(this, a, io), io.sesion.senal)) ?? 0;
       const venv = rutaActivacion(nombre, this.proyecto(), io.sesion.cwd);
       if (venv !== null) return this.#activarVenv(venv, io);
-      if (nombre.includes("/")) return await this.#ejecutarBinario(nombre, io);
+      if (nombre.includes("/")) return await this.#ejecutarBinario(nombre, io, a);
       if (NO_DISPONIBLE.includes(nombre)) {
         io.err(`${nombre}: no está disponible en esta terminal.\nEs una terminal del navegador (no un sistema operativo): trabaja con tus archivos y ejecuta node, python, git y más. Escribe help.\n`);
         return 127;
@@ -352,10 +569,16 @@ export class Shell {
     return almacenDeVenv(py, sesion.venv, () => this.cambio({ origen: "terminal" }));
   }
 
-  async #ejecutarBinario(nombre, io) {
+  async #ejecutarBinario(nombre, io, args = []) {
     const { sesion } = io;
     const ruta = FS.resolver(sesion.cwd, nombre);
     const salida = ruta !== null ? sesion.binarios[ruta] : undefined;
+    if (salida === undefined && ruta !== null && FS.tieneArchivo(this.proyecto(), ruta)) {
+      const texto = this.proyecto().files[ruta] ?? "";
+      if (/\.(sh|bash)$/i.test(ruta) || /^#!.*\b(ba)?sh\b/.test(texto)) return this.correrScript(ruta, args, io);
+      const otro = /^#!.*\b(python3?|node)\b/.exec(texto)?.[1];
+      if (otro) return this.#comando([otro.replace(/3$/, ""), nombre, ...args], io);
+    }
     if (salida === undefined) {
       io.err(`bash: ${nombre}: ${ruta !== null && FS.tieneArchivo(this.proyecto(), ruta) ? "Permiso denegado (no es un programa compilado)" : NO_EXISTE}\n`);
       return ruta !== null && FS.tieneArchivo(this.proyecto(), ruta) ? 126 : 127;
@@ -501,6 +724,7 @@ const COMANDOS = {
       let texto;
       if (largo) texto = [`total ${entradas.length}`, ...entradas.map((e) => lineaLarga(e.n, e.dir, e.dir ? 4096 : tamanoTexto(py.files[FS.unir(r, e.n)])))].join("\n");
       else if (uno) texto = entradas.map((e) => (e.dir ? nombreDir(e.n) : e.n)).join("\n");
+      else if (io.aTerminal === false) texto = [...(todos ? [".", ".."] : []), ...entradas.map((e) => e.n)].join("\n");   // como bash: uno por línea en tuberías
       else texto = enColumnas([...(todos ? [color.azul("."), color.azul("..")] : []), ...entradas.map((e) => (e.dir ? nombreDir(e.n) : e.n))], io.sesion.columnas);
       bloques.push({ titulo: destinos.length > 1 ? d : null, texto });
     }
@@ -1001,8 +1225,7 @@ COMANDOS.source = function source(a, io) {
   }
   const ruta = FS.resolver(io.sesion.cwd, a[0]);
   if (ruta === null || !FS.tieneArchivo(io.py(), ruta)) { io.err(`source: ${a[0]}: ${NO_EXISTE}\n`); return 1; }
-  io.err(`source: solo se pueden cargar scripts de activación de entornos virtuales (…/bin/activate)\n`);
-  return 1;
+  return this.correrScript(ruta, a.slice(1), io, { mismaSesion: true });
 };
 COMANDOS["."] = COMANDOS.source;
 COMANDOS.which = function which(a, io) {
@@ -1181,6 +1404,7 @@ COMANDOS.printf = function printf(a, io) {
   io.out(salida);
   return 0;
 };
+instalarComandos(COMANDOS);
 COMANDOS.true = () => 0;
 COMANDOS.false = () => 1;
 COMANDOS[":"] = () => 0;
@@ -1385,6 +1609,39 @@ COMANDOS.ruby = interpretado("ruby", "ruby", "rb");
 COMANDOS.swift = interpretado("swift", "swift", "swift");
 COMANDOS.go = interpretado("go", "go", "go", "run");
 COMANDOS.dotnet = interpretado("dotnet", "csharp", "cs", "run");
+// Más lenguajes (se ejecutan en el servidor de CódigoCamp o en línea): lua, perl, Rscript, scala, runghc, elixir, julia,
+// groovy, crystal run, nim r, ocaml, rdmd, fpc, zig run, sbcl. Acepta opciones antes del archivo (nim r --hints:off x.nim).
+const interpretadoFlexible = (nombre, lenguaje, exts, sub = null) => async function interpretar(a, io) {
+  let args = a;
+  if (sub && args[0] === sub) args = args.slice(1);
+  const archivo = args.find((x) => exts.some((e) => x.toLowerCase().endsWith(`.${e}`))) ?? args.find((x) => !x.startsWith("-"));
+  const f = archivoAEjecutar(this, io, nombre, archivo, exts);
+  return f ? enServidor(this, io, lenguaje, f) : 1;
+};
+COMANDOS["lua"] = interpretadoFlexible("lua", "lua", ["lua"], null);
+COMANDOS["lua5.4"] = interpretadoFlexible("lua5.4", "lua", ["lua"], null);
+COMANDOS["luajit"] = interpretadoFlexible("luajit", "lua", ["lua"], null);
+COMANDOS["perl"] = interpretadoFlexible("perl", "perl", ["pl"], null);
+COMANDOS["Rscript"] = interpretadoFlexible("Rscript", "r", ["r"], null);
+COMANDOS["scala"] = interpretadoFlexible("scala", "scala", ["scala"], null);
+COMANDOS["scala-cli"] = interpretadoFlexible("scala-cli", "scala", ["scala"], "run");
+COMANDOS["runghc"] = interpretadoFlexible("runghc", "haskell", ["hs"], null);
+COMANDOS["runhaskell"] = interpretadoFlexible("runhaskell", "haskell", ["hs"], null);
+COMANDOS["ghc"] = interpretadoFlexible("ghc", "haskell", ["hs"], null);
+COMANDOS["elixir"] = interpretadoFlexible("elixir", "elixir", ["exs", "ex"], null);
+COMANDOS["julia"] = interpretadoFlexible("julia", "julia", ["jl"], null);
+COMANDOS["groovy"] = interpretadoFlexible("groovy", "groovy", ["groovy"], null);
+COMANDOS["crystal"] = interpretadoFlexible("crystal", "crystal", ["cr"], "run");
+COMANDOS["nim"] = interpretadoFlexible("nim", "nim", ["nim"], "r");
+COMANDOS["ocaml"] = interpretadoFlexible("ocaml", "ocaml", ["ml"], null);
+COMANDOS["rdmd"] = interpretadoFlexible("rdmd", "d", ["d"], null);
+COMANDOS["dmd"] = interpretadoFlexible("dmd", "d", ["d"], null);
+COMANDOS["ldc2"] = interpretadoFlexible("ldc2", "d", ["d"], null);
+COMANDOS["fpc"] = interpretadoFlexible("fpc", "pascal", ["pas"], null);
+COMANDOS["zig"] = interpretadoFlexible("zig", "zig", ["zig"], "run");
+COMANDOS["sbcl"] = interpretadoFlexible("sbcl", "lisp", ["lisp"], null);
+COMANDOS["clisp"] = interpretadoFlexible("clisp", "lisp", ["lisp"], null);
+
 
 COMANDOS.run = async function run(a, io) {
   const f = archivoAEjecutar(this, io, "run", a[0], ["js"]);

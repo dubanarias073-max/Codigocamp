@@ -86,6 +86,12 @@ document.querySelectorAll("[name=tema]").forEach((r) => {
 });
 const pref = (clave, def) => { try { return localStorage.getItem(clave) ?? def; } catch { return def; } };
 $("sonido").checked = pref("cc_sonido", "1") !== "0";
+import("/js/temporada.js").then(({ temporadaActiva, activarTemporada, temporadaDe }) => {
+  $("temporada").checked = temporadaActiva();
+  const t = temporadaDe();
+  if (t) $("temporadaTxt").textContent += ` Ahora: ${t.icono} ${t.nombre}`;
+  $("temporada").onchange = () => activarTemporada($("temporada").checked);
+});
 $("sonido").onchange = () => { try { localStorage.setItem("cc_sonido", $("sonido").checked ? "1" : "0"); } catch { aviso("No se pudo guardar en este navegador.", true); } };
 $("movimiento").checked = pref("cc_menos_mov", "0") === "1";
 $("movimiento").onchange = () => {
@@ -93,7 +99,7 @@ $("movimiento").onchange = () => {
   document.documentElement.classList.toggle("cc-menos-mov", $("movimiento").checked);
   aplicarCosmeticos(user.cosmeticos || {});
 };
-const TIPOS = { fondo: "Fondo", cursor: "Puntero", tema: "Tema de color", marco: "Marco", efecto: "Efecto", dedo: "Rastro" };
+const TIPOS = { fondo: "Fondo", cursor: "Puntero", tema: "Tema de color", marco: "Marco", efecto: "Efecto", dedo: "Rastro", codi: "Accesorio de Codi" };
 async function pintarPuestos() {
   const c = await api("/api/cosmeticos/");
   user.cosmeticos = c.equipados;

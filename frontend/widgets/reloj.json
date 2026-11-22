@@ -1,0 +1,71 @@
+{
+  "type": "AdaptiveCard",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "ColumnSet",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "auto",
+          "verticalContentAlignment": "Center",
+          "items": [
+            {
+              "type": "Image",
+              "url": "${url_mascota}",
+              "size": "Medium",
+              "altText": "Codi"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "verticalContentAlignment": "Center",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "${reloj_titulo}",
+              "isSubtle": true,
+              "size": "Small",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "${quedan_texto}",
+              "weight": "Bolder",
+              "size": "ExtraLarge",
+              "color": "${reloj_color}",
+              "spacing": "None",
+              "fontType": "Monospace"
+            },
+            {
+              "type": "TextBlock",
+              "text": "🔥 ${racha} · ${xp_hoy}/${meta_xp} XP hoy",
+              "isSubtle": true,
+              "size": "Small",
+              "spacing": "None"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "${estado}",
+      "wrap": true,
+      "spacing": "Medium",
+      "weight": "Bolder",
+      "size": "Small",
+      "color": "${reloj_color}"
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.OpenUrl",
+      "title": "Practicar ahora",
+      "url": "${url_practicar}"
+    }
+  ]
+}

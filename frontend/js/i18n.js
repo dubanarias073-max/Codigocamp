@@ -530,3 +530,44 @@
   window.alert = function (m) { return a.call(window, window.ccT(m)); };
   window.prompt = function (m, d) { return p.call(window, window.ccT(m), d); };
 })();
+
+/* ===== Celular siempre en vertical =====
+   En la app instalada (y en Android) la pantalla se bloquea en vertical. En el navegador no se puede bloquear,
+   así que si el celular se gira aparece Codi pidiendo volver a ponerlo derecho (como hacen Duolingo y otras apps).
+   Se usa la orientación de la PANTALLA, no el tamaño de la ventana: abrir el teclado no lo activa por error.
+   Las tabletas y los computadores pueden girar libremente. */
+(function () {
+  if (typeof matchMedia !== "function" || typeof screen === "undefined") return;
+  const celular = () => matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 600;
+  if (!celular()) return;
+  try { screen.orientation?.lock?.("portrait").catch(() => {}); } catch { /* el navegador no deja bloquear */ }
+  const horizontal = () => {
+    const t = screen.orientation?.type;
+    if (t) return t.startsWith("landscape");
+    if (typeof window.orientation === "number") return Math.abs(window.orientation) === 90;
+    return screen.width > screen.height;
+  };
+  let capa = null;
+  const revisar = () => {
+    const mostrar = horizontal() && !document.fullscreenElement;
+    if (mostrar && !capa) {
+      capa = document.createElement("div");
+      capa.id = "cc-girar";
+      capa.setAttribute("role", "alertdialog");
+      capa.setAttribute("aria-label", "Gira tu celular");
+      capa.innerHTML = '<style>#cc-girar{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;gap:22px;padding:16px;'
+        + 'background:radial-gradient(circle at 30% 40%,#14234a,#060b18 70%);color:#e5eaff;font:600 16px/1.4 system-ui,sans-serif;text-align:left}'
+        + '#cc-girar img{width:min(32vh,150px);height:auto}#cc-girar b{display:block;font-size:22px;margin-bottom:4px}'
+        + '#cc-girar .cc-tel{display:inline-block;width:22px;height:36px;border:3px solid #5ef2ff;border-radius:6px;margin-top:12px;animation:ccGira 1.8s ease-in-out infinite}'
+        + '@keyframes ccGira{0%,20%{transform:rotate(90deg)}60%,100%{transform:rotate(0)}}'
+        + '@media (prefers-reduced-motion:reduce){#cc-girar .cc-tel{animation:none}}</style>'
+        + '<img src="/img/codi/saludo.svg" alt=""><div><b>Gira tu celular</b>CódigoCamp se usa en vertical para que todo se vea bien.<br><span class="cc-tel" aria-hidden="true"></span></div>';
+      (document.body || document.documentElement).append(capa);
+    } else if (!mostrar && capa) { capa.remove(); capa = null; }
+  };
+  screen.orientation?.addEventListener?.("change", revisar);
+  addEventListener("orientationchange", revisar);
+  addEventListener("resize", revisar);
+  document.addEventListener("fullscreenchange", revisar);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", revisar); else revisar();
+})();

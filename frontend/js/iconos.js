@@ -1,3 +1,4 @@
+import { codiSVG } from "/js/codi.js";
 const DIBUJOS = {
   inicio: '<path d="m3 11 9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/><path d="m2 12 10-8 10 8"/>',
   recompensas: '<path d="M5 8h14l-1 13H6L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2m-3 4v5m-2-2 2 2 2-2"/>',
@@ -53,6 +54,9 @@ const DIBUJOS = {
 };
 
 export function iconoSVG(clave, clase = "") {
+  // El ícono de la IA es Codi, la mascota
+  if (clave === "codi") return `<span class="${clase} icono-codi" aria-hidden="true">${codiSVG("feliz", { tam: 22, animado: false })}</span>`;
+  if (clave === "ia") return `<span class="${clase} icono-codi" aria-hidden="true">${codiSVG("feliz", { tam: 26, animado: false })}</span>`;
   const dibujo = DIBUJOS[clave] || '<path d="M4 4h16v16H4z"/><path d="M8 9h8m-8 4h8m-8 4h5"/>';
   return `<svg class="${clase}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${dibujo}</svg>`;
 }

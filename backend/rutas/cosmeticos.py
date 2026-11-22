@@ -7,7 +7,6 @@ from flask import Blueprint, current_app, jsonify, request, send_file
 from flask_login import current_user, login_required
 from sqlalchemy import func, or_
 
-from constantes import MAX_SALVARRACHAS
 from cosmeticos import COFRE_POR_CLAVE, COFRES, POR_CLAVE, TIPOS
 from models import (CompletedLevel, DailyChallenge, EquippedCosmetics, Friendship, LessonDone, OpenedChest, OwnedCosmetic, Profile,
                     ProfilePhoto, User, db)
@@ -126,7 +125,8 @@ def abrir_cofre():
     premio = c["premio"]
     apply_reward(perfil, {k: premio[k] for k in ("diamante", "xp", "vidas") if k in premio})
     if premio.get("salvarrachas"):
-        perfil.salvarrachas = min(MAX_SALVARRACHAS, perfil.salvarrachas + premio["salvarrachas"])
+        from servicios.perfil import dar_salvarrachas
+        dar_salvarrachas(perfil, premio["salvarrachas"])   # los cofres de logro pueden pasar de 2
     lista = premio.get("cosmetico")
     for clave in (lista if isinstance(lista, list) else [lista] if lista else []):
         dar_cosmetico(current_user.id, clave, "cofre")
@@ -272,10 +272,13 @@ def _datos_widget(usuario):
     xp_hoy = act.xp if act else 0
     meta_xp = max(10, p.meta_minutos * 3)
     hora = ahora.hour
+    medianoche = (ahora + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    restantes = int((medianoche - ahora).total_seconds())
+    urgente = restantes <= 3 * 3600          # como Duolingo: en rojo cuando quedan menos de 3 horas
     if practicado:
         estado = "¡Ya practicaste hoy! 💪"
     elif racha:
-        estado = f"⚠️ Practica antes de medianoche o pierdes tu racha de {racha}" if hora >= 18 else "Practica hoy para no perder tu racha"
+        estado = f"⚠️ Quedan menos de 3 horas: practica o pierdes tu racha de {racha}" if urgente else "Practica hoy para no perder tu racha"
     else:
         estado = "Empieza tu racha hoy"
     base = request.host_url.rstrip("/")
@@ -289,15 +292,20 @@ def _datos_widget(usuario):
     if practicado:
         animo = "fuego" if racha >= 7 else "feliz"
     elif racha:
-        animo = "alarma" if hora >= 18 else "preocupado"
+        animo = "alarma" if urgente else "preocupado"
     else:
         animo = "dormido"
-    medianoche = (ahora + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     return dict(
-        animo=animo, segundos_restantes=int((medianoche - ahora).total_seconds()), encargos=encargos,
+        animo=animo, segundos_restantes=restantes, urgente=urgente and not practicado, fin_del_dia=medianoche.isoformat(),
+        quedan_texto=f"{restantes // 3600} h {restantes % 3600 // 60:02d} min",
+        reloj_color="Good" if practicado else ("Attention" if urgente else "Warning"),
+        reloj_titulo=("Tu racha está a salvo hoy" if practicado else
+                      f"Quedan para salvar tu racha de {racha}" if racha else "Quedan para empezar tu racha"),
+        url_mascota=f"{base}/img/codi/{animo}.png", encargos=encargos,
         encargos_hechos=sum(1 for e in encargos if e["completado"]), pregunta=_pregunta_rapida(usuario, p),
         racha=racha, racha_maxima=p.racha_maxima, xp=p.xp_total, diamantes=p.diamante, meta=p.meta_minutos,
         nombre=(usuario.nombre or "").split(" ")[0], practicado_hoy=practicado, estado=estado, salvarrachas=p.salvarrachas,
+        dias_para_salvarrachas=10 - racha % 10, semana_dias=sum(1 for x in semana if x["icono"] == "🔥"),
         semana=semana, semana_texto=" ".join(x["icono"] for x in semana), xp_hoy=xp_hoy, meta_xp=meta_xp,
         progreso_hoy=min(100, round(xp_hoy * 100 / meta_xp)), vidas=p.vidas,
         mes=hoy.strftime("%m/%Y"), titulo=f"🔥 {racha} día{'s' if racha != 1 else ''}",

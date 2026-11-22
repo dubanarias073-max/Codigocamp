@@ -139,6 +139,8 @@ try {
 } catch { /* se intenta la próxima vez */ }
 await cargarLista();
 { const c = Number(new URLSearchParams(location.search).get("c")); if (c) await abrirConv(c, { empujar: false }); else pintarHistorial(); }
+// ?q=… (por ejemplo desde «¿Por qué?» de un reto): deja la pregunta escrita para enviarla
+{ const q = new URLSearchParams(location.search).get("q"); if (q) { const t = document.getElementById("q"); t.value = q.slice(0, 4000); t.dispatchEvent(new Event("input")); t.focus(); } }
 
 /* ===== Sugerencias según el curso ===== */
 const curso = prog.curso_actual?.nombre;

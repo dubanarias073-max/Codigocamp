@@ -1,3 +1,4 @@
+import { ACCESORIOS_CODI, codiSVG, ponerAccesorioCodi } from "/js/codi.js";
 // Cosméticos de la tienda y los cofres: cómo se ve cada fondo, puntero, tema, marco, efecto y rastro, y cómo se aplican
 // en todas las páginas. Todo es original (CSS, SVG y canvas), sin imágenes externas.
 const svg = (cuerpo, w = 32, h = 32) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 32 32">${cuerpo}</svg>`)}`;
@@ -9,6 +10,10 @@ const reducido = () => { try { if (localStorage.getItem("cc_menos_mov") === "1")
 const FLECHA = (r, b, extra = "") => `<path d="M3 3l20 8.5-8.4 2.6L12 23z" fill="${r}" stroke="${b}" stroke-width="1.8" stroke-linejoin="round"/>${extra}`;
 export const CURSORES = {
   cursor_cohete: { x: 3, y: 3, c: ["#e5e7eb", "#1f2937", '<path d="M24 25l2 5 2-2-1-3z" fill="#f97316"/>'], svg: '<path d="M4 4l9 3 10 10-4 4L9 11z" fill="#e5e7eb" stroke="#1f2937" stroke-width="1.5" stroke-linejoin="round"/><circle cx="14" cy="13" r="2.2" fill="#38bdf8" stroke="#1f2937"/><path d="M19 21l3 6 3-3-2-5M21 17l6 3-3 3-5-2" fill="#f97316" stroke="#1f2937" stroke-linejoin="round"/>' },
+  cursor_nave: { x: 16, y: 2, c: ["#e2e8f0", "#0f172a", '<path d="M26 26h4v4h-4z" fill="#f97316"/>'], svg: '<g shape-rendering="crispEdges"><path d="M14 2h4v4h2v8h4v4h4v6h-4v-2h-4v4h-2v2h-8v-2h-2v-4H4v2H0v-6h4v-4h4V6h2V4h4z" fill="#e2e8f0" stroke="#0f172a" stroke-width="1"/><path d="M14 8h4v4h-4z" fill="#22d3ee"/><path d="M12 26h2v4h-2zM18 26h2v4h-2z" fill="#f97316"/></g>' },
+  cursor_mando: { x: 4, y: 4, c: ["#6366f1", "#1e1b4b", ""], svg: '<rect x="2" y="9" width="28" height="15" rx="7" fill="#6366f1" stroke="#1e1b4b" stroke-width="1.6"/><path d="M9 13v7M5.5 16.5h7" stroke="#e0e7ff" stroke-width="2.2" stroke-linecap="round"/><circle cx="22" cy="14.5" r="2" fill="#f43f5e"/><circle cx="25.5" cy="18" r="2" fill="#22c55e"/><path d="M2 2l6 2-3 1 2 3-1 1-2-3-1 3z" fill="#fff" stroke="#1e1b4b"/>' },
+  cursor_baculo: { x: 4, y: 4, c: ["#a16207", "#1c1917", ""], svg: '<path d="M8 8l20 20" stroke="#1c1917" stroke-width="5" stroke-linecap="round"/><path d="M8 8l20 20" stroke="#a16207" stroke-width="3" stroke-linecap="round"/><circle cx="7" cy="7" r="6" fill="#a855f7" stroke="#1c1917" stroke-width="1.5"/><circle cx="5" cy="5" r="2" fill="#f5d0fe"/>' },
+  cursor_pico: { x: 2, y: 2, c: ["#c084fc", "#2e1065", '<path d="M25 25h4v4h-4z" fill="#a16207" stroke="#2e1065"/>'], svg: '<g shape-rendering="crispEdges"><path d="M2 6h4V4h4V2h8v2h4v2h2v4h-2V8h-2V6h-4V4h-6v2H8v2H6v2H4V8H2z" fill="#c084fc" stroke="#2e1065" stroke-width="1"/><path d="M14 10h2v2h2v2h2v2h2v2h2v2h2v2h2v4h-4v-2h-2v-2h-2v-2h-2v-2h-2v-2h-2v-2h-2z" fill="#a16207" stroke="#2e1065" stroke-width="1"/><path d="M8 4h2v2H8zM18 4h2v2h-2z" fill="#f5d0fe"/></g>' },
   cursor_espada: { x: 2, y: 2, c: ["#cbd5e1", "#0f172a", '<path d="M25 25h4v4h-4z" fill="#facc15" stroke="#0f172a"/>'], svg: '<path d="M2 2h4v2h2v2h2v2h2v2h2v2h2v2h-2v2h-2v-2h-2v-2H10v-2H8v-2H6V8H4V6H2z" fill="#cbd5e1" stroke="#0f172a" stroke-width="1"/><path d="M16 18h2v-2h2v2h2v2h-2v2h-2v-2h-2z" fill="#a16207" stroke="#0f172a"/><path d="M22 22h4v4h-4z" fill="#facc15" stroke="#0f172a"/>' },
   cursor_varita: { x: 4, y: 4, c: ["#ddd6fe", "#5b21b6", '<path d="M27 22l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="#fde047" stroke="#a16207" stroke-width=".6"/>'], svg: '<path d="M10 10l17 17" stroke="#1f2937" stroke-width="5" stroke-linecap="round"/><path d="M10 10l17 17" stroke="#7c3aed" stroke-width="3" stroke-linecap="round"/><path d="M6 1l1.6 3.4L11 6 7.6 7.6 6 11 4.4 7.6 1 6l3.4-1.6z" fill="#fde047" stroke="#a16207"/>' },
   cursor_lapiz: { x: 2, y: 29, c: ["#fde68a", "#78350f", '<path d="M25 30l1-4 4-4 1 1-4 4z" fill="#f472b6"/>'], svg: '<path d="M3 29l2-7L22 5l5 5L10 27z" fill="#fbbf24" stroke="#1f2937" stroke-width="1.5" stroke-linejoin="round"/><path d="M3 29l2-7 5 5z" fill="#fde68a" stroke="#1f2937" stroke-linejoin="round"/><path d="M19 8l5 5" stroke="#1f2937"/><path d="M22 5l5 5 2-2-5-5z" fill="#f472b6" stroke="#1f2937"/>' },
@@ -81,6 +86,14 @@ export const TEMAS = {
   tema_aurora: { acc: "#4ade80", acc2: "#7c3aed", cy: "#22d3ee" },
   tema_aprendiz: { acc: "#a3e635", acc2: "#3f6212", cy: "#fde047" },
   tema_mito: { acc: "#f0abfc", acc2: "#a16207", cy: "#fde68a" },
+  tema_mazmorra: { acc: "#f97316", acc2: "#44403c", cy: "#fbbf24" },
+  tema_portatil: { acc: "#9bbc0f", acc2: "#306230", cy: "#8bac0f" },
+  tema_arcade: { acc: "#facc15", acc2: "#7c3aed", cy: "#f43f5e" },
+  tema_uva: { acc: "#c084fc", acc2: "#6b21a8", cy: "#a5b4fc" },
+  tema_naranja: { acc: "#fb923c", acc2: "#c2410c", cy: "#fde047" },
+  tema_chicle: { acc: "#f472b6", acc2: "#be185d", cy: "#7dd3fc" },
+  tema_jade: { acc: "#34d399", acc2: "#047857", cy: "#fcd34d" },
+  tema_medianoche: { acc: "#93c5fd", acc2: "#1e3a8a", cy: "#e2e8f0" },
 };
 
 // -------------------------------------------------------------------------------------- fondos ----
@@ -118,6 +131,18 @@ export const FONDOS = {
   fondo_crt: { css: "background:repeating-linear-gradient(0deg,rgba(0,0,0,.35) 0 1px,transparent 1px 3px),radial-gradient(ellipse at center,#064e3b 0%,#022c22 70%,#000 100%);animation:cc-titilar 4s ease-in-out infinite alternate", oscuro: true },
   fondo_nebulosa_rosa: { css: "background:radial-gradient(1px 1px at 15% 25%,#fff,transparent),radial-gradient(1.5px 1.5px at 65% 15%,#fff,transparent),radial-gradient(1px 1px at 80% 75%,#fff,transparent),radial-gradient(1px 1px at 35% 85%,#fff,transparent),radial-gradient(45% 40% at 30% 40%,rgba(236,72,153,.55),transparent 70%),radial-gradient(40% 45% at 70% 60%,rgba(139,92,246,.55),transparent 70%),radial-gradient(35% 30% at 55% 30%,rgba(56,189,248,.35),transparent 70%),#0b0418;background-size:250px 250px,320px 320px,280px 280px,300px 300px,200% 200%,200% 200%,200% 200%,100% 100%;animation:cc-aurora 22s ease-in-out infinite alternate", oscuro: true },
   fondo_oceano_profundo: { css: "background:radial-gradient(4px 4px at 20% 80%,rgba(255,255,255,.5),transparent),radial-gradient(3px 3px at 60% 90%,rgba(255,255,255,.4),transparent),radial-gradient(5px 5px at 80% 70%,rgba(255,255,255,.35),transparent),repeating-linear-gradient(100deg,transparent 0 80px,rgba(125,211,252,.08) 80px 120px),linear-gradient(180deg,#0e7490 0%,#0c4a6e 35%,#082f49 70%,#020617 100%);background-size:200px 300px,260px 360px,300px 420px,200% 100%,100% 100%;animation:cc-olas 14s linear infinite", oscuro: true },
+  fondo_mazmorra: { css: `background:url("${svg('<g shape-rendering="crispEdges"><rect width="32" height="32" fill="#292524"/><g fill="#44403c"><rect x="1" y="1" width="14" height="6"/><rect x="17" y="1" width="14" height="6"/><rect x="9" y="9" width="14" height="6"/><rect x="-7" y="9" width="14" height="6"/><rect x="25" y="9" width="14" height="6"/><rect x="1" y="17" width="14" height="6"/><rect x="17" y="17" width="14" height="6"/><rect x="9" y="25" width="14" height="6"/><rect x="-7" y="25" width="14" height="6"/><rect x="25" y="25" width="14" height="6"/></g></g>', 32, 32)}") 0 0/96px 96px,#1c1917;background-blend-mode:normal`, oscuro: true },
+  fondo_espacial: { css: `background:url("${svg('<g shape-rendering="crispEdges"><path d="M6 10h2v2h2v4H4v-4h2z" fill="#22d3ee"/><path d="M6 16h2v2H6z" fill="#f97316"/><path d="M24 22h2v2h2v2h-6v-2h2z" fill="#f472b6"/><rect x="14" y="4" width="1" height="1" fill="#fff"/><rect x="28" y="12" width="1" height="1" fill="#fff"/><rect x="18" y="28" width="1" height="1" fill="#fff"/><rect x="2" y="26" width="1" height="1" fill="#fde047"/></g>', 32, 32)}") 0 0/120px 120px,radial-gradient(ellipse at 50% 0,#1e1b4b,#020617 70%);animation:cc-olas 30s linear infinite`, oscuro: true },
+  fondo_pista: { css: "background:repeating-conic-gradient(#0f172a 0 25%,#f8fafc 0 50%) 0 0/24px 24px,#111;background:linear-gradient(90deg,transparent 46%,#facc15 46% 47%,transparent 47% 53%,#facc15 53% 54%,transparent 54%),repeating-linear-gradient(#475569 0 40px,#334155 40px 80px),repeating-conic-gradient(#0f172a 0 25%,#f8fafc 0 50%) 0 0/24px 24px", oscuro: true },
+  fondo_portatil: { css: "background:radial-gradient(circle,rgba(15,56,15,.35) 1px,transparent 1.5px) 0 0/5px 5px,linear-gradient(#9bbc0f,#8bac0f)" },
+  fondo_arcade: { css: "background:repeating-linear-gradient(0deg,rgba(0,0,0,.25) 0 2px,transparent 2px 4px),repeating-linear-gradient(90deg,rgba(244,63,94,.5) 0 2px,transparent 2px 56px) 0 100%/100% 40% no-repeat,repeating-linear-gradient(0deg,rgba(250,204,21,.45) 0 2px,transparent 2px 28px) 0 100%/100% 40% no-repeat,radial-gradient(2px 2px at 20% 18%,#fff,transparent),radial-gradient(2px 2px at 70% 12%,#fff,transparent),radial-gradient(2px 2px at 45% 30%,#facc15,transparent),linear-gradient(#0f0524,#3b0764 58%,#1e0336)", oscuro: true },
+  fondo_islas: { css: `background:url("${svg('<g shape-rendering="crispEdges"><rect x="4" y="18" width="14" height="3" fill="#a855f7"/><rect x="6" y="21" width="10" height="3" fill="#6d28d9"/><rect x="9" y="24" width="4" height="3" fill="#4c1d95"/><rect x="11" y="13" width="2" height="5" fill="#f472b6"/><rect x="9" y="11" width="6" height="3" fill="#f9a8d4"/><rect x="22" y="6" width="6" height="2" fill="#fff" fill-opacity=".7"/><rect x="20" y="8" width="10" height="2" fill="#fff" fill-opacity=".7"/></g>', 32, 32)}") 0 0/160px 160px,linear-gradient(#38bdf8,#a5b4fc 55%,#f0abfc)` },
+  fondo_cueva: { css: `background:url("${svg('<g shape-rendering="crispEdges"><path d="M6 26h2v-6h2v-4h2v4h2v6h2z" fill="#22d3ee" fill-opacity=".7"/><path d="M10 16h2v4h-2z" fill="#ecfeff"/><path d="M22 28h2v-4h2v-3h2v3h2v4z" fill="#c084fc" fill-opacity=".7"/><rect x="2" y="4" width="3" height="2" fill="#334155"/><rect x="18" y="10" width="2" height="2" fill="#334155"/></g>', 32, 32)}") 0 0/128px 128px,radial-gradient(ellipse at 50% 100%,rgba(34,211,238,.25),transparent 60%),linear-gradient(#020617,#111827 60%,#0b1120)`, oscuro: true },
+  fondo_caramelo: { css: "background:repeating-linear-gradient(135deg,#fce7f3 0 28px,#fbcfe8 28px 56px,#fff 56px 70px)" },
+  fondo_desierto: { css: "background:radial-gradient(circle at 72% 30%,#fef3c7 0 7%,#fde68a 8%,transparent 22%),radial-gradient(120% 40% at 30% 100%,#b45309 40%,transparent 41%),radial-gradient(110% 45% at 85% 100%,#d97706 45%,transparent 46%),linear-gradient(#fdba74,#fcd34d 55%,#f59e0b)" },
+  fondo_binario: { css: `background:url("${svg('<g font-family="monospace" font-size="7" font-weight="700" fill="#22c55e" fill-opacity=".45"><text x="1" y="8">10</text><text x="17" y="15">01</text><text x="4" y="24">0</text><text x="21" y="30">1</text></g>', 32, 32)}") 0 0/64px 64px,radial-gradient(ellipse at 50% 30%,#052e16,#020617 70%)`, oscuro: true },
+  fondo_arrecife: { css: "background:radial-gradient(5px 5px at 18% 70%,rgba(255,255,255,.55),transparent),radial-gradient(4px 4px at 42% 82%,rgba(255,255,255,.45),transparent),radial-gradient(6px 6px at 76% 64%,rgba(255,255,255,.5),transparent),radial-gradient(60% 30% at 20% 100%,#f472b6 40%,transparent 41%),radial-gradient(50% 25% at 80% 100%,#fb923c 40%,transparent 41%),linear-gradient(#5eead4,#0891b2 55%,#155e75)", oscuro: true },
+  fondo_marte: { css: "background:radial-gradient(circle at 80% 18%,#fecaca 0 2%,transparent 2.5%),radial-gradient(circle at 70% 26%,#fde68a 0 1.2%,transparent 1.6%),radial-gradient(1px 1px at 20% 20%,#fff,transparent),radial-gradient(1px 1px at 40% 10%,#fff,transparent),radial-gradient(1px 1px at 60% 35%,#fff,transparent),radial-gradient(140% 50% at 50% 115%,#c2410c 45%,#7c2d12 60%,transparent 61%),linear-gradient(#1c0a05,#431407 60%,#7c2d12)", oscuro: true },
   fondo_aurora_polar: { css: "background:radial-gradient(70% 40% at 30% 25%,rgba(52,211,153,.55),transparent 70%),radial-gradient(60% 35% at 70% 20%,rgba(34,211,238,.45),transparent 70%),radial-gradient(50% 30% at 50% 35%,rgba(167,139,250,.4),transparent 70%),linear-gradient(180deg,#020617 0%,#0f172a 60%,#e2e8f0 60.3%,#cbd5e1 100%);background-size:200% 200%,200% 200%,200% 200%,100% 100%;animation:cc-aurora 12s ease-in-out infinite alternate", oscuro: true },
 };
 
@@ -147,6 +172,15 @@ export const MARCOS = {
   marco_lava: "background:conic-gradient(#1c1917,#dc2626,#1c1917,#f97316,#1c1917,#facc15,#1c1917);box-shadow:0 0 16px rgba(220,38,38,.75);animation:cc-rot 5s linear infinite",
   marco_aurora: "background:conic-gradient(#4ade80,#22d3ee,#a78bfa,#f0abfc,#22d3ee,#4ade80);box-shadow:0 0 18px rgba(74,222,128,.55),0 0 30px rgba(167,139,250,.35);animation:cc-rot 6s linear infinite",
   marco_estelar: "background:radial-gradient(circle at 20% 20%,#fff 0 6%,transparent 7%),radial-gradient(circle at 80% 30%,#fff 0 5%,transparent 6%),radial-gradient(circle at 40% 85%,#fff 0 5%,transparent 6%),conic-gradient(#1e1b4b,#6366f1,#1e1b4b,#a855f7,#1e1b4b);box-shadow:0 0 14px rgba(129,140,248,.7);animation:cc-rot 9s linear infinite",
+  marco_jefe: "background:conic-gradient(#450a0a,#dc2626,#000,#7f1d1d,#f43f5e,#000,#450a0a);box-shadow:0 0 18px rgba(220,38,38,.8);animation:cc-rot 1.4s linear infinite",
+  marco_vida: "background:repeating-conic-gradient(#ef4444 0 26deg,#1f2937 26deg 30deg);box-shadow:0 0 10px rgba(239,68,68,.6)",
+  marco_nivel_up: "background:conic-gradient(#fde047,#22d3ee,#fff,#a3e635,#fde047);box-shadow:0 0 20px 5px rgba(253,224,71,.7);animation:cc-rot 2.4s linear infinite",
+  marco_arcade: "background:repeating-conic-gradient(#facc15 0 15deg,#7c3aed 15deg 30deg,#f43f5e 30deg 45deg,#22d3ee 45deg 60deg);box-shadow:0 0 14px rgba(250,204,21,.7);animation:cc-rot 2s steps(8) infinite",
+  marco_caramelo: "background:repeating-conic-gradient(#ef4444 0 20deg,#fff 20deg 40deg);animation:cc-rot 6s linear infinite",
+  marco_binario: "background:repeating-conic-gradient(#22c55e 0 6deg,#052e16 6deg 10deg,#4ade80 10deg 13deg,#052e16 13deg 20deg);box-shadow:0 0 12px rgba(34,197,94,.6);animation:cc-rot 4s steps(18) infinite",
+  marco_uva: "background:#a855f7;box-shadow:0 0 0 2px #581c87",
+  marco_zafiro: "background:conic-gradient(#1e3a8a,#3b82f6,#dbeafe,#1d4ed8,#93c5fd,#1e3a8a);box-shadow:0 0 16px rgba(59,130,246,.75),inset 0 0 5px #fff;animation:cc-rot 5s linear infinite",
+  marco_trofeo: "background:conic-gradient(#fef3c7,#f59e0b,#16a34a,#fde047,#b45309,#22c55e,#fef3c7);box-shadow:0 0 22px 6px rgba(245,158,11,.75),0 0 0 2px #fde68a;animation:cc-rot 3s linear infinite",
   marco_cristal: "background:conic-gradient(#ecfeff,#a5f3fc,#f0abfc,#ecfeff,#bae6fd,#fde68a,#ecfeff);box-shadow:0 0 16px rgba(165,243,252,.9),inset 0 0 6px #fff;animation:cc-rot 4s linear infinite",
 };
 
@@ -161,7 +195,13 @@ const CSS_BASE = `
 #cc-fondo canvas{width:100%;height:100%;display:block}
 html.cc-con-fondo body{background:transparent!important}
 #cc-fondo::after{content:"";position:absolute;inset:0;background:var(--cc-velo,transparent)}
-html.cc-con-fondo :is(.tarjeta,.lado,.inf,.cab,header,nav,aside,.ruta,.teoria,.explorador,.asistente,.editor-tarjeta,.ide-barra,.ide-estado,.lab,.panel,.chat,.pe-cab,.r-pie){-webkit-backdrop-filter:blur(8px) saturate(1.25);backdrop-filter:blur(8px) saturate(1.25)}
+html.cc-con-fondo :is(.area-editor,.editores,.editor-dividido,.ed-monaco,.monaco-editor,.aula .ed-monaco,.aula #ed){background:var(--cc-panel-solido)!important}
+html.cc-con-fondo .pantalla-reto{background-color:transparent}
+html.cc-con-fondo .r-pie{background:color-mix(in srgb,var(--cc-bg-solido) 62%,transparent)!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+html.cc-con-fondo .r-pie.bien{background:color-mix(in srgb,var(--acc) 28%,color-mix(in srgb,var(--cc-bg-solido) 55%,transparent))!important}
+html.cc-con-fondo .r-pie.mal{background:color-mix(in srgb,var(--rojo,#ef4444) 26%,color-mix(in srgb,var(--cc-bg-solido) 55%,transparent))!important}
+html.cc-con-fondo .r-enunciado h1,html.cc-con-fondo .pantalla-reto .tarjeta{-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+html.cc-con-fondo :is(.tarjeta,.lado,.inf,.cab,header,nav,aside,.ruta,.teoria,.explorador,.asistente,.editor-tarjeta,.ide-barra,.ide-estado,.lab,.panel,.chat,.pe-cab,.r-pie){-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3)}
 html.cc-con-fondo :is(dialog,[role=dialog],[role=menu],[role=listbox],.ide-dialogo,.ide-menu,.ide-avisos,.ide-aviso,.modal,.menu,.toast,.aviso,select option){--panel:var(--cc-panel-solido)!important;--panel2:var(--cc-panel2-solido)!important;--surf:var(--cc-surf-solido)!important;--bg:var(--cc-bg-solido)!important}
 .cc-marco{position:relative;display:inline-grid;place-items:center;border-radius:50%;padding:4px;isolation:isolate}
 .cc-marco::before{content:"";position:absolute;inset:0;border-radius:50%;z-index:-1}
@@ -336,6 +376,11 @@ export const EFECTOS = {
   efecto_codigo: (x, y) => { const t = ["{ }", "</>", "01", ";", "=>", "()", "[ ]", "#"]; for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; texto(x, y, t[i % t.length], { color: ["#4ade80", "#22d3ee", "#facc15"][i % 3], tam: 13, dx: Math.cos(a) * 70, dy: Math.sin(a) * 70, dur: 800 }); } },
   efecto_ondas: (x, y) => { [0, 140, 280].forEach((d, k) => setTimeout(() => onda(x, y, ["#38bdf8", "#7dd3fc", "#bae6fd"][k], 3.6 + k), d)); },
   efecto_emojis: (x, y) => { const e = ["🎉", "✨", "🔥", "🚀", "💯", "⭐"]; for (let i = 0; i < 7; i++) texto(x, y, e[(Math.random() * e.length) | 0], { color: "transparent", tam: 18 + Math.random() * 8, dx: (Math.random() - .5) * 140, dy: -50 - Math.random() * 90, dur: 1100, emoji: true }); },
+  efecto_critico: (x, y) => { texto(x, y, "¡CRÍTICO!", { color: "#ef4444", tam: 20, dx: 0, dy: -55, dur: 850 }); for (let i = 0; i < 10; i++) { const a = Math.random() * Math.PI * 2; particula(x, y, { color: ["#ef4444", "#fde047"][i % 2], tam: 6, dx: Math.cos(a) * 60, dy: Math.sin(a) * 60, dur: 500, forma: "pixel" }); } },
+  efecto_xp: (x, y) => { for (let i = 0; i < 8; i++) particula(x, y, { color: ["#a3e635", "#4ade80", "#fde047"][i % 3], tam: 7 + Math.random() * 6, dx: (Math.random() - .5) * 60, dy: -50 - Math.random() * 60, dur: 900 + Math.random() * 400, forma: "punto" }); texto(x, y, "+XP", { color: "#a3e635", tam: 15, dx: 0, dy: -45, dur: 800 }); },
+  efecto_teletransporte: (x, y) => { particula(x, y, { color: "#22d3ee", tam: 30, dx: 0, dy: 0, dur: 600, forma: "burbuja" }); particula(x, y, { color: "#a855f7", tam: 16, dx: 0, dy: 0, dur: 700, forma: "burbuja" }); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; particula(x + Math.cos(a) * 40, y + Math.sin(a) * 40, { color: "#67e8f9", tam: 5, dx: -Math.cos(a) * 40, dy: -Math.sin(a) * 40, dur: 500, forma: "pixel" }); } },
+  efecto_bloques: (x, y) => { const c = ["#78716c", "#a8a29e", "#57534e", "#d6d3d1"]; for (let i = 0; i < 12; i++) { const a = -Math.PI * Math.random(); particula(x, y, { color: c[i % c.length], tam: 7 + Math.random() * 7, dx: Math.cos(a) * (20 + Math.random() * 60), dy: 40 + Math.random() * 70, dur: 650 + Math.random() * 300, forma: "pixel" }); } },
+  efecto_combo: (x, y) => { const t = ["+100", "COMBO!", "x2", "NICE!", "+1UP"][Math.floor(Math.random() * 5)]; texto(x, y, t, { color: ["#facc15", "#22d3ee", "#f472b6", "#4ade80"][Math.floor(Math.random() * 4)], tam: 18, dx: (Math.random() - .5) * 30, dy: -60, dur: 900 }); for (let i = 0; i < 6; i++) particula(x, y, { color: "#facc15", tam: 8, dx: (Math.random() - .5) * 70, dy: -20 - Math.random() * 50, dur: 600, forma: "estrella" }); },
   efecto_pixeles: (x, y) => { const c = ["#f43f5e", "#facc15", "#4ade80", "#22d3ee", "#a855f7", "#fb923c"]; for (let i = 0; i < 20; i++) { const a = Math.random() * Math.PI * 2, d = 30 + Math.random() * 80; particula(x, y, { color: c[i % c.length], tam: 6, dx: Math.cos(a) * d, dy: Math.sin(a) * d + 20, dur: 700 + Math.random() * 300, forma: "pixel" }); } },
   efecto_supernova: (x, y) => { onda(x, y, "#fde68a", 6); setTimeout(() => onda(x, y, "#c084fc", 8), 90); for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2; particula(x, y, { color: i % 2 ? "#fff" : "#f0abfc", tam: i % 3 ? 4 : 9, dx: Math.cos(a) * 110, dy: Math.sin(a) * 110, dur: 1000, forma: i % 3 ? "punto" : "estrella" }); } },
   efecto_fuegos: (x, y) => { const c = ["#f43f5e", "#facc15", "#22d3ee", "#a855f7", "#4ade80", "#fb923c"]; const base = c[(Math.random() * c.length) | 0]; for (let i = 0; i < 28; i++) { const a = (i / 28) * Math.PI * 2, d = 70 + Math.random() * 50; particula(x, y, { color: i % 3 ? base : "#fff", tam: 4 + Math.random() * 3, dx: Math.cos(a) * d, dy: Math.sin(a) * d + 20, dur: 900 + Math.random() * 500, forma: "punto" }); } },
@@ -360,6 +405,8 @@ function texto(x, y, ch, { color, tam, dx, dy, dur, emoji = false, girar = 0 }) 
 }
 /** Cada estela: mover(x, y, i) se llama mientras el dedo se desliza; tocar(x, y) al apoyar el dedo. */
 export const DEDOS = {
+  dedo_turbo: { mover: (x, y) => particula(x, y, { color: ["#f97316", "#fde047", "#ef4444"][Math.floor(Math.random() * 3)], tam: 6 + Math.random() * 4, dx: (Math.random() - .5) * 10, dy: 8 + Math.random() * 14, dur: 500, forma: "pixel" }) },
+  dedo_orbes: { mover: (x, y, i) => { if (i % 2 === 0) particula(x, y, { color: ["#a3e635", "#4ade80"][i % 4 ? 0 : 1], tam: 8, dx: (Math.random() - .5) * 16, dy: -18 - Math.random() * 16, dur: 800, forma: "punto" }); } },
   dedo_tinta: { mover: (x, y) => particula(x, y, { color: "#3b82f6", tam: 7 + Math.random() * 6, dx: (Math.random() - .5) * 6, dy: 10 + Math.random() * 10, dur: 700, forma: "punto" }) },
   dedo_burbujas: { mover: (x, y, i) => { if (i % 2) particula(x, y, { color: "#7dd3fc", tam: 8 + Math.random() * 12, dx: (Math.random() - .5) * 30, dy: -40 - Math.random() * 50, dur: 1000, forma: "burbuja" }); } },
   dedo_neon: { mover: (x, y) => particula(x, y, { color: "#22d3ee", tam: 9, dx: 0, dy: 0, dur: 520, forma: "punto" }) },
@@ -401,7 +448,7 @@ function onda(x, y, color, escala = 2.6) {
   document.body.appendChild(p);
   p.animate([{ transform: "translate(-50%,-50%) scale(.4)", opacity: .9 }, { transform: `translate(-50%,-50%) scale(${escala})`, opacity: 0 }], { duration: 450, easing: "ease-out" }).onfinish = () => p.remove();
 }
-const COLOR_DEDO = { dedo_tinta: "#3b82f6", dedo_burbujas: "#7dd3fc", dedo_neon: "#22d3ee", dedo_codigo: "#4ade80", dedo_arcoiris: "#f59e0b", dedo_fuego: "#f97316", dedo_galaxia: "#c084fc",
+const COLOR_DEDO = { dedo_turbo: "#f97316", dedo_orbes: "#a3e635", dedo_tinta: "#3b82f6", dedo_burbujas: "#7dd3fc", dedo_neon: "#22d3ee", dedo_codigo: "#4ade80", dedo_arcoiris: "#f59e0b", dedo_fuego: "#f97316", dedo_galaxia: "#c084fc",
   dedo_estrellas: "#facc15", dedo_nieve: "#bae6fd", dedo_corazones: "#f43f5e", dedo_pixeles: "#a855f7", dedo_rayo: "#fde047", dedo_sakura: "#f472b6", dedo_cometa: "#38bdf8",
   dedo_hojas: "#f97316", dedo_notas: "#a855f7", dedo_confeti: "#f43f5e", dedo_luciernagas: "#fde047", dedo_humo: "#a78bfa", dedo_dragon: "#f97316", dedo_mito: "#f0abfc" };
 
@@ -533,6 +580,7 @@ export function aplicarCosmeticos(eq = {}, { fondo = true } = {}) {
   estilo("cc-cosmeticos-base", CSS_BASE);
   const html = document.documentElement;
   try { localStorage.setItem("cc_cosm", JSON.stringify(eq)); } catch { /* sin almacenamiento */ }
+  ponerAccesorioCodi(eq.codi);   // Codi se pone (o se quita) su accesorio en toda la página
   // Tema de color
   const t = TEMAS[eq.tema];
   estilo("cc-cosm-tema", t ? `:root,:root body,:root[data-tema] body{--acc:${t.acc}!important;--acc2:${t.acc2}!important;--cy:${t.cy}!important}` : "");
@@ -562,13 +610,15 @@ input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button
   // Efecto (clic) y estela del dedo (celular)
   activarEfecto(eq.efecto);
   activarDedo(eq.dedo);
+  // Decoración de temporada (Navidad, Halloween…): automática y sin tocar tus cosméticos
+  import("/js/temporada.js").then((m) => m.aplicarTemporada()).catch(() => {});
 }
 
 /* Con un fondo comprado los paneles se vuelven translúcidos (se ve el fondo) pero conservan
    suficiente color para leer bien. Menús, diálogos, editor y terminal siguen opacos. */
-const ALFA = { panel: 56, panel2: 62, surf: 56, surf2: 56, surf3: 56, "lado-bg": 50, bg: 30, "chip-bg": 66, "campo-bg": 80,
-  "unidad-bg": 52, "sec-bg": 64, "inf-bg": 60, "pie-bg": 66, "guia-bg": 64, "pieza-bg": 70, "nodo-bg": 74, "caja-bg": 58,
-  "mix-a": 58, "mix-b": 58, "mes-b-bg": 64, "lab-top": 70, "onb-form-bg": 74 };
+const ALFA = { panel: 44, panel2: 52, surf: 44, surf2: 44, surf3: 44, "lado-bg": 38, bg: 22, "chip-bg": 56, "campo-bg": 72,
+  "unidad-bg": 40, "sec-bg": 52, "inf-bg": 48, "pie-bg": 56, "guia-bg": 52, "pieza-bg": 62, "nodo-bg": 66, "caja-bg": 46,
+  "mix-a": 46, "mix-b": 46, "mes-b-bg": 52, "lab-top": 62, "onb-form-bg": 66 };
 const PRIMER_COLOR = /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|color\([^)]*\)/i;
 let observadorTema = null;
 function luminancia(color) {
@@ -633,6 +683,9 @@ export function vistaPrevia(el, clave, tipo) {
     el.style.touchAction = "none";   // dentro de la tarjeta, deslizar dibuja (no mueve la página)
     el.__quitarDedo?.();
     el.__quitarDedo = seguirDedo(el, clave);
+  } else if (tipo === "codi" && ACCESORIOS_CODI[clave]) {
+    el.classList.add("cc-prev-codi");
+    el.innerHTML = codiSVG("saludo", { tam: 118, accesorio: clave }).replace("<svg ", "<svg data-fijo ");
   } else if (tipo === "efecto") {
     el.innerHTML = '<span class="cc-prev-efecto">Haz clic aquí</span>';
     el.onpointerdown = (e) => { const fn = EFECTOS[clave]; if (fn) fn(e.clientX, e.clientY); else for (let i = 0; i < 6; i++) particula(e.clientX, e.clientY, { color: "#facc15", tam: 9, dx: (Math.random() - .5) * 40, dy: 20 + Math.random() * 20, dur: 700, forma: "estrella" }); };

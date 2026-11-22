@@ -7,7 +7,10 @@ html,body{margin:0;height:100%}
 body{font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--txt);background:linear-gradient(145deg,var(--bg1),var(--bg2));overflow:hidden}
 .wg{display:flex;flex-direction:column;gap:8px;height:100%;min-height:150px;padding:max(10px,env(safe-area-inset-top)) 12px max(10px,env(safe-area-inset-bottom))}
 .wg-cab{display:flex;align-items:center;gap:8px}
-.wg-tabs{display:flex;gap:4px;flex:1;min-width:0}
+.wg-tabs{display:flex;gap:4px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.wg-tabs::-webkit-scrollbar{display:none}
+.wg-vidas{flex:none;white-space:nowrap}
+@media (max-width:440px){.wg-tabs button span{display:none}.wg-tabs button{padding:3px 8px;font-size:14px}}
 .wg-tabs button{flex:0 1 auto;padding:3px 8px;border:1px solid var(--borde);border-radius:99px;background:none;color:var(--sub);font:600 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
 .wg-tabs button[aria-selected="true"]{color:var(--txt);border-color:var(--verde);background:color-mix(in srgb,var(--verde) 14%,transparent)}
 .wg-vidas{font-weight:700;font-size:12px;white-space:nowrap}
@@ -35,33 +38,7 @@ body{font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:v
 
 /* ===== Codi, la mascota ===== */
 .wg-codi{display:flex;align-items:center;gap:10px;min-height:0}
-.codi{width:clamp(58px,26vmin,104px);height:auto;flex:none;overflow:visible;animation:cd-flota 3.2s ease-in-out infinite;transform-origin:50% 90%}
-.cd-cuerpo{fill:#22c55e;stroke:#0f5132;stroke-width:3}
-.cd-fuego .cd-cuerpo{fill:#fb923c;stroke:#9a3412}
-.cd-alarma .cd-cuerpo{fill:#f87171;stroke:#7f1d1d}
-.cd-preocupado .cd-cuerpo{fill:#facc15;stroke:#854d0e}
-.cd-dormido .cd-cuerpo{fill:#94a3b8;stroke:#334155}
-.cd-ojo{fill:#fff}.cd-pupila{fill:#0b1020}
-.cd-linea{fill:none;stroke:#0b1020;stroke-width:3.2;stroke-linecap:round}
-.cd-boca{fill:#0b1020}
-.cd-mejilla{fill:#fff;opacity:.35}
-.cd-tag{font:800 13px ui-monospace,Consolas,monospace;fill:#0b1020;text-anchor:middle;opacity:.55}
-.cd-llama{fill:#ff9f1c;stroke:#c2410c;stroke-width:2;transform-origin:48px 30px;animation:cd-llama .5s ease-in-out infinite alternate}
-.cd-z{font:800 14px system-ui;fill:var(--sub);animation:cd-z 2.4s ease-in-out infinite}.cd-z2{font-size:11px;animation-delay:.8s}
-.cd-gota{fill:#60a5fa;animation:cd-gota 1.6s ease-in infinite}
-.cd-excl{font:900 26px system-ui;fill:#ff6b6b;animation:cd-late .6s ease-in-out infinite alternate}
-.cd-brillo{fill:#fde047;animation:cd-late 1.2s ease-in-out infinite alternate;transform-origin:80px 25px}
-.cd-alarma{animation:cd-tiembla .35s linear infinite}
-.cd-dormido{animation:cd-respira 4s ease-in-out infinite}
-.cd-fuego{animation:cd-salta 1s ease-in-out infinite}
-@keyframes cd-flota{50%{transform:translateY(-4px)}}
-@keyframes cd-salta{0%,100%{transform:translateY(0) scale(1,1)}40%{transform:translateY(-8px) scale(.96,1.04)}60%{transform:translateY(0) scale(1.04,.96)}}
-@keyframes cd-tiembla{0%,100%{transform:rotate(0)}25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
-@keyframes cd-respira{50%{transform:scale(1.03,.97)}}
-@keyframes cd-llama{to{transform:scale(1.08,.92) skewX(-4deg)}}
-@keyframes cd-z{0%{opacity:0;transform:translate(0,6px)}40%{opacity:1}100%{opacity:0;transform:translate(6px,-8px)}}
-@keyframes cd-gota{0%{opacity:0;transform:translateY(-4px)}30%{opacity:1}100%{opacity:0;transform:translateY(10px)}}
-@keyframes cd-late{to{transform:scale(1.25);opacity:.75}}
+.codi{width:clamp(64px,28vmin,112px);height:auto;flex:none;overflow:visible}
 @media (prefers-reduced-motion:reduce){.codi,.codi *{animation:none!important}}
 .wg-globo{position:relative;display:grid;gap:2px;min-width:0;padding:8px 10px;border-radius:14px;background:color-mix(in srgb,var(--txt) 8%,transparent);border:1px solid var(--borde)}
 .wg-globo::before{content:"";position:absolute;left:-7px;top:50%;margin-top:-6px;border:6px solid transparent;border-right-color:var(--borde);border-left:0}
@@ -69,6 +46,23 @@ body{font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:v
 .wg-num small{font-size:12px;color:var(--sub);font-weight:600}
 .wg-globo span{font-size:12.5px;font-weight:600}
 .wg-cuenta{color:var(--fuego)}
+.wg-cuenta.rojo,.wg.urgente .wg-cuenta{color:var(--rojo);font-weight:800}
+/* ===== Reloj: horas que quedan del día (rojo con menos de 3 horas) ===== */
+.wg-reloj{display:flex;align-items:center;gap:12px;min-height:0;padding:6px 10px;border-radius:16px;border:1px solid var(--borde);background:color-mix(in srgb,var(--fuego) 7%,transparent)}
+.wg-reloj>div:last-child{display:grid;gap:4px;min-width:0;flex:1}
+.wg-reloj small{color:var(--sub);font-weight:600;font-size:12px}
+.wg-reloj-num{font:800 clamp(28px,13vmin,52px)/1 ui-monospace,"SF Mono",Consolas,monospace;letter-spacing:.02em;color:var(--fuego);font-variant-numeric:tabular-nums}
+.wg-reloj-barra{height:7px;border-radius:99px;background:color-mix(in srgb,var(--txt) 10%,transparent);overflow:hidden}
+.wg-reloj-barra i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--verde),var(--fuego));transition:width 1s linear}
+.wg-reloj-pie{font-size:11.5px!important}
+.wg-reloj.ok{background:color-mix(in srgb,var(--verde) 9%,transparent)}
+.wg-reloj.ok .wg-reloj-num{color:var(--verde)}
+.wg-reloj.rojo,.wg.urgente .wg-reloj:not(.ok){border-color:var(--rojo);background:color-mix(in srgb,var(--rojo) 14%,transparent);animation:wgLate 1.4s ease-in-out infinite}
+.wg-reloj.rojo .wg-reloj-num,.wg.urgente .wg-reloj:not(.ok) .wg-reloj-num{color:var(--rojo);text-shadow:0 0 14px color-mix(in srgb,var(--rojo) 60%,transparent)}
+.wg-reloj.rojo .wg-reloj-barra i,.wg.urgente .wg-reloj:not(.ok) .wg-reloj-barra i{background:var(--rojo)}
+.wg-reloj-codi .codi{width:clamp(56px,24vmin,96px)}
+@keyframes wgLate{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--rojo) 25%,transparent)}}
+@media (prefers-reduced-motion:reduce){.wg-reloj{animation:none!important}}
 .wg-semana .hecho i{filter:drop-shadow(0 0 4px #ff9f1c)}
 .wg-semana .hoy i{animation:cd-late 1s ease-in-out infinite alternate}
 

@@ -153,3 +153,11 @@ def test_python_servidor_apagado(monkeypatch, carpeta):
     monkeypatch.setenv("PYTHON_SERVIDOR", "0")
     with pytest.raises(ValueError, match="desactivad"):
         ps.instalar(1, ["numpy"])
+
+
+# ---------------------------------------------------------------- IA en Trabajo ----
+def test_ia_quita_cercas_de_codigo():
+    from rutas.tutor import sin_cercas
+    assert sin_cercas("```js\nconst a = 1;\n```") == "const a = 1;"
+    assert sin_cercas("```\nprint(1)\n```") == "print(1)"
+    assert sin_cercas("x = 2") == "x = 2"

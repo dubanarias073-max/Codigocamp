@@ -4,7 +4,7 @@
   "version": "1.5",
   "body": [
     { "type": "ColumnSet", "columns": [
-      { "type": "Column", "width": "auto", "verticalContentAlignment": "Center", "items": [{ "type": "TextBlock", "text": "🔥", "size": "ExtraLarge" }] },
+      { "type": "Column", "width": "auto", "verticalContentAlignment": "Center", "items": [{ "type": "Image", "url": "${url_mascota}", "size": "Medium", "altText": "Codi" }] },
       { "type": "Column", "width": "stretch", "items": [
         { "type": "TextBlock", "text": "${racha}", "weight": "Bolder", "size": "ExtraLarge", "color": "Warning", "spacing": "None" },
         { "type": "TextBlock", "text": "días de racha", "isSubtle": true, "spacing": "None" }

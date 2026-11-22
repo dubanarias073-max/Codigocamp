@@ -8,7 +8,11 @@ BACKEND = Path(__file__).resolve().parent
 
 MAX_VIDAS_REGEN = 5
 MAX_VIDAS = 10
-MAX_SALVARRACHAS = 2
+MAX_SALVARRACHAS = 2            # tope para comprarlos en la tienda o sacarlos de los cofres del camino
+MAX_SALVARRACHAS_PREMIO = 10    # los que se ganan con la racha sí pueden pasar de 2 (hasta este tope)
+SALVARRACHAS_CADA = 10          # cada 10 días seguidos de racha: +1 salvarrachas de regalo
+PREMIO_SEMANA_PERFECTA = {"diamante": 250, "xp": 100, "salvarrachas": 1}
+PREMIO_MES_PERFECTO = {"diamante": 2000, "xp": 600, "vidas": 10, "salvarrachas": 3}
 MINUTOS_VIDA = 30
 META_MES = 60
 PUNTOS_POR_DESAFIO = 5

@@ -68,3 +68,4 @@ body{color:var(--txt);background-color:var(--bg);background-image:radial-gradien
 .olvide-link:hover{text-decoration:underline}
 .authbox .ok-msg{color:#2f9e6b}
 .restablecer-in{grid-template-columns:minmax(320px,460px);justify-content:center}
+.login-codi{display:block;width:96px;height:96px;margin:0 0 6px}

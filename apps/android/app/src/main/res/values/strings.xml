@@ -3,4 +3,10 @@
     <string name="app_name">CódigoCamp</string>
     <string name="widget_racha">CódigoCamp · Tu racha</string>
     <string name="widget_desc">Tu racha, la semana, la meta de hoy, vidas y diamantes.</string>
+    <string name="widget_reloj">CódigoCamp · Reloj del día</string>
+    <string name="widget_reloj_desc">Cuenta regresiva de las horas que te quedan hoy para salvar tu racha. En rojo con menos de 3 horas.</string>
+    <string name="widget_codi">CódigoCamp · Codi</string>
+    <string name="widget_codi_desc">Codi, la mascota: cambia de ánimo con tu racha y te avisa cuando se acaba el día.</string>
+    <string name="widget_meta">CódigoCamp · Meta de hoy</string>
+    <string name="widget_meta_desc">Tu XP de hoy con barra de progreso y los encargos del día.</string>
 </resources>

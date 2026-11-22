@@ -9,6 +9,7 @@ import android.content.ActivityNotFoundException;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
@@ -74,6 +75,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle estado) {
         super.onCreate(estado);
+        // En el celular la app va siempre en vertical (en horizontal se descuadra todo). Las tabletas pueden girar.
+        if (getResources().getConfiguration().smallestScreenWidthDp < 600) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        }
         base = BuildConfig.URL_SERVIDOR;
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor("#0B1020"));
@@ -145,14 +150,14 @@ public class MainActivity extends Activity {
             if (token == null || token.length() < 20) return;
             String b = servidor != null && servidor.startsWith("http") ? servidor.replaceAll("/+$", "") : base;
             Datos.guardar(MainActivity.this, b, token);
-            WidgetRacha.actualizarTodos(MainActivity.this);
+            Widgets.actualizarTodos(MainActivity.this);
         }
 
         /** Al cerrar sesión en la app, el widget deja de mostrar tus datos. */
         @JavascriptInterface
         public void desconectarWidget() {
             Datos.olvidar(MainActivity.this);
-            WidgetRacha.actualizarTodos(MainActivity.this);
+            Widgets.actualizarTodos(MainActivity.this);
         }
 
         @JavascriptInterface

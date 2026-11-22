@@ -13,7 +13,7 @@
     "standalone",
     "minimal-ui"
   ],
-  "orientation": "any",
+  "orientation": "portrait",
   "background_color": "#06100f",
   "theme_color": "#0d1b1a",
   "categories": [
@@ -121,6 +121,31 @@
       "type": "application/json",
       "auth": false,
       "update": 1800,
+      "icons": [
+        {
+          "src": "/img/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "screenshots": [
+        {
+          "src": "/img/app/icon-512.png",
+          "sizes": "512x512",
+          "label": "Widget de racha"
+        }
+      ]
+    },
+    {
+      "name": "Reloj del día",
+      "short_name": "Reloj",
+      "description": "Cuántas horas te quedan hoy para salvar tu racha (en rojo con menos de 3 horas).",
+      "tag": "reloj",
+      "template": "reloj",
+      "ms_ac_template": "/widgets/reloj.json",
+      "data": "/api/widget/",
+      "type": "application/json",
+      "auth": false,
+      "update": 900,
       "icons": [
         {
           "src": "/img/app/icon-192.png",

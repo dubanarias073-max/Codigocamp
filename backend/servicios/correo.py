@@ -57,7 +57,7 @@ def _config(app):
     }
 
 
-def plantilla(titulo, parrafos, boton=None, pie=""):
+def plantilla(titulo, parrafos, boton=None, pie="", mascota=None):
     """HTML sencillo y compatible con los clientes de correo (tablas y estilos en línea)."""
     cuerpo = "".join(f'<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#2b3338">{p}</p>' for p in parrafos)
     if boton:
@@ -67,7 +67,7 @@ def plantilla(titulo, parrafos, boton=None, pie=""):
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f2eb;padding:28px 12px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fffefa;border:1px solid #d9d5c9;border-radius:16px">
 <tr><td style="padding:22px 28px;border-bottom:1px solid #ece9df;font-weight:800;font-size:18px;color:{COLOR}">&lt;/&gt; codigocamp</td></tr>
-<tr><td style="padding:26px 28px"><h1 style="margin:0 0 16px;font-size:21px;color:#1f262c">{html.escape(titulo)}</h1>{cuerpo}</td></tr>
+<tr><td style="padding:26px 28px">{f'<img src="{html.escape(mascota)}" width="96" height="96" alt="Codi" style="display:block;margin:0 0 10px;width:96px;height:96px">' if mascota else ""}<h1 style="margin:0 0 16px;font-size:21px;color:#1f262c">{html.escape(titulo)}</h1>{cuerpo}</td></tr>
 <tr><td style="padding:16px 28px;border-top:1px solid #ece9df;font-size:12px;color:#737a7e">{pie or "Recibes este correo por tu cuenta de CódigoCamp. Puedes elegir qué correos recibir en Configuración → Correos."}</td></tr>
 </table></td></tr></table></body></html>"""
 
@@ -203,6 +203,7 @@ def bienvenida(usuario, agente, ip, metodo="contraseña"):
          "Practica unos minutos cada día para mantener tu 🔥 racha: te avisaremos por correo si estás a punto de perderla.",
          f"{nombre}, <b>si no fuiste tú</b> quien creó esta cuenta, escríbenos o cambia la contraseña desde Configuración → Seguridad."],
         ("Empezar a aprender", f"{cfg['url']}/pages/inicio.html"),
+        mascota=f"{cfg['url']}/img/codi/saludo.png",
     ))
     return True
 
@@ -316,7 +317,8 @@ def recordar_rachas(hoy=None, nivel=None):
             parrafos = [f"Hola {primer}, hoy todavía no practicaste. <b>Si se te olvida entrar, perderás tu racha de {dias}.</b>",
                         f"Te bastan {perfil.meta_minutos} minutos: una lección o un reto y tu racha sigue viva.", salvar]
         enviar(usuario.email, asunto, plantilla(titulo, parrafos, ("Salvar mi racha", f"{cfg['url']}/pages/inicio.html"),
-                                                pie="Puedes desactivar estos avisos en Configuración → Correos."))
+                                                pie="Puedes desactivar estos avisos en Configuración → Correos.",
+                                                mascota=f"{cfg['url']}/img/codi/{'alarma' if nivel_u >= 2 else 'preocupado'}.png"))
         enviados += 1
     db.session.commit()
     return enviados

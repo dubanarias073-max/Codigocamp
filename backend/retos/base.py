@@ -21,6 +21,7 @@ Cómo se escribe (ejemplo mínimo):
         ),
     ]
 """
+import re
 
 XP_ETAPA = [15, 18, 20, 23, 25, 28, 30, 33, 35, 38, 40]   # cada etapa da más XP que la anterior
 PREGUNTAS_POR_LECCION = 3          # mínimo validado; ninguna pregunta se repite en el curso, así que las lecciones son cortas
@@ -41,7 +42,11 @@ def O(pregunta, correcta, *falsas, codigo="", explicacion=""):
 def C(pregunta, *validas, codigo="", explicacion=""):
     """Escribir la respuesta. Se aceptan varias respuestas válidas (sin importar mayúsculas ni espacios)."""
     if not explicacion and validas:
-        explicacion = f"Respuesta: {validas[0]}."
+        if "___" in pregunta:
+            frase = re.sub(r"\s*\([^()]*\)\s*$", "", pregunta)
+            explicacion = f"La frase completa es: «{re.sub(r'_{2,}', lambda _m: validas[0], frase, count=1).strip().rstrip('.')}»."
+        else:
+            explicacion = f"La respuesta es «{validas[0]}»."
     return _reto("completar", pregunta, [], "|".join(validas), codigo, explicacion)
 
 

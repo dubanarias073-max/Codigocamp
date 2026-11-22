@@ -103,7 +103,12 @@ Cómo respondes:
 
 GUÍA DE CÓDIGOCAMP (todo lo que la plataforma puede hacer; úsala para ayudar al alumno a usarla):
 - Inicio: la ruta del curso elegido (etapas → secciones → niveles de retos). Cada nivel da XP; cada 100 XP sube un nivel. Racha = días
-  seguidos practicando (los salvarrachas la protegen un día). Vidas: se pierde una al fallar un reto y se recuperan con el tiempo.
+  seguidos practicando (los salvarrachas la protegen un día). Salvarrachas: en la tienda y
+  cofres del camino el tope es 2, pero cada 10 días seguidos de racha se gana +1 aunque pases de 2 (hasta 10). Tienda: además de fondos, punteros, temas, marcos,
+  efectos y rastros, hay «Accesorios de Codi» (gorra, gafas pixel, audífonos, corona, sombrero de mago, capa, casco vikingo,
+  birrete, casco de astronauta…) que la mascota lleva puestos en toda la página. Semana perfecta
+  (lunes a domingo sin usar salvarrachas): cofre de oro con 250 diamantes, 100 XP y 1 salvarrachas. Mes perfecto (todo el mes sin
+  perder la racha ni usar salvarrachas): cofre legendario con 2000 diamantes, 600 XP, 10 vidas y 3 salvarrachas. Vidas: se pierde una al fallar un reto y se recuperan con el tiempo.
   El curso se cambia arriba en «Mi curso».
 - Recompensas: encargos de hoy (misiones diarias con diamantes), cofres de logro (se abren al cumplir metas) y el desafío del mes.
 - Aprende: 24 cursos con lecciones (HTML, CSS, JavaScript, Python, SQL, Bases de datos, TypeScript, Java, C#, Kotlin, Swift, PHP, Ruby,
@@ -116,11 +121,30 @@ GUÍA DE CÓDIGOCAMP (todo lo que la plataforma puede hacer; úsala para ayudar 
   y proyectos Vite con npm create vite@latest mi-app -- --template vanilla | vanilla-ts | react | react-ts | preact | vue | svelte.
   · Botón Ejecutar (Ctrl+Enter): HTML/CSS → vista previa; JS → node; TS → ts-node; Python; SQL; .jsx/.tsx → muestra el componente React
     en la vista previa (crea vista-Nombre.html si no hay página); Java, C, C++, C#, PHP, Go, Rust, Swift, Kotlin, Ruby → se compilan y
-    ejecutan en el servidor (o en línea con Wandbox / Kotlin Playground si el servidor no tiene el compilador); Dockerfile → docker build +
+    ejecutan en el servidor (o en línea con Wandbox / Kotlin Playground y, de respaldo, Compiler Explorer); también Lua, Perl, R, Scala,
+    Haskell, Elixir, Julia, Groovy, Crystal, Nim, OCaml, D, Pascal, Zig, Common Lisp y Bash (comandos lua, perl, Rscript, scala,
+    runghc, elixir, julia, groovy, crystal run, nim r, ocaml, rdmd, fpc, zig run, sbcl); Dockerfile → docker build +
     docker run; compose.yaml → docker compose up -d.
-  · Archivos nuevos .java, .c, .cpp, .cs, .kt, .swift, .php, .rb, .go, .rs, Dockerfile y compose.yaml vienen con un ejemplo que funciona.
-  · Terminal: bash simulado con ls, cd, cat, mkdir, rm, mv, cp, grep, find, head, tail, wc, echo, printf, true/false, variables, comodines,
-    tuberías |, && ; ||, redirecciones > >> <. Se pueden pegar varias líneas y se ejecutan en orden. Si un programa pide datos (input(),
+  · Archivos nuevos de cualquiera de esos lenguajes, .sh, Dockerfile y compose.yaml vienen con un ejemplo que funciona.
+  · Como VS Code: Ctrl+P ir a archivo, Ctrl+Shift+P comandos, Ctrl+, ajustes del editor (letra, tabulación, ajuste de línea, minimapa,
+    números de línea, formatear al guardar…), Ctrl+K Ctrl+S lista de atajos, Ctrl+\\ dividir el editor, Ctrl+K Z modo zen (Esc sale),
+    Ctrl+ / Ctrl− / Ctrl 0 tamaño de letra, Alt+Z ajuste de línea, Ctrl+Shift+O ir a símbolo, F12 definición, F2 renombrar, Ctrl+D
+    multicursor, Alt+↑/↓ mover línea, Shift+Alt+F formatear, reabrir pestaña cerrada (paleta), Ctrl+K Ctrl+T temas de color
+    (Dark+, Light+, Monokai, Dracula, One Dark Pro, GitHub, Night Owl, Solarized, alto contraste), Ctrl+Shift+V vista previa de
+    Markdown, clic derecho en las pestañas (cerrar otras / a la derecha / todas, copiar ruta, dividir, mostrar en el explorador).
+  · IA en Trabajo (como Copilot): Ctrl+I pide un cambio en el código seleccionado (o escribe en el cursor) y se acepta con Enter o
+    se descarta con Esc; clic derecho en el editor → ✨ explicar, arreglar errores, mejorar, comentar/documentar, escribir pruebas;
+    💡 bombilla (Ctrl+.) en cada error subrayado → «Arreglar con IA» o «Explicar este error»; en la terminal, si un comando falla,
+    aparece «✨ Arreglar con IA»; en Git, «✨ Mensaje con IA» escribe el mensaje del commit; sugerencias en gris mientras escribes
+    (Tab acepta); y el chat del Asistente con «Editar con IA» propone cambios en varios archivos que el alumno acepta o rechaza.
+  · En Aprende, si el código da error aparece «✨ Explícame este error (IA)»; en los retos, «🤖 ¿Por qué?».
+  · Terminal (Ctrl+Ñ o Ctrl+` la abre/cierra; Ctrl+Shift+Ñ terminal nueva; Ctrl+R busca en el historial): bash con ls, cd, cat,
+    mkdir, rm, mv, cp, grep, find, head, tail, wc, echo, printf, sort, uniq, cut, tr, sed (también -i), awk, seq, rev, tac, nl, tee, diff,
+    xargs, basename, dirname, du, stat, time, sleep, cal; variables (X=5), export, alias, read, test/[ ]/[[ ]], for/while/until/if/case,
+    for ((i=0;i<5;i++)), funciones f() { …; } con $1 $# $@ y return, $((aritmética)), $(comando), ${var^^} ${var:-x} ${#var},
+    scripts: bash archivo.sh, ./archivo.sh (chmod +x opcional) y source; tuberías |, && ; ||, redirecciones > >> <.
+    Los bloques se pueden escribir en varias líneas (aparece «>» hasta cerrar con done/fi). Se pueden pegar varias líneas.
+    nano/vim archivo abren el archivo en el editor. Si un programa pide datos (input(),
     Scanner, cin, scanf…), la terminal los pide con «»» (un dato por línea, línea vacía para ejecutar) o se pueden pasar con
     printf 'Ana\\n17\\n' | python programa.py.
   · Python: corre en el navegador (Pyodide). pip install y pip install -r requirements.txt instalan todo lo posible en el navegador; los
@@ -134,6 +158,15 @@ GUÍA DE CÓDIGOCAMP (todo lo que la plataforma puede hacer; úsala para ayudar 
     rmi, pull, docker compose up -d | ps | logs | exec | down. Cada alumno solo ve sus contenedores; no se permite --privileged, la red del
     host ni montar carpetas fuera del proyecto. Si sale «Docker no está instalado / no está encendido», debe instalar o abrir Docker Desktop.
   · No existen en la terminal: sudo, apt, curl, wget, ssh, ni editores de terminal (vim, nano).
+- Codi es la mascota de CódigoCamp: un robot con cabeza de visor, orejas en forma de { }, antena que se vuelve llama con la racha y
+  torso de base de datos. Cambia de ánimo (feliz, en llamas, preocupado, en alarma, dormido…) según la racha y la hora.
+- Reloj del día: cuenta regresiva de las horas que quedan para salvar la racha (en rojo con menos de 3 horas). Está en la tarjeta de
+  racha, en el chip ⏳ de arriba (celular) y en los widgets. También se envían correos de aviso.
+- Widgets: Android (app CódigoCamp → mantener pulsada la pantalla de inicio → Widgets → CódigoCamp: Tu racha, Reloj del día, Codi,
+  Meta de hoy), Windows 11 (Windows+W: Tu racha, Reloj del día, Meta de hoy, Calendario), iPhone/iPad/Mac con Scriptable (parámetro
+  racha, reloj, meta o calendario, también en la pantalla de bloqueo) y el widget flotante (📌) en cualquier computador.
+  Se configuran en Configuración → App y widgets.
+- En el celular CódigoCamp se usa en vertical (la app se bloquea en vertical; en el navegador Codi pide girar el teléfono).
 - Tutor de IA (esta página): conversaciones guardadas, adjuntar imágenes, PDF, audio, video y código.
 - Chats: agregar amigos por nombre, @usuario o ID (o desde los contactos del teléfono), enlace de invitación, mensajes con `código`,
   emojis, adjuntos (hasta 1 GB), eliminar mensajes para todos. Tocar la foto o el nombre del amigo (o ⋮ → Ver perfil) muestra su perfil:
@@ -465,3 +498,120 @@ def limpiar_sugerencia(texto, antes, despues):
         t = t.rstrip()[: -len(sig.strip())]
     lineas = t.split("\n")[:12]
     return "\n".join(lineas).rstrip() if len(lineas) > 1 else lineas[0]
+
+
+PORQUE = """Eres Codi, el tutor de CódigoCamp. Explica en español, SIMPLE y CORTO (1 o 2 frases, máximo 40 palabras), POR QUÉ
+la respuesta correcta es la correcta: la idea de fondo, con palabras fáciles. NO repitas la pregunta ni la respuesta (el alumno ya
+las ve) ni la «explicación guardada». Si el alumno respondió otra cosa, di en pocas palabras por qué eso no era. Sin títulos, sin
+listas, sin saludar. Usa `código` para nombres de código."""
+
+
+@bp.post("/api/reto/<int:reto_id>/porque/")
+@login_required
+def porque_reto(reto_id):
+    """«¿Por qué?» en los retos: la IA explica la respuesta correcta (y el error del alumno si lo hubo)."""
+    from models import Challenge
+    reto = db.session.get(Challenge, reto_id)
+    if not reto:
+        return api_error("No encontramos ese reto.", 404)
+    data = json_body()
+    if isinstance(data, tuple):
+        return data
+    respuesta_alumno = data.get("respuesta")
+    if isinstance(respuesta_alumno, list):
+        respuesta_alumno = " → ".join(map(str, respuesta_alumno))
+    respuesta_alumno = str(respuesta_alumno or "")[:500]
+    correcta = reto.respuesta.split("|")[0] if reto.tipo == "completar" else reto.respuesta
+    if reto.tipo == "error":
+        correcta = f"la línea {reto.respuesta}"
+    elif reto.tipo == "ordenar":
+        correcta = " → ".join((reto.datos or {}).get("piezas", []))
+    api_key = current_app.config["GEMINI_API_KEY"]
+    if not api_key or too_many(f"porque:{current_user.id}", 15, 60):
+        return jsonify(texto=reto.explicacion or f"La respuesta correcta es «{correcta}».", ia=False)
+    prompt = (f"Reto ({reto.tipo}): {reto.enunciado}\n" + (f"Código:\n```\n{reto.codigo}\n```\n" if reto.codigo else "")
+              + (f"Opciones: {' | '.join(map(str, reto.opciones or []))}\n" if reto.opciones else "")
+              + f"Respuesta correcta: {correcta}\nExplicación guardada: {reto.explicacion}\n"
+              + (f"El alumno respondió: {respuesta_alumno}\n" if respuesta_alumno else ""))
+    payload = json.dumps({
+        "systemInstruction": {"parts": [{"text": PORQUE}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 350},
+    }).encode()
+    try:
+        result, _ = generar(payload, api_key, current_app.config["GEMINI_MODEL"], timeout=25)
+        texto = "".join(p.get("text", "") for p in result["candidates"][0].get("content", {}).get("parts", []) if not p.get("thought")).strip()
+    except Exception:
+        texto = ""
+    return jsonify(texto=texto or reto.explicacion, ia=bool(texto))
+
+
+EDITAR = """Eres el copiloto de código de CódigoCamp (como Copilot en VS Code, «Ctrl+I»). Te dan un archivo con una SELECCIÓN
+(o un cursor) y una instrucción del alumno. Devuelve SOLO el código que debe ir en lugar de la selección (o insertarse en el
+cursor): sin explicaciones, sin ``` y sin repetir lo que está antes o después. Respeta la sangría, el estilo y el lenguaje del
+archivo. Cambia solo lo pedido. Si la instrucción pide comentarios o documentación, escríbelos en español."""
+
+COMMIT = """Escribe UN mensaje de commit de git en español para estos cambios: una primera línea de máximo 60 caracteres en
+imperativo («Agrega…», «Corrige…»), y si hace falta una línea en blanco y 1 a 3 viñetas cortas con «- ». Solo el mensaje."""
+
+
+def _texto_gemini(prompt, sistema, tokens=1500, temperatura=0.2, timeout=40):
+    api_key = current_app.config["GEMINI_API_KEY"]
+    if not api_key:
+        raise ValueError("La IA no está configurada en este servidor (falta GEMINI_API_KEY en backend/.env).")
+    payload = json.dumps({"systemInstruction": {"parts": [{"text": sistema}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                          "generationConfig": {"temperature": temperatura, "maxOutputTokens": tokens}}).encode()
+    result, _ = generar(payload, api_key, current_app.config["GEMINI_MODEL"], timeout=timeout)
+    return "".join(p.get("text", "") for p in result["candidates"][0].get("content", {}).get("parts", []) if not p.get("thought"))
+
+
+def sin_cercas(texto):
+    t = texto.strip("\n")
+    m = re.match(r"^\s*```[\w+#.-]*\n([\s\S]*?)\n?```\s*$", t)
+    return m.group(1) if m else t
+
+
+@bp.post("/api/tutor/editar/")
+@login_required
+def editar_en_linea():
+    """Ctrl+I en Trabajo: reescribe la selección (o escribe en el cursor) según la instrucción."""
+    data = json_body()
+    if isinstance(data, tuple):
+        return data
+    instruccion = str(data.get("instruccion", "")).strip()[:2000]
+    if not instruccion:
+        return api_error("Escribe qué quieres que haga la IA.")
+    if too_many(f"editar:{current_user.id}", 20, 60):
+        return api_error("Vas muy rápido. Espera unos segundos.", 429)
+    ruta, lenguaje = str(data.get("ruta", ""))[:200], str(data.get("lenguaje", ""))[:30]
+    antes, sel, despues = str(data.get("antes", ""))[-8000:], str(data.get("seleccion", ""))[:20000], str(data.get("despues", ""))[:4000]
+    prompt = (f"Archivo: {ruta} ({lenguaje})\nInstrucción: {instruccion}\n\n--- antes ---\n{antes}\n--- SELECCIÓN"
+              f"{' (vacía: escribe en el cursor)' if not sel else ''} ---\n{sel}\n--- después ---\n{despues}")
+    try:
+        texto = _texto_gemini(prompt, EDITAR, tokens=4000)
+    except ValueError as e:
+        return api_error(str(e), 503)
+    except Exception:
+        current_app.logger.exception("Falló Ctrl+I")
+        return api_error("La IA no respondió. Inténtalo de nuevo.", 502)
+    return jsonify(texto=sin_cercas(texto))
+
+
+@bp.post("/api/tutor/commit/")
+@login_required
+def mensaje_commit():
+    """Mensaje de commit escrito por la IA a partir de las diferencias."""
+    data = json_body()
+    if isinstance(data, tuple):
+        return data
+    diff = str(data.get("diff", ""))[:30000]
+    if not diff.strip():
+        return api_error("No hay cambios para describir.")
+    if too_many(f"commit:{current_user.id}", 10, 60):
+        return api_error("Vas muy rápido. Espera unos segundos.", 429)
+    try:
+        texto = _texto_gemini(diff, COMMIT, tokens=300, temperatura=0.3, timeout=25)
+    except ValueError as e:
+        return api_error(str(e), 503)
+    except Exception:
+        return api_error("La IA no respondió. Inténtalo de nuevo.", 502)
+    return jsonify(texto=sin_cercas(texto).strip().strip('"'))

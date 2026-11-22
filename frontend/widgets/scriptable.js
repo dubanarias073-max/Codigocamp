@@ -1,7 +1,8 @@
 // CódigoCamp · widget para iPhone, iPad y Mac (app gratuita «Scriptable» de la App Store).
 // Cómo usarlo: Configuración → App y widgets → «Widget para iPhone/iPad». Este archivo ya está conectado a tu sesión
 // (sigue funcionando hasta que cierres sesión en CódigoCamp).
-// En el widget, «Parameter» puede ser: racha (por defecto), meta o calendario.
+// En el widget, «Parameter» puede ser: racha (por defecto), reloj, meta o calendario.
+//   reloj = cronómetro de las horas que quedan del día para salvar tu racha (en rojo con menos de 3 horas).
 // Tamaños: pequeño, mediano, grande y los de la pantalla de bloqueo (circular, rectangular y en línea).
 
 const BASE = "__CC_BASE__";
@@ -27,6 +28,18 @@ async function cargar() {
     return { d: null, error: String(e.message || e) };
   }
 }
+
+// Codi, la mascota (imagen según su ánimo; se guarda para cuando no hay internet)
+async function mascota(d) {
+  const ruta = fm.joinPath(fm.documentsDirectory(), `codigocamp-codi-${d.animo || "feliz"}.png`);
+  try {
+    if (fm.fileExists(ruta)) return fm.readImage(ruta);
+    const img = await new Request(d.url_mascota || `${BASE}/img/codi/${d.animo || "feliz"}.png`).loadImage();
+    fm.writeImage(ruta, img);
+    return img;
+  } catch { return null; }
+}
+const TRES_HORAS = 3 * 3600 * 1000;
 
 function texto(pila, t, tam, color = C.texto, negrita = false) {
   const x = pila.addText(String(t));
@@ -62,14 +75,28 @@ function barra(pila, pct, ancho) {
   pila.addImage(ctx.getImage()).imageSize = new Size(ancho, 8);
 }
 
-function crear({ d, viejo, error }) {
+function crear({ d, viejo, error, codi }) {
   const fam = config.widgetFamily || "medium";
   const w = new ListWidget();
-  w.refreshAfterDate = new Date(Date.now() + 30 * 60 * 1000);
+  // Se refresca cada 30 min, justo cuando faltan 3 horas (para ponerse en rojo) y a medianoche.
+  const fin = d?.segundos_restantes != null ? new Date(Date.now() + d.segundos_restantes * 1000) : null;
+  const momentos = [Date.now() + 30 * 60 * 1000];
+  if (fin) { momentos.push(fin.getTime() + 5000); if (fin - Date.now() > TRES_HORAS) momentos.push(fin.getTime() - TRES_HORAS + 1000); }
+  w.refreshAfterDate = new Date(Math.min(...momentos));
+  const urgente = !!(d && fin && !d.practicado_hoy && fin - Date.now() <= TRES_HORAS);
   w.url = d?.url_practicar || `${BASE}/pages/inicio.html?app=1`;
 
   // ---- pantalla de bloqueo ----
-  if (fam === "accessoryInline") { w.addText(d ? `🔥 ${d.racha} · ${d.practicado_hoy ? "✓ hoy" : "practica hoy"}` : "CódigoCamp"); return w; }
+  if (fam === "accessoryInline") {
+    if (d && VISTA === "reloj" && fin && !d.practicado_hoy) { const t = w.addDate(fin); t.applyTimerStyle(); return w; }
+    w.addText(d ? `🔥 ${d.racha} · ${d.practicado_hoy ? "✓ hoy" : "practica hoy"}` : "CódigoCamp"); return w;
+  }
+  if (fam === "accessoryCircular" && d && VISTA === "reloj" && fin) {
+    w.addAccessoryWidgetBackground = true;
+    const a = w.addText(d.practicado_hoy ? "✓" : "⏳"); a.font = Font.systemFont(12); a.centerAlignText();
+    const t = w.addDate(fin); t.applyTimerStyle(); t.font = Font.boldMonospacedSystemFont(11); t.centerAlignText(); t.minimumScaleFactor = 0.5;
+    return w;
+  }
   if (fam === "accessoryCircular") {
     w.addAccessoryWidgetBackground = true;
     const a = w.addText(d ? "🔥" : "⚠️"); a.font = Font.systemFont(14); a.centerAlignText();
@@ -98,13 +125,26 @@ function crear({ d, viejo, error }) {
   texto(cab, `❤️ ${d.vidas}${chico ? "" : `  💎 ${d.diamantes}`}`, chico ? 11 : 12, C.texto);
   w.addSpacer(chico ? 4 : 6);
 
+  if (VISTA === "reloj") {
+    const color = d.practicado_hoy ? C.verde : urgente ? C.rojo : C.fuego;
+    if (urgente) w.backgroundGradient = (() => { const r = new LinearGradient(); r.colors = [new Color("#2a0b14"), new Color("#12081a")]; r.locations = [0, 1]; return r; })();
+    const fila = w.addStack(); fila.centerAlignContent();
+    if (codi) { const im = fila.addImage(codi); im.imageSize = new Size(chico ? 44 : 60, chico ? 44 : 60); fila.addSpacer(8); }
+    const col = fila.addStack(); col.layoutVertically();
+    texto(col, d.practicado_hoy ? "Racha a salvo hoy" : d.racha ? `Quedan para salvar ${d.racha} 🔥` : "Quedan para empezar", 11, C.sub, true);
+    const t = col.addDate(fin); t.applyTimerStyle(); t.font = Font.boldMonospacedSystemFont(chico ? 22 : 30); t.textColor = color; t.minimumScaleFactor = 0.5; t.lineLimit = 1;
+    w.addSpacer(6);
+    texto(w, d.practicado_hoy ? "✅ Ya practicaste. Mañana empieza otro día." : urgente ? "🔴 ¡Menos de 3 horas! Haz una lección." : "⏳ El día termina a medianoche.", 11, color, true).lineLimit = 2;
+    return w;
+  }
   if (VISTA === "meta") {
     texto(w, `${d.xp_hoy} / ${d.meta_xp} XP`, chico ? 22 : 26, C.texto, true);
     w.addSpacer(6); barra(w, d.progreso_hoy, chico ? 120 : 280); w.addSpacer(6);
     texto(w, `${d.progreso_hoy}% completado · 🔥 ${d.racha}`, 12, C.sub);
   } else {
     const fila = w.addStack(); fila.centerAlignContent();
-    texto(fila, ({ fuego: "🔥", feliz: "😄", preocupado: "😟", alarma: "😱", dormido: "😴" })[d.animo] || "🔥", chico ? 26 : 30);   // ánimo de Codi
+    if (codi) { const im = fila.addImage(codi); im.imageSize = new Size(chico ? 40 : 52, chico ? 40 : 52); }   // Codi según su ánimo
+    else texto(fila, "🔥", chico ? 26 : 30);
     fila.addSpacer(6);
     const col = fila.addStack(); col.layoutVertically();
     texto(col, d.racha, chico ? 26 : 30, C.fuego, true);
@@ -125,6 +165,7 @@ function crear({ d, viejo, error }) {
 }
 
 const resultado = await cargar();
+if (resultado.d) resultado.codi = await mascota(resultado.d);
 const widget = crear(resultado);
 if (config.runsInWidget || config.runsInAccessoryWidget) Script.setWidget(widget);
 else await widget.presentMedium();

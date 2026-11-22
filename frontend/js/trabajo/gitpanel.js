@@ -109,6 +109,7 @@ export class PanelGit {
       <div class="git-cab"><span>⎇ <b>${esc(rama || "HEAD desacoplado")}</b>${origen ? ` · <span title="${esc(origen.url)}">origin</span>` : ""}${delante ? ` · ↑${delante}` : ""}${detras ? ` · ↓${detras}` : ""}</span>
         <span><button type="button" class="icono-btn" data-accion="ramas" title="Cambiar de rama / crear rama" aria-label="Ramas">⎇</button><button type="button" class="icono-btn" data-accion="actualizar" title="Actualizar" aria-label="Actualizar">⟳</button></span></div>
       <textarea name="mensaje" rows="2" placeholder="Mensaje (Ctrl+Enter para confirmar en «${esc(rama || "HEAD")}»)" aria-label="Mensaje del commit">${esc(mensaje)}</textarea>
+      ${this.pedirIA && (preparados.length || cambios.length) ? '<button type="button" class="btn sm git-ia" data-accion="mensaje-ia" title="La IA escribe el mensaje del commit a partir de tus cambios">✨ Mensaje con IA</button>' : ""}
       <button type="button" class="btn pri sm git-commit" data-accion="commit" ${preparados.length || cambios.length || conflictos.length ? "" : "disabled"}>✓ Confirmar${preparados.length ? "" : " todo"} (commit)</button>
       ${origen ? `<button type="button" class="btn sm git-sync" data-accion="sincronizar" title="git pull y luego git push">⟳ Sincronizar cambios${delante || detras ? ` ${detras ? `↓${detras} ` : ""}${delante ? `↑${delante}` : ""}` : ""}</button>` : `<button type="button" class="btn sm git-sync" data-accion="publicar" ${log.length ? "" : "disabled"} title="git remote add origin … y git push -u">⇡ Publicar en GitHub</button>`}
       ${conflictos.length ? `<div class="git-grupo"><div class="git-titulo">Conflictos de merge <span>${conflictos.length}</span></div>${conflictos.map((r) => fila(r, "conflicto", "cambios")).join("")}<p class="git-nota">Abre cada archivo, elige qué queda entre <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> y <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code>, prepáralo (+) y confirma.</p></div>` : ""}
@@ -131,6 +132,35 @@ export class PanelGit {
     this.ocupado = true;
     this.raiz.classList.add("git-ocupado");
     try { await fn(); } finally { this.ocupado = false; this.raiz.classList.remove("git-ocupado"); await this.render(); }
+  }
+
+  /** Diff sencillo (por líneas) de los archivos cambiados, para que la IA escriba el mensaje. */
+  async #mensajeIA(boton) {
+    const ta = this.raiz.querySelector("[name=mensaje]");
+    boton.disabled = true; boton.textContent = "✨ Escribiendo…";
+    try {
+      const motor = await this.motor();
+      const py = this.proyecto();
+      const d = motor.dirFs(this.repo);
+      let head = null;
+      try { head = await motor.git.resolveRef({ fs: motor.fs, dir: d, ref: "HEAD" }); } catch { /* primer commit */ }
+      const filas = [...this.raiz.querySelectorAll(".git-fila")].map((f) => [f.dataset.ruta, f.dataset.tipo]);
+      let diff = "";
+      for (const [r, tipo] of filas.slice(0, 25)) {
+        const completa = this.rutaCompleta(r);
+        const antes = head ? (await motor.textoEn(d, head, r).catch(() => null)) : null;
+        const despues = py.files[completa] ?? null;
+        if (esMarcador(despues) || antes?.startsWith("\u0000bin")) { diff += `\n### ${r} (${tipo}, binario)\n`; continue; }
+        const a = (antes ?? "").split("\n"), b = (despues ?? "").split("\n");
+        const quitadas = a.filter((x) => !b.includes(x)).slice(0, 40).map((x) => `- ${x}`);
+        const nuevas = b.filter((x) => !a.includes(x)).slice(0, 60).map((x) => `+ ${x}`);
+        diff += `\n### ${r} (${antes === null ? "nuevo" : despues === null ? "borrado" : "modificado"})\n${[...quitadas, ...nuevas].join("\n")}\n`;
+        if (diff.length > 25000) break;
+      }
+      const r = await this.pedirIA(diff);
+      if (ta) { ta.value = r; ta.focus(); }
+    } catch (x) { this.aviso(x.message, { tipo: "error" }); }
+    boton.disabled = false; boton.textContent = "✨ Mensaje con IA";
   }
 
   async #commit() {
@@ -175,6 +205,7 @@ export class PanelGit {
       });
     }
     if (accion === "commit") return this.#commit();
+    if (accion === "mensaje-ia") return this.#mensajeIA(e.target.closest("button"));
     if (accion === "sincronizar") return this.correr(`${this.repo ? `cd /workspace/${this.repo} && ` : ""}git pull && git push`);
     if (accion === "pull") return this.correr(`${this.repo ? `cd /workspace/${this.repo} && ` : ""}git pull`);
     if (accion === "push") return this.correr(`${this.repo ? `cd /workspace/${this.repo} && ` : ""}git push`);

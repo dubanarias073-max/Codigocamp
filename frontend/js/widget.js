@@ -10,7 +10,8 @@ const q = new URLSearchParams(location.search);
 // Con la sesión del navegador (cookie) no hace falta token; ?t=… solo lo usan las apps de widgets.
 const token = q.get("t") || "";
 if (q.get("tema") !== "oscuro") document.documentElement.classList.add("auto");
-let vista = ["racha", "hoy", "reto", "calendario"].includes(q.get("w")) ? q.get("w") : q.get("w") === "meta" ? "hoy" : (() => { try { const v = localStorage.getItem("cc-widget-vista"); return ["racha", "hoy", "reto", "calendario"].includes(v) ? v : "racha"; } catch { return "racha"; } })();
+const VISTAS_OK = ["racha", "reloj", "hoy", "reto", "calendario"];
+let vista = VISTAS_OK.includes(q.get("w")) ? q.get("w") : q.get("w") === "meta" ? "hoy" : (() => { try { const v = localStorage.getItem("cc-widget-vista"); return VISTAS_OK.includes(v) ? v : "racha"; } catch { return "racha"; } })();
 let datos = null;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -32,41 +33,30 @@ async function cargar() {
   } finally { $("recargar").disabled = false; }
 }
 
-/* ===== Codi, la mascota: cambia de ánimo según tu racha (como el búho de Duolingo) ===== */
-const FRASES = {
-  feliz: ["¡Bien hecho! Tu racha está a salvo 💪", "¡Hoy cumpliste! Nos vemos mañana", "¡Qué crack! Ya practicaste hoy"],
-  fuego: ["¡Estás en llamas! 🔥", "¡Racha imparable! Sigue así", "Nadie te para 🚀"],
-  preocupado: ["¿Practicamos un ratito hoy?", "Tu racha te está esperando 👀", "5 minutos y listo, ¿vamos?"],
-  alarma: ["¡Tu racha está en peligro! 😱", "¡Corre! Se acaba el día", "¡No dejes que se apague tu racha!"],
-  dormido: ["Zzz… despiértame con una lección", "Empieza una racha hoy ✨", "¿Hoy empezamos? Yo te acompaño"],
-};
-function codi(animo) {
-  const ojos = animo === "dormido" ? `<path d="M30 46q5 4 10 0M56 46q5 4 10 0" class="cd-linea"/>`
-    : animo === "alarma" ? `<circle cx="35" cy="45" r="6" class="cd-ojo"/><circle cx="61" cy="45" r="6" class="cd-ojo"/><circle cx="35" cy="45" r="2.5" class="cd-pupila"/><circle cx="61" cy="45" r="2.5" class="cd-pupila"/>`
-    : `<circle cx="35" cy="45" r="5" class="cd-ojo"/><circle cx="61" cy="45" r="5" class="cd-ojo"/><circle cx="36.5" cy="44" r="2.2" class="cd-pupila"/><circle cx="62.5" cy="44" r="2.2" class="cd-pupila"/>`;
-  const boca = { feliz: `<path d="M38 60q10 10 20 0" class="cd-linea"/>`, fuego: `<path d="M36 58q12 14 24 0z" class="cd-boca"/>`,
-    preocupado: `<path d="M39 64q9-6 18 0" class="cd-linea"/>`, alarma: `<ellipse cx="48" cy="63" rx="6" ry="7" class="cd-boca"/>`, dormido: `<path d="M42 62h12" class="cd-linea"/>` }[animo];
-  const extra = { fuego: `<path class="cd-llama" d="M48 2c8 10 14 14 10 24-2 5-7 7-10 7s-9-2-11-8c-2-7 3-11 5-15 1 4 3 6 5 6-2-5-1-9 1-14z"/>`,
-    dormido: `<text x="74" y="20" class="cd-z">z</text><text x="82" y="10" class="cd-z cd-z2">z</text>`,
-    preocupado: `<path class="cd-gota" d="M78 30c3 5 4 7 4 9a4 4 0 0 1-8 0c0-2 1-4 4-9z"/>`,
-    alarma: `<text x="76" y="24" class="cd-excl">!</text>`, feliz: `<path class="cd-brillo" d="M80 18l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>` }[animo];
-  return `<svg class="codi cd-${animo}" viewBox="0 0 96 96" aria-hidden="true">${extra}
-    <rect x="14" y="20" width="68" height="62" rx="26" class="cd-cuerpo"/><path d="M14 52h-6M82 52h6" class="cd-linea"/>
-    <text x="48" y="31" class="cd-tag">&lt;/&gt;</text>${ojos}${boca}
-    <ellipse cx="27" cy="57" rx="5" ry="3" class="cd-mejilla"/><ellipse cx="69" cy="57" rx="5" ry="3" class="cd-mejilla"/></svg>`;
-}
-const frase = (animo) => { const l = FRASES[animo] || FRASES.feliz; return l[Math.floor(Date.now() / 600000) % l.length]; };
+/* ===== Codi, la mascota (js/codi.js): cambia de ánimo según tu racha y la hora (como el búho de Duolingo) ===== */
+import { codiSVG, fraseDe } from "/js/codi.js";
+const codi = (animo) => codiSVG(animo, { tam: 92 });
+const frase = (animo) => fraseDe(animo);
 const ccT = (t) => (window.ccT ? window.ccT(t) : t);
 
-function cuentaAtras(seg) {
-  const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60);
-  return `${h}h ${String(m).padStart(2, "0")}m`;
+const TRES_HORAS = 3 * 3600;
+function cuentaAtras(seg, conSegundos = false) {
+  seg = Math.max(0, Math.floor(seg));
+  const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), x = seg % 60;
+  return conSegundos ? `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : `${h}h ${String(m).padStart(2, "0")}m`;
 }
 let base = 0, segBase = 0;
-setInterval(() => {   // la cuenta atrás avanza sola cada 30 s
-  const el = $("wg").querySelector("[data-cuenta]");
-  if (el && segBase) el.textContent = cuentaAtras(Math.max(0, segBase - (Date.now() - base) / 1000));
-}, 30000);
+const quedan = () => Math.max(0, segBase - (Date.now() - base) / 1000);
+setInterval(() => {   // el cronómetro avanza solo cada segundo
+  const raiz = $("wg");
+  const seg = quedan();
+  for (const el of raiz.querySelectorAll("[data-cuenta]")) el.textContent = cuentaAtras(seg, el.dataset.cuenta === "s");
+  const urgente = seg <= TRES_HORAS && !datos?.practicado_hoy;
+  raiz.classList.toggle("urgente", urgente);
+  const barra = raiz.querySelector("[data-dia]");
+  if (barra) barra.style.width = `${Math.min(100, (1 - seg / 86400) * 100)}%`;
+  if (segBase && seg <= 0) { segBase = 0; cargar(); }   // empezó otro día
+}, 1000);
 
 let respondida = null;   // {id, elegida}
 function pintar() {
@@ -97,14 +87,24 @@ function pintar() {
         <div class="wg-ops">${p.opciones.map((o, i) => `<button type="button" data-op="${i}" ${r ? "disabled" : ""} class="${r ? (o === p.respuesta ? "bien" : r.elegida === i ? "mal" : "") : ""}">${esc(o)}</button>`).join("")}</div>
         ${r ? `<p class="wg-fb ${p.opciones[r.elegida] === p.respuesta ? "ok" : "no"}">${p.opciones[r.elegida] === p.respuesta ? "✅ ¡Correcto!" : "❌ Casi"}${p.explicacion ? " · " + esc(p.explicacion) : ""}</p>` : `<p class="wg-sub">Reto rápido de repaso · cambia cada 30 min</p>`}`;
     }
+  } else if (vista === "reloj") {
+    const seg = segBase;
+    const urg = seg <= TRES_HORAS && !d.practicado_hoy;
+    const titulo = d.practicado_hoy ? "Tu racha está a salvo hoy" : d.racha ? `Te quedan para salvar tu racha de ${d.racha}` : "Te quedan para empezar tu racha";
+    html = `<div class="wg-reloj ${d.practicado_hoy ? "ok" : urg ? "rojo" : ""}">
+        <div class="wg-reloj-codi">${codi(d.practicado_hoy ? (d.racha >= 7 ? "fuego" : "feliz") : urg ? "alarma" : d.racha ? "preocupado" : "dormido")}</div>
+        <div><small>${esc(titulo)}</small><b class="wg-reloj-num" data-cuenta="s">${cuentaAtras(seg, true)}</b>
+        <div class="wg-reloj-barra"><i data-dia style="width:${Math.min(100, (1 - seg / 86400) * 100)}%"></i></div>
+        <small class="wg-reloj-pie">${d.practicado_hoy ? "✅ Ya practicaste hoy. Mañana empieza otro día." : urg ? "🔴 ¡Menos de 3 horas! Haz una lección ya." : "⏳ El día termina a medianoche (tu hora)."}</small></div></div>`;
   } else if (vista === "calendario") {
     html = `${semana}<p class="wg-sub">Mejor racha: <b>${d.racha_maxima}</b> días · 🧊 ${d.salvarrachas} salvarrachas</p>`;
   } else {
     const peligro = !d.practicado_hoy && d.racha > 0;
     html = `<div class="wg-codi">${codi(animo)}<div class="wg-globo"><b class="wg-num">${d.racha}<small> ${d.racha === 1 ? "día de racha" : "días de racha"}</small></b>
-      <span>${esc(frase(animo))}</span>${peligro ? `<span class="wg-cuenta">⏳ <b data-cuenta>${cuentaAtras(segBase)}</b></span>` : ""}</div></div>${semana}`;
+      <span>${esc(frase(animo))}</span>${peligro ? `<span class="wg-cuenta ${segBase <= TRES_HORAS ? "rojo" : ""}">⏳ <b data-cuenta>${cuentaAtras(segBase)}</b> para salvarla</span>` : ""}</div></div>${semana}`;
   }
-  $("cuerpo").innerHTML = vista === "racha" || vista === "reto" ? html : `${html}<p class="wg-estado ${clase}">${esc(d.estado)}</p>`;
+  $("wg").classList.toggle("urgente", segBase <= TRES_HORAS && !d.practicado_hoy);
+  $("cuerpo").innerHTML = vista === "racha" || vista === "reto" || vista === "reloj" ? html : `${html}<p class="wg-estado ${clase}">${esc(d.estado)}</p>`;
 }
 
 $("cuerpo").addEventListener("click", async (e) => {
@@ -118,7 +118,7 @@ $("cuerpo").addEventListener("click", async (e) => {
   pintar();
 });
 
-const VISTAS = ["racha", "hoy", "reto", "calendario"];
+const VISTAS = VISTAS_OK;
 const cambiarVista = (v) => { vista = v; try { localStorage.setItem("cc-widget-vista", vista); } catch { /* nada */ } pintar(); };
 $("wg").querySelector(".wg-tabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-v]");

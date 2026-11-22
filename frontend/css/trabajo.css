@@ -696,3 +696,59 @@ button.estado-item:hover { background: var(--hover); color: var(--cy); }
 .gh-cuenta-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gh-cuenta-btn small { padding: 0 6px; border-radius: 99px; background: var(--hover); color: var(--sub); font-size: 11px; }
 .gh-cuenta-btn i { font-style: normal; color: var(--sub); font-size: 10px; }
+.term-entrada.buscando { background: color-mix(in srgb, var(--acc) 14%, transparent); border-radius: 4px; }
+.term-entrada.sin-resultado { background: color-mix(in srgb, #ef4444 16%, transparent); border-radius: 4px; }
+
+/* ===== Editor dividido (Ctrl+\) ===== */
+.area-editor.con-division > .editores { flex: 1 1 50%; }
+.editor-dividido { flex: 1 1 50%; min-width: 220px; display: flex; flex-direction: column; border-left: 1px solid var(--borde); background: var(--campo-bg); }
+.ed-div-cab { display: flex; align-items: center; justify-content: space-between; height: 28px; padding: 0 6px 0 12px; font: 700 12px system-ui, sans-serif; color: var(--sub); border-bottom: 1px solid var(--borde); }
+.ed-div-cuerpo { flex: 1; min-height: 0; }
+.area-editor.con-division .bienvenida { display: none; }
+
+/* ===== Modo zen (Ctrl+K Z) ===== */
+body.zen .lado, body.zen #lado, body.zen .inf, body.zen .tope, body.zen .migas, body.zen .estado-barra, body.zen .actividad { display: none !important; }
+body.zen .ide { --w-exp: 0px; }
+body.zen .editor-tarjeta { border-radius: 0; }
+
+/* ===== Ajustes y atajos ===== */
+.ide-ajustes .ajustes-lista { display: grid; gap: 2px; max-height: min(62vh, 560px); overflow: auto; margin: 8px 0 4px; }
+.ide-ajustes label { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 4px; border-bottom: 1px solid var(--borde); cursor: pointer; }
+.ide-ajustes label span { display: grid; gap: 2px; }
+.ide-ajustes label small { color: var(--sub); font-size: 12px; }
+.ide-ajustes select, .ide-ajustes input[type="number"] { min-width: 150px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--borde); background: var(--campo-bg); color: var(--txt); font: inherit; }
+.ide-ajustes input[type="number"] { min-width: 80px; width: 80px; }
+.ide-ajustes input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--acc); }
+.ide-atajos .atajos-buscar { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--borde); background: var(--campo-bg); color: var(--txt); font: inherit; margin: 6px 0; }
+.ide-atajos .atajos-lista { columns: 2 300px; column-gap: 22px; max-height: min(62vh, 560px); overflow: auto; }
+.ide-atajos section { break-inside: avoid; margin-bottom: 12px; }
+.ide-atajos h4 { margin: 4px 0; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--sub); }
+.ide-atajos .atajo { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 13px; border-bottom: 1px dashed color-mix(in srgb, var(--borde) 70%, transparent); }
+.ide-atajos .atajo[hidden] { display: none; }
+.ide-atajos kbd, .ide-ajustes kbd { padding: 1px 6px; border-radius: 6px; border: 1px solid var(--borde); background: var(--panel2); font: 600 11.5px ui-monospace, Consolas, monospace; white-space: nowrap; }
+.bienvenida-codi { width: 120px; height: 120px; }
+
+/* ===== IA en línea (Ctrl+I) ===== */
+.ia-linea { width: min(640px, 70vw); padding: 8px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--acc) 55%, var(--borde)); background: var(--panel); box-shadow: 0 10px 30px rgba(0,0,0,.28); font: 13px system-ui, sans-serif; color: var(--txt); z-index: 30; }
+.ia-linea-form { display: flex; align-items: center; gap: 6px; }
+.ia-linea-form input { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--borde); background: var(--campo-bg); color: var(--txt); font: inherit; outline: none; }
+.ia-linea-form input:focus { border-color: var(--acc); }
+.ia-linea-ic { font-size: 16px; }
+.ia-linea-ic.gira { display: inline-block; animation: iaGira 1s linear infinite; }
+.ia-linea-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sub); }
+.ia-linea-btn { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--borde); background: var(--panel2); color: var(--txt); font: 700 12px system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
+.ia-linea-btn.pri { background: var(--acc); border-color: var(--acc); color: #fff; }
+.ia-linea-btn kbd { font-size: 10px; opacity: .8; margin-left: 3px; }
+.ia-linea-ayuda, .ia-linea-error { margin-top: 5px; font-size: 11.5px; color: var(--sub); }
+.ia-linea-error { color: #ef4444; }
+.ia-linea-nuevo { background: rgba(34, 197, 94, .14); }
+.ia-linea-margen { border-left: 3px solid #22c55e; margin-left: 3px; }
+@keyframes iaGira { to { transform: rotate(360deg); } }
+/* Botón de la terminal cuando un comando falla */
+.term-ia-btn { margin: 2px 0 6px; padding: 3px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--acc) 60%, transparent); background: color-mix(in srgb, var(--acc) 12%, transparent); color: inherit; font: 700 12px system-ui, sans-serif; cursor: pointer; }
+.term-ia-btn:disabled { opacity: .5; cursor: default; }
+/* Git: mensaje con IA */
+.git-ia { width: 100%; margin-bottom: 6px; }
+/* Vista previa de Markdown */
+.vista-md .md-cuerpo { overflow: auto; padding: 14px 20px; font: 15px/1.6 system-ui, sans-serif; color: var(--txt); }
+.vista-md .md-cuerpo pre { padding: 10px; border-radius: 8px; background: var(--panel2); overflow: auto; }

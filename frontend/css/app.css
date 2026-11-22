@@ -326,6 +326,19 @@ button.cl:focus-visible{outline:2px solid var(--c);outline-offset:-2px}
 .widget-racha:hover{transform:translateY(-1px)}
 .wr-cab{display:flex;align-items:center;gap:10px}
 .wr-cab b{font-size:28px;line-height:1;color:#f97316}.wr-cab small{display:block;color:var(--sub)}
+.wr-codi{flex:none;display:grid;place-items:center;width:58px;height:58px;margin:-6px 0}
+.wr-reloj{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:12px;background:color-mix(in srgb,#f97316 10%,transparent);border:1px solid color-mix(in srgb,#f97316 35%,transparent)}
+.wr-reloj span{font-size:12.5px;font-weight:700;color:var(--sub)}
+.wr-reloj b{font:800 18px/1 ui-monospace,Consolas,monospace;color:#f97316;font-variant-numeric:tabular-nums}
+.widget-racha.hecho .wr-reloj{background:color-mix(in srgb,#22c55e 10%,transparent);border-color:color-mix(in srgb,#22c55e 40%,transparent)}
+.widget-racha.hecho .wr-reloj b{color:#22c55e}
+.wr-reloj.rojo{background:color-mix(in srgb,#ef4444 16%,transparent);border-color:#ef4444;animation:wrLate 1.4s ease-in-out infinite}
+.wr-reloj.rojo b,.wr-reloj.rojo span{color:#ef4444}
+.widget-racha.urgente{border-color:#ef4444}
+.chip-reloj{font-variant-numeric:tabular-nums;text-decoration:none}
+.chip-reloj.rojo{color:#fff;background:#ef4444;border-color:#ef4444;animation:wrLate 1.4s ease-in-out infinite}
+@keyframes wrLate{50%{box-shadow:0 0 0 4px rgba(239,68,68,.25)}}
+@media (prefers-reduced-motion:reduce){.wr-reloj.rojo,.chip-reloj.rojo{animation:none}}
 .wr-fuego{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:linear-gradient(160deg,#fdba74,#ea580c);color:#fff;filter:drop-shadow(0 4px 10px rgba(249,115,22,.45))}
 .wr-svg{width:26px;height:26px}.wr-mini{width:14px;height:14px;vertical-align:-2px}.wr-dia{width:15px;height:15px;color:#ea580c}
 .widget-racha:not(.hecho) .wr-fuego{background:linear-gradient(160deg,#cbd5e1,#64748b);filter:none}
@@ -377,3 +390,30 @@ img,video,canvas,svg{max-width:100%}
 }
 @media(max-width:360px){.inf-i .nav-icon{width:24px;height:24px}.inf-i{min-height:48px;padding:10px 0}}
 @media(max-height:560px) and (max-width:700px){.inf-i{min-height:40px;padding:6px 0}.inf-i .nav-icon{width:22px;height:22px}}
+.ia-codi{display:block;margin:0 auto 6px;width:110px;height:110px}
+/* Codi, el compañero de todas las páginas */
+.codi-lado{display:flex;align-items:flex-end;gap:6px;margin-top:auto;padding:4px 6px;text-decoration:none;color:var(--txt)}
+.codi-lado+.yo-chip{margin-top:6px}
+.codi-lado-img{flex:none;width:64px;height:64px;transition:transform .2s}
+.codi-lado:hover .codi-lado-img{transform:translateY(-3px) rotate(-4deg)}
+.codi-lado-globo{position:relative;margin-bottom:22px;padding:7px 9px;border-radius:12px 12px 12px 3px;font-size:11.5px;font-weight:700;line-height:1.25;background:var(--panel2);border:1px solid var(--borde);color:var(--txt)}
+.codi-tope{display:none;flex:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:12px;background:var(--panel2);border:1px solid var(--borde)}
+@media (max-width:900px){.codi-tope{display:inline-flex}}
+@media (max-height:640px){.codi-lado-globo{display:none}}
+.codi-lado.compacto{justify-content:center;padding:4px 0}
+.codi-lado.compacto .codi-lado-globo{display:none}
+.codi-lado.compacto .codi-lado-img,.codi-lado.compacto .codi-lado-img svg{width:44px;height:44px}
+
+/* Codi como ícono de la IA en el menú */
+.icono-codi{display:inline-grid;place-items:center;flex:none;width:26px;height:26px;stroke:none;transition:transform .2s}
+.icono-codi svg{width:26px;height:26px;display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))}
+a:hover>.icono-codi,.on>.icono-codi{transform:translateY(-2px) scale(1.08)}
+.inf-i .icono-codi,.inf-i .icono-codi svg{width:28px;height:28px}
+
+/* Metas de racha: salvarrachas cada 10 días y semana perfecta */
+.wr-metas{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.wr-metas span{flex:1 1 auto;padding:4px 8px;border-radius:8px;font-size:11.5px;font-weight:700;color:var(--sub);background:color-mix(in srgb,var(--txt) 7%,transparent);white-space:nowrap}
+
+/* Vista previa de los accesorios de Codi en la tienda */
+.vista.cc-prev-codi{display:grid;place-items:center;background:radial-gradient(circle at 50% 60%,color-mix(in srgb,var(--cy,#22d3ee) 22%,transparent),transparent 70%)}
+.vista.cc-prev-codi svg{overflow:visible}

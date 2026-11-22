@@ -1,7 +1,7 @@
 // Service worker de CódigoCamp: hace que la app se pueda instalar, abre aunque falle la red (página «sin conexión»),
 // guarda en caché los archivos de la interfaz y actualiza el widget de racha (Windows 11).
-const VERSION = "cc-v6";
-const BASE = ["/offline.html", "/css/app.css", "/css/tema.css", "/js/app.js", "/js/auth.js", "/js/iconos.js", "/js/cosmeticos.js", "/js/carga.js", "/js/tema.js", "/js/i18n.js", "/js/pwa.js",
+const VERSION = "cc-v11";
+const BASE = ["/offline.html", "/img/codi/triste.svg", "/img/codi/saludo.svg", "/js/codi.js", "/js/temporada.js", "/css/app.css", "/css/tema.css", "/js/app.js", "/js/auth.js", "/js/iconos.js", "/js/cosmeticos.js", "/js/carga.js", "/js/tema.js", "/js/i18n.js", "/js/pwa.js",
   "/img/app/icon-192.png", "/img/app/icon-512.png", "/img/logo-icon.png", "/img/favicon.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
@@ -56,7 +56,7 @@ async function actualizarWidget(widget) {
 }
 async function actualizarTodos() {
   if (!self.widgets) return;
-  for (const tag of ["racha", "meta", "calendario"]) {
+  for (const tag of ["racha", "reloj", "meta", "calendario"]) {
     const w = await self.widgets.getByTag(tag).catch(() => null);
     if (w) await actualizarWidget(w);
   }

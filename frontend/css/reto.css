@@ -97,3 +97,24 @@
 @keyframes racha-llama { from { transform: scale(1) rotate(-3deg); } to { transform: scale(1.12) rotate(3deg); } }
 @keyframes racha-num { from { transform: scale(.3); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .racha-hoy, .racha-fuego, .racha-num b { animation: none; } }
+/* Codi en los retos */
+.r-pie #mensaje{display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:center}
+.r-pie #mensaje>*:not(.r-codi){grid-column:2}
+.r-codi{grid-column:1;grid-row:1/span 6;align-self:start;width:72px;height:72px;animation:rCodiEntra .35s cubic-bezier(.3,1.6,.6,1)}
+.fin-codi{display:grid;place-items:center;margin:0 auto -6px;animation:rCodiEntra .5s cubic-bezier(.3,1.6,.6,1)}
+.racha-codi{background:none!important;box-shadow:none!important;width:auto!important;height:auto!important;font-size:0}
+@keyframes rCodiEntra{from{transform:scale(.4) translateY(14px);opacity:0}}
+@media (max-width:480px){.r-codi{width:56px;height:56px}.r-codi svg{width:56px;height:56px}}
+@media (prefers-reduced-motion:reduce){.r-codi,.fin-codi{animation:none}}
+.r-enunciado{display:flex;align-items:center;gap:14px}
+.r-enunciado h1{position:relative;flex:1;margin:0;padding:12px 16px;border:2px solid var(--borde);border-radius:18px;background:var(--panel)}
+.r-enunciado h1::before{content:"";position:absolute;left:-11px;top:50%;margin-top:-9px;border:9px solid transparent;border-right-color:var(--borde);border-left:0}
+.r-codi-preg{flex:none;width:84px;height:84px}
+@media (max-width:520px){.r-codi-preg{width:62px;height:62px}.r-codi-preg svg{width:62px;height:62px}.r-enunciado{gap:10px}.r-enunciado h1{padding:10px 12px}}
+.r-porque b{color:inherit}
+.r-porque-btn{justify-self:start;margin-top:2px;padding:7px 12px;border-radius:12px;border:2px solid currentColor;background:transparent;color:inherit;font:800 13px system-ui,sans-serif;cursor:pointer;opacity:.9}
+.r-porque-btn:hover{opacity:1;background:color-mix(in srgb,currentColor 10%,transparent)}
+.r-porque-ia{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:14px;background:color-mix(in srgb,var(--panel) 80%,transparent);border:1px solid var(--borde);animation:rCodiEntra .3s ease}
+.r-porque-ia p{margin:0;font-size:14px;line-height:1.45}
+.r-porque-ia code{padding:1px 5px;border-radius:6px;background:var(--panel2);font:13px ui-monospace,Consolas,monospace}
+.r-porque-codi{flex:none;width:44px;height:44px}
