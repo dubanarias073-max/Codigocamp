@@ -108,6 +108,7 @@ export class Almacen {
   }
 
   #estado(estado, mensaje = "") {
+    if (this.modoEquipo && estado !== "equipo" && estado !== "sesion") return;   // en el equipo, la nube no manda el estado
     this.estado = estado;
     this.alEstado(estado, mensaje);
   }
@@ -123,6 +124,9 @@ export class Almacen {
     return null;
   }
 
+  /** El proyecto de la cuenta: el abierto, o el guardado aparte mientras trabajas en tu equipo. */
+  get proyectoNube() { return this.modoEquipo ? this.nube : this.proyecto; }
+
   /** Con proyectos grandes, convertir a JSON en cada tecla se nota: se agrupan las escrituras locales (400 ms). */
   #persistirPronto() {
     if ((this.ultimoLargo || 0) < 300_000) { this.#persistir(); return; }
@@ -134,7 +138,8 @@ export class Almacen {
     clearTimeout(this.persistencia);
     this.persistencia = null;
     try {
-      const datos = JSON.stringify({ v: VERSION, proyecto: this.proyecto, sucio: this.sucio, base: this.base, ts: Date.now() });
+      // Con la carpeta del equipo abierta, en el navegador se guarda la copia de la NUBE (nunca la del equipo)
+      const datos = JSON.stringify({ v: VERSION, proyecto: this.proyectoNube, sucio: this.sucio, base: this.base, ts: Date.now() });
       this.ultimoLargo = datos.length;
       this.storage.setItem(this.clave, datos);
       this.errorLocalAvisado = false;
@@ -199,6 +204,10 @@ export class Almacen {
     const local = this.#leerLocal(); // se lee DESPUÉS de la respuesta para incluir lo escrito mientras esperaba
     const token = remoto.actualizado ?? null;
     const reemplazar = (proyecto, sucio) => {
+      if (this.modoEquipo) {   // trabajando en el equipo: solo se actualiza la copia de la nube guardada aparte
+        this.nube = proyecto; this.sucio = sucio; this.base = token; this.reconciliado = true; this.#persistir();
+        return;
+      }
       const cambio = !iguales(proyecto, this.proyecto);
       this.proyecto = proyecto;
       this.sucio = sucio;
@@ -209,7 +218,7 @@ export class Almacen {
     };
     if (!remoto.proyecto) {
       // La cuenta todavía no tiene proyecto: se sube el local (o las plantillas si es la primera vez).
-      reemplazar(local ? local.proyecto : this.proyecto, true);
+      reemplazar(local ? local.proyecto : this.proyectoNube, true);
       return true;
     }
     const nube = normalizarProyecto(remoto.proyecto);
@@ -230,8 +239,36 @@ export class Almacen {
     return true;
   }
 
+  // --------------------------------------------- trabajar en tu equipo (sin guardar en la nube) ----
+  /** Desde aquí se trabaja sobre una carpeta de tu computador o celular: nada se guarda en la nube ni en el
+   *  navegador. Tu proyecto de la nube queda intacto en tu cuenta y vuelve con salirModoEquipo(). */
+  async entrarModoEquipo() {
+    if (this.modoEquipo) { this.proyecto = normalizarProyecto({ files: {} }); this.version += 1; return; }
+    clearTimeout(this.temporizador);
+    if (this.corriendo) await this.corriendo.catch(() => {});   // una subida a medias termina con el proyecto de la nube
+    if (this.sucio) { this.#persistir(); await this.#subir(); }
+    this.nube = this.proyecto;
+    this.modoEquipo = true;
+    clearTimeout(this.temporizador);
+    this.proyecto = normalizarProyecto({ files: {} });
+    this.version += 1;
+    this.#estado("equipo");
+  }
+
+  salirModoEquipo() {
+    if (!this.modoEquipo) return;
+    this.modoEquipo = false;
+    this.proyecto = this.nube || this.#leerLocal()?.proyecto || proyectoNuevo();
+    this.nube = null;
+    this.version += 1;
+    this.version += 1;
+    this.#estado(this.sucio ? "guardando" : "guardado");
+    if (this.sucio) void this.#subir();
+  }
+
   /** Avisa que el proyecto cambió: guarda al instante en el navegador y programa la subida. */
   cambiar() {
+    if (this.modoEquipo) { this.version += 1; return; }   // se guarda en tu equipo (lo hace la sincronización con la carpeta)
     this.version += 1;
     this.sucio = true;
     this.#persistirPronto();
@@ -242,6 +279,7 @@ export class Almacen {
 
   /** Sube ya (botón Guardar / Ctrl+S). Resuelve cuando termina, con true si quedó guardado en la cuenta. */
   async guardarAhora() {
+    if (this.modoEquipo) return true;
     clearTimeout(this.temporizador);
     this.#persistir();
     await this.#subir();
@@ -262,12 +300,17 @@ export class Almacen {
         if (!this.sucio) continue;
       }
       const version = this.version;
-      this.#estado("guardando");
+      const equipo = this.modoEquipo;
+      const nube = this.proyectoNube;
+      if (!nube) return;
+      if (!equipo) this.#estado("guardando");
       try {
-        const r = await this.#pedir("PUT", JSON.stringify(this.proyecto));
+        const r = await this.#pedir("PUT", JSON.stringify(nube));
         this.base = r.actualizado ?? this.base;
         this.fallos = 0;
-        if (version === this.version) {
+        if (equipo || this.modoEquipo) {   // lo que faltaba de la nube ya subió; lo del equipo nunca va a la nube
+          this.sucio = false;
+        } else if (version === this.version) {
           this.sucio = false;
           this.#estado("guardado");
         } else {
@@ -282,6 +325,7 @@ export class Almacen {
   }
 
   #fallo(error) {
+    if (this.modoEquipo) { clearTimeout(this.temporizador); this.temporizador = setTimeout(() => { if (this.sucio) void this.#subir(); }, 30_000); return; }
     const http = error.estado;
     if (http === 401 || http === 403) {
       this.#estado("sesion", "Tu sesión venció. Recarga la página e inicia sesión de nuevo; tu trabajo sigue guardado en este navegador.");
@@ -299,6 +343,7 @@ export class Almacen {
 
   /** Para pagehide / visibilitychange: intenta mandar lo pendiente aunque la página se esté cerrando. */
   volcarAlSalir() {
+    if (this.modoEquipo) return;
     if (this.persistencia) this.#persistir();
     if (!this.sucio) return;
     clearTimeout(this.temporizador);
@@ -309,6 +354,7 @@ export class Almacen {
 
   /** Otra pestaña del mismo navegador guardó: se adopta su versión para no pisarla. */
   recargarDesdeLocal() {
+    if (this.modoEquipo) return false;
     const local = this.#leerLocal();
     if (!local || iguales(local.proyecto, this.proyecto)) return false;
     this.proyecto = local.proyecto;

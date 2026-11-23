@@ -113,7 +113,7 @@ if (yaDentro) {
   // Si Google no dejó entrar, el servidor vuelve con ?error=…: se explica qué pasó (antes no se veía nada).
   const params = new URLSearchParams(location.search);
   const ERRORES_GOOGLE = {
-    google_config: "«Continuar con Google» no está configurado: faltan GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en backend/.env.",
+    google_config: "«Continuar con Google» no está disponible en este momento. Entra con tu correo y contraseña.",
     google_email: "Tu cuenta de Google no tiene un correo verificado. Usa otra cuenta de Google o entra con tu correo y contraseña.",
     google_conflict: "Ese correo ya está unido a OTRA cuenta de Google. Entra con la cuenta de Google que usaste la primera vez, o con tu correo y contraseña (si no la recuerdas: «¿Olvidaste tu contraseña?»).",
     google_inactive: "Esta cuenta está desactivada.",

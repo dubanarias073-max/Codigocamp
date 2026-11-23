@@ -1,5 +1,7 @@
 // Lógica de ia.html
 import { iniciar, api, aviso, esc } from "/js/app.js";
+import { sonar } from "/js/sonidos.js";
+import { codiSVG } from "/js/codi.js";
 import { CSS_ADJUNTOS, crearAdjuntador } from "/js/adjuntar.js";
 import { formato } from "/js/formato-ia.js";
 const { user, prog } = await iniciar("ia");
@@ -23,7 +25,7 @@ function burbuja(rol, texto, archivos = [], { pensando = false } = {}) {
   d.className = `msg ${rol}${pensando ? " pensando" : ""}`;
   let cuerpo = d;
   if (rol === "tutor") {
-    d.innerHTML = `<div class="msg-av" aria-hidden="true"><img src="/img/logo-icon.png" alt=""></div><div class="msg-cuerpo"></div>
+    d.innerHTML = `<div class="msg-av" aria-hidden="true">${codiSVG("feliz", { tam: 30, animado: false })}</div><div class="msg-cuerpo"></div>
       <div class="msg-acc"><button type="button" class="ia-ico" data-copiar title="Copiar respuesta" aria-label="Copiar respuesta">${ICO_COPIAR}</button></div>`;
     cuerpo = d.querySelector(".msg-cuerpo");
     if (pensando) cuerpo.innerHTML = `<span class="ia-pensando" aria-hidden="true"><i></i><i></i><i></i></span><span class="ia-espera"></span>`, cuerpo.querySelector(".ia-espera").textContent = texto;
@@ -181,11 +183,13 @@ $("f").onsubmit = async (e) => {
   vacia(false);
   burbuja("yo", t || "(archivos)", adj.adjuntos());
   adj.limpiar();
+  sonar("enviar");
   const espera = burbuja("tutor", adjuntos.length ? "Revisando tus archivos…" : "", [], { pensando: true });
   try {
     const r = await api("/api/tutor/", { mensaje: t, adjuntos, ...(actual ? { conversacion_id: actual.id } : { guardar: true }), contexto: { pagina: "IA" } });
     espera.closest(".msg").classList.remove("pensando");
     formato(espera, r.respuesta);
+    sonar("ia");
     mensajes.push({ rol: "yo", texto: t || "(archivos)", archivos: archivos.map((a) => a.nombre) }, { rol: "tutor", texto: r.respuesta });
     if (r.conversacion) {
       const nueva = !actual;
@@ -203,3 +207,6 @@ $("f").onsubmit = async (e) => {
   if (!TACTIL) $("q").focus();
 };
 actualizar();
+
+// Codi en vivo en la bienvenida (con el accesorio que tenga puesto)
+{ const c = document.getElementById("iaCodi"); if (c) c.innerHTML = codiSVG("saludo", { tam: 110 }); }

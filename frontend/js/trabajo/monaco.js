@@ -6,10 +6,12 @@
 //
 // Cada archivo es un «modelo» con la URI file:///workspace/<ruta>. Los .js/.ts/.jsx/.tsx/.json del proyecto se
 // mantienen como modelos aunque no estén abiertos, para que TypeScript entienda los import entre archivos.
+const TACTIL = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 // Si Monaco no carga (navegador muy viejo), trabajo.js usa el editor simple de siempre.
 import { extension } from "./fs.js";
 import { OPCIONES_MONACO } from "./autocompletar.js";
 import { definirTemas, guardarTema, temaMonaco } from "./temas.js";
+import { traducirMarcas, vigilar } from "./analisis.js";
 
 const BASE = "/vendor/monaco/vs";
 let promesa = null;
@@ -32,7 +34,10 @@ const NOMBRES = { javascript: "JavaScript", typescript: "TypeScript", html: "HTM
   elixir: "Elixir", julia: "Julia", pascal: "Pascal", clojure: "Lisp", fsharp: "OCaml/F#", dockerfile: "Dockerfile" };
 
 export const lenguajeDe = (ruta) => (/(^|\/)Dockerfile$/i.test(ruta) ? "dockerfile" : LENGUAJES[extension(ruta)] ?? "plaintext");
-const CODIGO = new Set(["js", "mjs", "cjs", "jsx", "ts", "mts", "tsx", "json"]);
+// Archivos que se mantienen como modelos aunque estén cerrados: así el detector de problemas revisa TODO el proyecto
+// (JavaScript/TypeScript con IntelliSense; HTML, CSS, Python, Java, C/C++, PHP… con el analizador de CódigoCamp).
+const CODIGO = new Set(["js", "mjs", "cjs", "jsx", "ts", "mts", "tsx", "json", "html", "htm", "css", "scss", "less",
+  "py", "java", "c", "h", "cpp", "cc", "hpp", "cs", "go", "rs", "php", "rb", "kt", "swift", "sql"]);
 const esCodigo = (ruta) => CODIGO.has(extension(ruta)) || /\.d\.ts$/.test(ruta);
 const uriDe = (ruta) => monaco.Uri.parse(`file:///workspace/${ruta.split("/").map(encodeURIComponent).join("/")}`);
 
@@ -82,8 +87,8 @@ function configurar(m) {
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => m.editor.setTheme(temaActual()));
   const ts = m.languages.typescript;
   const opciones = {
-    target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.NodeJs,
-    jsx: ts.JsxEmit.ReactJSX, allowJs: true, checkJs: false, allowNonTsExtensions: true, esModuleInterop: true,
+    target: ts.ScriptTarget.ESNext ?? 99, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.NodeJs,
+    jsx: ts.JsxEmit.ReactJSX, allowJs: true, checkJs: true, allowNonTsExtensions: true, esModuleInterop: true,
     allowImportingTsExtensions: true, noEmit: true, strict: false, skipLibCheck: true, resolveJsonModule: true, isolatedModules: true,
   };
   ts.typescriptDefaults.setCompilerOptions({ ...opciones, strict: true });
@@ -91,7 +96,12 @@ function configurar(m) {
   // Paquetes de npm (react, etc.): no hay node_modules, así que no se marcan como error «no se encuentra el módulo».
   const ignorar = [2307, 2792, 7016];
   ts.typescriptDefaults.setDiagnosticsOptions({ diagnosticCodesToIgnore: ignorar });
-  ts.javascriptDefaults.setDiagnosticsOptions({ diagnosticCodesToIgnore: ignorar });
+  // En JavaScript se marcan nombres sin definir, constantes reasignadas, argumentos que faltan… pero no las quejas de
+  // tipos de TypeScript (en JS confunden más de lo que ayudan) ni las de Node (require, process, module).
+  ts.javascriptDefaults.setDiagnosticsOptions({ diagnosticCodesToIgnore: [...ignorar, 2339, 2345, 2322, 2531, 2532, 2533, 18046, 18047, 18048,
+    2362, 2363, 2365, 2367, 2769, 2349, 2351, 2352, 2353, 2355, 2741, 2740, 2739, 2559, 2571, 2580, 2591, 2584, 2686, 7005, 7006, 7031, 7034, 7053,
+    80001, 80002, 80004, 80005, 80006, 80007, 7044, 7043, 7045, 7046, 7047, 7048, 7049, 7050, 2550, 2585, 2683, 2695, 2364, 1371, 2614, 2305, 2306] });
+  traducirMarcas(m);
   ts.typescriptDefaults.setEagerModelSync(true);
   ts.javascriptDefaults.setEagerModelSync(true);
 }
@@ -115,27 +125,70 @@ export function sincronizarModelos(py, esTexto) {
   if (!monaco) return;
   const vivas = new Set();
   for (const [ruta, texto] of Object.entries(py.files)) {
-    if (!esCodigo(ruta) || !esTexto(texto) || texto.length > 1_000_000) continue;
+    if (!esCodigo(ruta) || !esTexto(texto) || texto.length > 1_000_000 || deTerceros(ruta)) continue;
     vivas.add(uriDe(ruta).toString());
-    if (!abiertos.get(ruta)) modeloPara(ruta, texto);
+    if (!abiertos.get(ruta)) vigilar(monaco, modeloPara(ruta, texto), ruta, { completo: false });
   }
   for (const m of monaco.editor.getModels()) {
     const u = m.uri.toString();
     if (u.startsWith("file:///workspace/") && !vivas.has(u)) {
       const ruta = decodeURIComponent(u.slice("file:///workspace/".length));
-      if (!abiertos.get(ruta)) m.dispose();
+      if (!abiertos.get(ruta)) soltarModelo(m);
     }
   }
 }
 
+/** Cierra el modelo de un archivo que ya no está (otro proyecto, se borró…) junto con sus marcas de error:
+ *  Monaco guarda las marcas aunque el modelo se cierre y quedarían en Problemas. */
+function soltarModelo(m) {
+  for (const dueno of new Set(monaco.editor.getModelMarkers({ resource: m.uri }).map((k) => k.owner))) monaco.editor.setModelMarkers(m, dueno, []);
+  m.dispose();
+}
+
+/** Código de librerías (node_modules, vendor, dist, venv, .min.js…): como en VS Code, sus errores no son tuyos y no
+ *  van a Problemas (si abres uno de esos archivos, se revisa igual mientras está abierto). */
+const TERCEROS = /(^|\/)(node_modules|bower_components|vendor|dist|build|out|coverage|\.next|\.nuxt|\.venv|venv|env|site-packages|__pycache__|target|\.gradle|\.git)\//;
+export const deTerceros = (ruta) => TERCEROS.test(ruta) || /\.min\.(js|css)$|\.bundle\.js$|-bundle\.js$/i.test(ruta);
+
 /** Errores y advertencias que Monaco encontró en el proyecto: { errores, advertencias, lista:[{ruta, linea, mensaje, grave}] }. */
 export function problemas() {
   if (!monaco) return { errores: 0, advertencias: 0, lista: [] };
-  const lista = monaco.editor.getModelMarkers({}).filter((k) => k.resource.toString().startsWith("file:///workspace/") && k.severity >= monaco.MarkerSeverity.Warning)
+  // Solo los archivos del proyecto abierto (con modelo vivo): nunca marcas viejas de otro proyecto o de un archivo borrado
+  const lista = monaco.editor.getModelMarkers({}).filter((k) => k.resource.toString().startsWith("file:///workspace/") && k.severity >= monaco.MarkerSeverity.Warning && monaco.editor.getModel(k.resource))
     .map((k) => ({ ruta: decodeURIComponent(k.resource.path.slice("/workspace/".length)), linea: k.startLineNumber, mensaje: k.message, grave: k.severity === monaco.MarkerSeverity.Error }));
   return { errores: lista.filter((p) => p.grave).length, advertencias: lista.filter((p) => !p.grave).length, lista };
 }
 export const alCambiarProblemas = (fn) => monaco?.editor.onDidChangeMarkers(fn);
+
+/**
+ * Errores que salieron al ejecutar (Python, Node, compiladores…): se subrayan en su archivo y suman en ⊗ / ⚠.
+ * Cada ejecución reemplaza las marcas de la anterior; al editar el archivo marcado, su marca se quita.
+ * @param {{ruta, linea, columna?, mensaje, grave}[]} lista
+ * @param {(ruta:string)=>string|null} textoDe  texto del archivo (para crear el modelo si estaba cerrado)
+ */
+const DUENO_EJECUCION = "ejecucion";
+export function marcarEjecucion(lista, textoDe) {
+  if (!monaco) return;
+  for (const m of monaco.editor.getModels()) monaco.editor.setModelMarkers(m, DUENO_EJECUCION, []);
+  const porRuta = new Map();
+  for (const p of lista) { if (!porRuta.has(p.ruta)) porRuta.set(p.ruta, []); porRuta.get(p.ruta).push(p); }
+  for (const [ruta, ps] of porRuta) {
+    let modelo = monaco.editor.getModel(uriDe(ruta));
+    if (!modelo) { const t = textoDe(ruta); if (typeof t !== "string") continue; modelo = modeloPara(ruta, t); }
+    const n = modelo.getLineCount();
+    monaco.editor.setModelMarkers(modelo, DUENO_EJECUCION, ps.map((p) => {
+      const l = Math.min(Math.max(1, p.linea), n);
+      const ini = p.columna ? Math.min(p.columna, modelo.getLineMaxColumn(l)) : (modelo.getLineFirstNonWhitespaceColumn(l) || 1);
+      return { severity: p.grave ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning, message: `${p.mensaje} (al ejecutar)`,
+        startLineNumber: l, startColumn: ini, endLineNumber: l, endColumn: Math.max(modelo.getLineMaxColumn(l), ini + 1), source: "Ejecución" };
+    }));
+    if (!marcadosEjecucion.has(modelo)) {
+      marcadosEjecucion.add(modelo);
+      modelo.onDidChangeContent(() => { if (monaco.editor.getModelMarkers({ resource: modelo.uri, owner: DUENO_EJECUCION }).length) monaco.editor.setModelMarkers(modelo, DUENO_EJECUCION, []); });
+    }
+  }
+}
+const marcadosEjecucion = new WeakSet();
 
 // ------------------------------------------------------------------------ editor ----
 export class EditorMonaco {
@@ -155,6 +208,7 @@ export class EditorMonaco {
     abiertos.set(ruta, (abiertos.get(ruta) || 0) + 1);
     this.modelo = modeloPara(ruta, texto);
     if (this.modelo.getValue() !== texto) this.modelo.setValue(texto);
+    vigilar(monaco, this.modelo, ruta);   // errores de Python, Java, C/C++, HTML… mientras escribes
     this.editor = monaco.editor.create(this.raiz, {
       model: this.modelo, automaticLayout: true, fontSize: 14, fontFamily: "'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace",
       fontLigatures: true, minimap: { enabled: innerWidth > 1500 }, tabSize: this.ext === "py" || this.ext === "java" ? 4 : 2, insertSpaces: this.ext !== "go",
@@ -185,6 +239,8 @@ export class EditorMonaco {
         this.alAtajo(b.shiftKey ? "nueva-terminal" : "terminal");
       }
     });
+    if (TACTIL) this.#barraTactil();
+    this.#lenteErrores();
     this.editor.addCommand(K.CtrlCmd | C.KeyB, () => this.alAtajo("explorador"));
     this.editor.addCommand(K.CtrlCmd | K.Shift | C.KeyG, () => this.alAtajo("git"));
     // Como VS Code: ajustes, dividir, zen, atajos, zoom, ajuste de línea, reabrir pestaña
@@ -212,7 +268,134 @@ export class EditorMonaco {
     ia.forEach(([id, label, keybindings], i) => this.editor.addAction({ id: `cc.${id}`, label, keybindings, contextMenuGroupId: "0_ia", contextMenuOrder: i + 1, run: () => this.alAtajo(id) }));
   }
 
+  /** Como la extensión Error Lens: el mensaje del error se ve al final de su línea (en el celular no hay «pasar el mouse»). */
+  #lenteErrores() {
+    const deco = this.editor.createDecorationsCollection();
+    const pintar = () => {
+      const modelo = this.editor.getModel();
+      if (!modelo || modelo.isDisposed()) return deco.clear();
+      const porLinea = new Map();
+      for (const m of monaco.editor.getModelMarkers({ resource: modelo.uri })) {
+        if (m.severity < monaco.MarkerSeverity.Warning) continue;
+        const x = porLinea.get(m.startLineNumber);
+        if (!x || m.severity > x.severity) porLinea.set(m.startLineNumber, m);
+      }
+      this.erroresLinea = [...porLinea.values()].sort((a, b) => a.startLineNumber - b.startLineNumber);
+      pintarMovil?.();
+      deco.set([...porLinea.values()].slice(0, 150).map((m) => {
+        const error = m.severity === monaco.MarkerSeverity.Error;
+        const fin = modelo.getLineMaxColumn(Math.min(m.startLineNumber, modelo.getLineCount()));
+        const texto = m.message.split("\n")[0];
+        return {
+          range: new monaco.Range(m.startLineNumber, fin, m.startLineNumber, fin),
+          options: { showIfCollapsed: true, linesDecorationsClassName: error ? "lente-marca-error" : "lente-marca-aviso",
+            after: { content: `  ${error ? "⊗" : "⚠"} ${texto.length > 110 ? `${texto.slice(0, 107)}…` : texto}`, inlineClassName: error ? "lente-error" : "lente-aviso", cursorStops: monaco.editor.InjectedTextCursorStops?.None } },
+        };
+      }));
+    };
+    // Celular: el error de la línea donde estás (o el primero) se lee completo arriba del código; ‹ › salta entre errores
+    let pintarMovil = null;
+    if (TACTIL) {
+      const ed = this.editor;
+      const nodo = document.createElement("div");
+      nodo.className = "ed-error-movil";
+      nodo.hidden = true;
+      nodo.innerHTML = '<button type="button" data-e="-1" aria-label="Error anterior">‹</button><span role="status" aria-live="polite"></span><button type="button" data-e="1" aria-label="Error siguiente">›</button>';
+      nodo.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) e.preventDefault(); });
+      const ir = (paso) => {
+        const lista = this.erroresLinea || [];
+        if (!lista.length) return;
+        const actual = ed.getPosition()?.lineNumber ?? 0;
+        const sig = paso > 0 ? lista.find((m) => m.startLineNumber > actual) ?? lista[0] : [...lista].reverse().find((m) => m.startLineNumber < actual) ?? lista[lista.length - 1];
+        ed.setPosition({ lineNumber: sig.startLineNumber, column: sig.startColumn });
+        ed.revealLineInCenterIfOutsideViewport(sig.startLineNumber);
+      };
+      nodo.addEventListener("click", (e) => { const b = e.target.closest("[data-e]"); if (b) ir(Number(b.dataset.e)); else ir(0); });
+      ed.addOverlayWidget({ getId: () => "cc.error.movil", getDomNode: () => nodo, getPosition: () => null });
+      pintarMovil = () => {
+        const lista = this.erroresLinea || [];
+        nodo.hidden = !lista.length;
+        if (!lista.length) return;
+        const linea = ed.getPosition()?.lineNumber ?? 0;
+        const m = lista.find((x) => x.startLineNumber === linea) ?? lista[0];
+        const error = m.severity === monaco.MarkerSeverity.Error;
+        nodo.classList.toggle("aviso", !error);
+        nodo.querySelector("span").textContent = `${error ? "⊗" : "⚠"} Línea ${m.startLineNumber}: ${m.message.split("\n")[0]}${lista.length > 1 ? `  (${lista.indexOf(m) + 1}/${lista.length})` : ""}`;
+        const l = ed.getLayoutInfo();
+        nodo.style.width = `${l.width - 26}px`;
+        nodo.style.top = `${Math.max(4, l.height - 54 - (nodo.offsetHeight || 46) - 8)}px`;   // justo encima de la barra táctil
+      };
+      ed.onDidChangeCursorPosition(() => pintarMovil());
+      ed.onDidLayoutChange(() => pintarMovil());
+    }
+    let t = null;
+    const programar = () => { clearTimeout(t); t = setTimeout(pintar, 120); };
+    const sub = monaco.editor.onDidChangeMarkers((uris) => { const u = this.editor.getModel()?.uri.toString(); if (uris.some((x) => x.toString() === u)) programar(); });
+    this.editor.onDidChangeModel(programar);
+    this.editor.onDidDispose(() => { sub.dispose(); clearTimeout(t); });
+    programar();
+  }
+
   get lenguaje() { return NOMBRES[lenguajeDe(this.ruta)] ?? lenguajeDe(this.ruta); }
+
+  /** Celular y tableta: Monaco casi no deja seleccionar con el dedo, así que hay una barra con selección por líneas,
+   *  copiar/cortar/pegar y la IA; y tocar o arrastrar sobre los números de línea selecciona esas líneas. */
+  #barraTactil() {
+    const ed = this.editor;
+    const lineas = () => {
+      const s = ed.getSelection();
+      let fin = s.endLineNumber;
+      if (s.endColumn === 1 && fin > s.startLineNumber) fin--;   // la selección termina al inicio de la línea siguiente
+      return [s.startLineNumber, fin];
+    };
+    const elegir = (a, b) => {
+      const m = this.modelo, n = m.getLineCount();
+      a = Math.max(1, Math.min(n, a)); b = Math.max(1, Math.min(n, b));
+      const [x, y] = a <= b ? [a, b] : [b, a];
+      ed.setSelection(new monaco.Selection(x, 1, y, m.getLineMaxColumn(y)));
+      ed.revealLinesInCenterIfOutsideViewport(x, y);
+    };
+    const avisar = (t) => { nodo.dataset.aviso = t; clearTimeout(this._av); this._av = setTimeout(() => { delete nodo.dataset.aviso; }, 1400); };
+    const texto = () => this.modelo.getValueInRange(ed.getSelection());
+    const acciones = {
+      linea: () => { const [a, b] = lineas(); elegir(a, b); },
+      arriba: () => { const [a, b] = lineas(); elegir(a - 1, b); },
+      abajo: () => { const [a, b] = lineas(); elegir(a, b + 1); },
+      menos: () => { const [a, b] = lineas(); elegir(a, Math.max(a, b - 1)); },
+      palabra: () => { const p = ed.getPosition(); const w = this.modelo.getWordAtPosition(p); if (w) ed.setSelection(new monaco.Selection(p.lineNumber, w.startColumn, p.lineNumber, w.endColumn)); },
+      todo: () => ed.setSelection(this.modelo.getFullModelRange()),
+      copiar: async () => { const t = texto(); if (!t) return avisar("Selecciona algo primero"); try { await navigator.clipboard.writeText(t); avisar("Copiado ✓"); } catch { avisar("No se pudo copiar"); } },
+      cortar: async () => { const t = texto(); if (!t) return avisar("Selecciona algo primero"); try { await navigator.clipboard.writeText(t); ed.executeEdits("cortar", [{ range: ed.getSelection(), text: "" }]); avisar("Cortado ✓"); } catch { avisar("No se pudo cortar"); } },
+      pegar: async () => { try { const t = await navigator.clipboard.readText(); ed.executeEdits("pegar", [{ range: ed.getSelection(), text: t, forceMoveMarkers: true }]); ed.focus(); } catch { avisar("Mantén pulsado el editor → Pegar"); } },
+      deshacer: () => ed.trigger("barra", "undo"),
+      rehacer: () => ed.trigger("barra", "redo"),
+      sangria: () => ed.trigger("barra", "editor.action.indentLines"),
+      comentar: () => ed.trigger("barra", "editor.action.commentLine"),
+      ia: () => this.alAtajo("ia-menu"),
+    };
+    const B = (id, ic, t) => `<button type="button" data-a="${id}" title="${t}" aria-label="${t}">${ic}<small>${t}</small></button>`;
+    const nodo = document.createElement("div");
+    nodo.className = "ed-tactil";
+    nodo.setAttribute("role", "toolbar");
+    nodo.setAttribute("aria-label", "Selección y acciones del código");
+    nodo.innerHTML = B("ia", "✨", "IA") + B("linea", "▤", "Línea") + B("arriba", "⤒", "+ arriba") + B("abajo", "⤓", "+ abajo") + B("menos", "⊖", "− línea")
+      + B("palabra", "ab", "Palabra") + B("todo", "⬚", "Todo") + B("copiar", "⧉", "Copiar") + B("cortar", "✂", "Cortar") + B("pegar", "📋", "Pegar")
+      + B("comentar", "//", "Comentar") + B("sangria", "⇥", "Sangría") + B("deshacer", "↶", "Deshacer") + B("rehacer", "↷", "Rehacer");
+    // pointerdown + preventDefault: el editor no pierde el foco ni se cierra el teclado
+    nodo.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) e.preventDefault(); });
+    nodo.addEventListener("click", (e) => { const b = e.target.closest("button[data-a]"); if (b) acciones[b.dataset.a]?.(); });
+    const widget = { getId: () => "cc.barra.tactil", getDomNode: () => nodo, getPosition: () => null };
+    ed.addOverlayWidget(widget);
+    const ubicar = () => { const l = ed.getLayoutInfo(); nodo.style.top = `${Math.max(0, l.height - 54)}px`; nodo.style.width = `${l.width - 12}px`; };
+    ed.onDidLayoutChange(ubicar); ubicar();
+    ed.updateOptions({ padding: { top: 8, bottom: 60 }, scrollBeyondLastLine: true });
+    // Tocar / arrastrar sobre los números de línea
+    let ancla = null;
+    const enMargen = (t) => t && (t.type === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS || t.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN || t.type === monaco.editor.MouseTargetType.GUTTER_LINE_DECORATIONS);
+    ed.onMouseDown((e) => { if (enMargen(e.target) && e.target.position) { ancla = e.target.position.lineNumber; elegir(ancla, ancla); } });
+    ed.onMouseMove((e) => { if (ancla && e.target.position && (e.event.buttons & 1 || e.event.browserEvent?.pointerType === "touch")) elegir(ancla, e.target.position.lineNumber); });
+    ed.onMouseUp(() => { ancla = null; });
+  }
 
   #cursor() {
     const p = this.editor.getPosition();

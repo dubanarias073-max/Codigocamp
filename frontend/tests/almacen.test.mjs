@@ -234,3 +234,54 @@ test("normalizarProyecto descarta basura y conserva Git válido", () => {
   assert.equal(py.git.commits.length, 1);
   assert.deepEqual(py.git.branches, { main: "abc1234" });
 });
+
+test("modo equipo: lo que se hace en el equipo NO se sube a la nube y el proyecto de la nube vuelve intacto", async () => {
+  const srv = new Servidor(), ls = new Almacenamiento();
+  const a = crear(srv, ls);
+  await a.iniciar();
+  FS.crearArchivo(a.proyecto, "nube.txt", "de la nube");
+  a.cambiar();
+  await a.guardarAhora();
+  const antes = JSON.stringify(srv.proyecto.files);
+  const peticiones = srv.peticiones.length;
+  await a.entrarModoEquipo();
+  assert.equal(a.estado, "equipo");
+  assert.deepEqual(a.proyecto.files, {});
+  FS.crearArchivo(a.proyecto, "equipo.py", "print(1)");
+  a.cambiar();
+  assert.equal(await a.guardarAhora(), true);
+  await dormir(40);
+  assert.equal(srv.peticiones.length, peticiones, "no se llama al servidor");
+  assert.equal(JSON.stringify(srv.proyecto.files), antes);
+  a.salirModoEquipo();
+  assert.equal(a.proyecto.files["nube.txt"], "de la nube");
+  assert.equal(a.proyecto.files["equipo.py"], undefined);
+  assert.notEqual(a.estado, "equipo");
+});
+
+test("modo equipo: ni una subida a medias ni la reconciliación suben el proyecto del equipo (o uno vacío) a la nube", async () => {
+  const srv = new Servidor(), ls = new Almacenamiento();
+  const a = crear(srv, ls, { retardo: 1 });
+  await a.iniciar();
+  FS.crearArchivo(a.proyecto, "nube.txt", "importante");
+  a.cambiar();                        // queda una subida programada
+  const entrar = a.entrarModoEquipo();
+  FS.crearArchivo(a.proyecto, "equipo.py", "x = 1");
+  await entrar;
+  FS.crearArchivo(a.proyecto, "otro.py", "y = 2");
+  a.cambiar();
+  await dormir(60);
+  assert.equal(srv.proyecto.files["nube.txt"], "importante");
+  assert.equal(srv.proyecto.files["equipo.py"], undefined);
+  assert.equal(srv.proyecto.files["otro.py"], undefined);
+  // lo guardado en el navegador también es la copia de la nube
+  assert.equal(JSON.parse(ls.getItem(CLAVE)).proyecto.files["nube.txt"], "importante");
+  assert.equal(JSON.parse(ls.getItem(CLAVE)).proyecto.files["otro.py"], undefined);
+  // una página nueva (recarga) con el navegador y el servidor tal cual: sigue la nube intacta
+  const b = crear(srv, ls);
+  await b.iniciar();
+  assert.equal(b.proyecto.files["nube.txt"], "importante");
+  a.salirModoEquipo();
+  assert.equal(a.proyecto.files["nube.txt"], "importante");
+  assert.equal(a.proyecto.files["otro.py"], undefined);
+});

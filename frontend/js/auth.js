@@ -12,7 +12,7 @@ export async function api(url, datos, metodo) {
     body: datos === undefined ? undefined : JSON.stringify(datos),
   });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.error || "No se pudo conectar con el servidor.");
+  if (!r.ok) throw Object.assign(new Error(d.error || "No se pudo conectar con el servidor."), { estado: r.status, datos: d });
   return d;
 }
 

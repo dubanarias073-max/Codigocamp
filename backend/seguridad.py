@@ -52,6 +52,8 @@ def configurar_seguridad(app):
         if request.method in {"GET", "HEAD", "OPTIONS"}:
             session.setdefault("_csrf_token", secrets.token_urlsafe(32))
             return None
+        if request.path.startswith("/api/conector/agente/"):
+            return None   # el Conector de tu equipo usa su propio token (Authorization: Bearer), sin cookies
         if request.path.startswith("/api/"):
             cookie_token = request.cookies.get("csrftoken", "")
             session_token = session.get("_csrf_token", "")
@@ -83,6 +85,10 @@ def configurar_seguridad(app):
             response.set_cookie("csrftoken", token, httponly=False, samesite="Lax", secure=app.config["SESSION_COOKIE_SECURE"])
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "geolocation=(self), camera=(self), microphone=(self), payment=(), usb=(), serial=(), bluetooth=()")
+        if request.is_secure or request.headers.get("X-Forwarded-Proto") == "https":
+            response.headers.setdefault("Strict-Transport-Security", "max-age=15552000")
         return response
 
     @app.errorhandler(HTTPException)

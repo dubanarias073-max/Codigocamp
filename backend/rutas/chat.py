@@ -4,7 +4,7 @@ from flask_login import current_user, login_required
 
 from datetime import timedelta
 
-from models import Attachment, Message, db, utcnow
+from models import Attachment, ChatBorrado, Message, db, utcnow
 from rutas.adjuntos import publico, tomar
 from servicios.amistades import my_friendships
 from utilidades import api_error, json_body, parse_integer, too_many
@@ -50,7 +50,7 @@ def chat(friendship_id):
         contar_actividad(get_profile(current_user), "mensajes")
         db.session.commit()
     after = parse_integer(request.args.get("despues"), 0)
-    query = Message.query.filter_by(amistad_id=friendship.id)
+    query = Message.query.filter(Message.amistad_id == friendship.id, Message.id > borrado_hasta(current_user.id, friendship.id))
     messages = query.filter(Message.id > after).order_by(Message.id).limit(50).all() if after else query.order_by(Message.id.desc()).limit(50).all()[::-1]
     query.filter(Message.leido.is_(False), Message.autor_id != current_user.id).update(
         {Message.leido: True}, synchronize_session=False,
@@ -63,6 +63,38 @@ def chat(friendship_id):
     # Mensajes que se eliminaron hace poco (para quitarlos también de la pantalla de la otra persona)
     borrados = [m.id for m in query.filter(Message.borrado_en.isnot(None), Message.borrado_en > utcnow() - timedelta(days=2)).with_entities(Message.id).all()]
     return jsonify(mensajes=[_ser(message, adj) for message in messages], borrados=borrados)
+
+
+def borrado_hasta(usuario_id, amistad_id):
+    """Último mensaje que esta persona eliminó de su vista (0 si nunca borró el chat)."""
+    b = ChatBorrado.query.filter_by(usuario_id=usuario_id, amistad_id=amistad_id).first()
+    return b.hasta_mensaje_id if b else 0
+
+
+@bp.delete("/api/chat/<int:friendship_id>/")
+@login_required
+def borrar_chat(friendship_id):
+    """«Eliminar chat»: desaparece solo para quien lo borra. La otra persona conserva la conversación completa."""
+    friendship = my_friendships(current_user.id).filter_by(id=friendship_id).first()
+    if not friendship:
+        return api_error("Esa conversación no existe.", 404)
+    ultimo = db.session.query(db.func.max(Message.id)).filter(Message.amistad_id == friendship.id).scalar() or 0
+    b = ChatBorrado.query.filter_by(usuario_id=current_user.id, amistad_id=friendship.id).first()
+    if b:
+        b.hasta_mensaje_id, b.creado_en = max(b.hasta_mensaje_id, ultimo), utcnow()
+    else:
+        db.session.add(ChatBorrado(usuario_id=current_user.id, amistad_id=friendship.id, hasta_mensaje_id=ultimo))
+    db.session.flush()
+    # Lo que ya borraron las dos personas no le sirve a nadie: se elimina de verdad (con sus adjuntos)
+    otro = friendship.a_usuario_id if friendship.de_usuario_id == current_user.id else friendship.de_usuario_id
+    ambos = min(ultimo, borrado_hasta(otro, friendship.id))
+    if ambos:
+        viejos = [m.id for m in Message.query.filter(Message.amistad_id == friendship.id, Message.id <= ambos).with_entities(Message.id).all()]
+        if viejos:
+            Attachment.query.filter(Attachment.mensaje_id.in_(viejos)).delete(synchronize_session=False)
+            Message.query.filter(Message.id.in_(viejos)).delete(synchronize_session=False)
+    db.session.commit()
+    return jsonify(ok=True)
 
 
 def _ser(message, adj):

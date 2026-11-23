@@ -124,7 +124,7 @@ if(d.token)setTimeout(function(){{window.close()}},900);}})();</script></body></
 def dispositivo():
     cid = _cfg("GITHUB_CLIENT_ID")
     if not cid:
-        return api_error("El inicio de sesión con GitHub no está configurado (falta GITHUB_CLIENT_ID en backend/.env).", 503)
+        return api_error("El inicio de sesión con GitHub no está disponible ahora. Usa un token personal.", 503)
     if too_many(f"ghdev:{current_user.id}", 10, 300):
         return api_error("Demasiados intentos. Espera unos minutos.", 429)
     try:

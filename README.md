@@ -1,6 +1,6 @@
 # CódigoCamp
 
-**CódigoCamp** es una plataforma web interactiva en español para aprender a programar. Combina lecciones teóricas, retos prácticos al estilo Duolingo, un editor tipo VS Code integrado en el navegador (**Trabajo**), un tutor con IA (Gemini), chat en tiempo real entre amigos, cofres y una tienda de recompensas.
+**CódigoCamp** es una plataforma web interactiva en español para aprender a programar. Combina lecciones teóricas, retos prácticos al estilo Duolingo, un editor profesional integrado en el navegador (**Trabajo**) que puede usar la terminal real de tu computador o celular, un tutor con IA (Gemini), chat en tiempo real entre amigos, cofres y una tienda de recompensas.
 
 - **Backend:** Python (Flask + SQLAlchemy) con MySQL o MariaDB (XAMPP).
 - **Frontend:** HTML, CSS y JavaScript puro sin compilación (servido directamente por Flask desde `frontend/`).
@@ -14,12 +14,13 @@
 3. [Configuración de variables (`backend/.env`)](#3-configuración-de-variables-backendenv)
 4. [Comandos útiles](#4-comandos-útiles)
 5. [Qué incluye la plataforma](#5-qué-incluye-la-plataforma)
-6. [Trabajo: el editor tipo VS Code](#6-trabajo-el-editor-tipo-vs-code)
+6. [Trabajo: el editor profesional de CódigoCamp](#6-trabajo-el-editor-profesional-de-códigocamp)
 7. [Ver el diagrama de la base en MySQL Workbench](#7-ver-el-diagrama-de-la-base-en-mysql-workbench)
 8. [Instalar como app y widgets](#8-instalar-como-app-y-widgets)
 9. [Estructura del proyecto](#9-estructura-del-proyecto)
 10. [Pruebas](#10-pruebas)
 11. [Solución de problemas](#11-solución-de-problemas)
+12. [Consultas de la base de datos de CódigoCamp](#12-consultas-de-la-base-de-datos-de-códigocamp)
 
 > 🚀 **¿Quieres publicarlo en la máquina virtual del SENA con Docker y Tailscale?** Sigue la guía de despliegue en [Readme2.md](Readme2.md).
 
@@ -189,6 +190,10 @@ Compress-Archive backend\almacen_archivos $HOME\almacen_archivos-respaldo.zip -F
 | `PYTHON_VENVS_DIR` | carpeta temporal | Dónde se guardan esos entornos virtuales (uno por usuario). |
 | `DOCKER_TRABAJO` | `auto` | Docker de verdad en la terminal de Trabajo (`docker …`, `docker compose …`). `auto` = solo en desarrollo (`DEBUG=1`), `1` siempre, `0` nunca. Necesita Docker Desktop abierto. Cada usuario solo ve sus contenedores; sin `--privileged`, red del host ni carpetas fuera del proyecto. |
 | `DOCKER_DIR` | carpeta temporal | Dónde se copian los proyectos para Docker. |
+| `ANTIVIRUS` | `1` | Revisa cada archivo subido (programas `.exe`/ELF/Mach-O aunque les cambien la extensión, macros, doble extensión, zips con programas o zip-bombas, firma EICAR). Si instalas **ClamAV** también lo usa. `0` lo apaga (no recomendado). |
+| `CLAMAV_SOCKET` | automático | Socket de ClamAV. Si no existe, se usa `clamscan` si está instalado. |
+| `SAFE_BROWSING_KEY` | — | Opcional: clave gratuita de Google Safe Browsing para que el detector de enlaces también consulte la lista de Google. Sin ella usa sus propias reglas y listas. |
+| `PHP_SERVIDOR` | `1` (si hay `php`) | `php -S` real en Trabajo (un servidor por cuenta, solo en 127.0.0.1, con límites de CPU y se apaga a los 15 min sin uso). `0` lo desactiva. |
 
 *(Si no configuras credenciales SMTP, los correos no fallan: se guardan como archivos `.eml` dentro de `backend/almacen_archivos/correos/` para revisarlos en local).*
 
@@ -211,6 +216,7 @@ Ejecútalos dentro de `backend` con el entorno virtual activado (`venv\Scripts\a
 | `flask --app app probar-correo tu@correo.com` | Verifica el envío de correo SMTP. |
 | `flask --app app probar-ia` | Verifica la conexión con la API de Gemini. |
 | `flask --app app limpiar-archivos` | Limpia del disco archivos huérfanos que ya no se usan. |
+| `flask --app app actualizar-listas` | Descarga las listas públicas de sitios de virus y estafas (URLhaus, Phishing Army, OpenPhish). Ejecútalo una vez al día (Programador de tareas de Windows o `cron`). |
 | `python herramientas/generar_aprende.py <curso>` | Regenera las lecciones teóricas de un curso desde `retos/conceptos/`. |
 | `python herramientas/puente_bd.py` | Puente local para conectar una instancia remota con tu MySQL local. |
 
@@ -222,7 +228,7 @@ Ejecútalos dentro de `backend` con el entorno virtual activado (`venv\Scripts\a
 - El onboarding incluye la aceptación obligatoria de **Términos y condiciones** (`frontend/pages/terminos.html`), informando sobre copias de respaldo en Trabajo, uso de IA y reglas de convivencia.
 - Si actualizas `data-version="…"` en `terminos.html`, todos los usuarios deberán aceptar la nueva versión al iniciar sesión (se registra en la tabla `terminos_aceptados`).
 
-### 23 Cursos (Aprende e Inicio)
+### 25 Cursos (Aprende e Inicio)
 - **Web:** HTML, CSS, JavaScript y TypeScript.
 - **Lenguajes:** Python, Java, C#, Kotlin, Swift, PHP, Ruby, Go, Rust, C (9 etapas) y C++ (9 etapas).
 - **Datos:** Bases de datos, SQL y NoSQL (MongoDB, Redis, Firestore, Cassandra, Neo4j, DynamoDB, Elasticsearch).
@@ -237,7 +243,7 @@ Ejecútalos dentro de `backend` con el entorno virtual activado (`venv\Scripts\a
 
 ---
 
-## 6. Trabajo: el editor tipo VS Code
+## 6. Trabajo: el editor profesional de CódigoCamp
 
 **Trabajo** es un entorno de desarrollo integrado directamente en el navegador:
 
@@ -247,13 +253,17 @@ Ejecútalos dentro de `backend` con el entorno virtual activado (`venv\Scripts\a
 | **Vista previa (como Live Server)** | Se abre **al lado del código** (o como pestaña) y se **recarga sola** mientras escribes, sin perder dónde ibas. Tiene selector de páginas, atrás/adelante, tamaño celular/tableta y el botón ↗ **Abrir en el navegador**: una dirección real `https://<tu-servidor>/live/<clave>/index.html` que funciona en cualquier navegador o celular, con los enlaces entre páginas, el CSS, el JS y las imágenes, y que también se recarga sola al guardar. La página corre aislada (no puede usar la cuenta de quien la abre) y con «Cambiar enlace» el anterior deja de funcionar. |
 | **Varias vistas previas** | Una pestaña por página (index.html, login.html…) dentro del panel; «Ejecutar» en otro HTML abre otra vista. El enlace del navegador arma la página con el mismo motor que Trabajo (React/JSX, módulos, npm) y usa la dirección pública de `APP_URL` si entraste por localhost. |
 | **Cuentas de GitHub** | Varias cuentas: cambiar la activa, agregar otra, cerrar sesión de una o de todas (panel de Git o `gh auth login/switch/logout/status`). |
-| **Autocompletado** | Como en VS Code: mientras escribes aparece la lista de sugerencias y **Enter** (o Tab) inserta la elegida. Python, Java, C/C++, C#, PHP, SQL (con las tablas y columnas de tus `CREATE TABLE`), Go, Rust, Ruby, Kotlin, Swift y Bash, además del IntelliSense de JS/TS/HTML/CSS. Incluye fragmentos (`def`, `for`, `main`, `sout`, `log`, `mysql`…), Emmet en HTML (`!`, `ul>li*3`, `div.caja`) y los nombres de tu proyecto. Funciona también en el celular. |
+| **Problemas (⊗ y ⚠)** | Detector de errores de todo el proyecto (JavaScript/TypeScript, HTML, CSS, Python, Java, C/C++, PHP…) y de los errores que salen al ejecutar (Python, Node, compiladores, PHP, Ruby). Los archivos dañados se ven en **rojo** en el árbol y en las pestañas, con el número de problemas; clic en ⊗/⚠ (o `Ctrl+Shift+M`) abre el panel **PROBLEMAS** y te lleva a la línea. |
+| **Terminal en tu equipo (Conector)** | Botón 🖥 del panel de terminal o paleta → *Conectar mi computador o celular*. Descargas `codigocamp-conector.py`, lo abres en la carpeta de tu proyecto con el código que muestra Trabajo y la terminal «Mi equipo» ejecuta comandos **de verdad** en Windows, macOS, Linux o Android (Termux). Solo funciona mientras tú tengas el Conector abierto; con *Enviar proyecto* / *Traer archivos* sincronizas la carpeta. **Seguridad:** antes de vincular pide el PIN, huella o clave de tu propio equipo (Windows Hello, contraseña de macOS/Linux, huella en Termux); se cierra solo tras 30 min sin uso; nunca ejecuta comandos destructivos (borrar el disco, apagar el antivirus, robar contraseñas, reverse shells, mineros…) ni comandos con enlaces peligrosos. |
+| **Protección de enlaces y archivos** | Cualquier enlace externo (vista previa, chat, Trabajo) se revisa antes de abrirse: si es de virus o estafa (suplantación de marcas, `g00gle`, letras falsas, listas públicas, Google Safe Browsing) **no se abre aunque aceptes**; si es dudoso (acortadores, descargas `.exe`) te pregunta. CódigoCamp no guarda esos enlaces. Los archivos subidos pasan por el antivirus (`ANTIVIRUS`). |
+| **GitHub** | «Recordar sesión» se mantiene; si cierras la ventana con la sesión de GitHub abierta, te avisa. El indicador de la barra inferior permite cerrarla en un clic. |
+| **Enlaces externos** | Los enlaces `https://`, `www.`, `mailto:` y `tel:` de tus páginas se abren en una pestaña nueva del navegador. |
+| **Autocompletado** | Mientras escribes aparece la lista de sugerencias y **Enter** (o Tab) inserta la elegida. Python, Java, C/C++, C#, PHP, SQL (con las tablas y columnas de tus `CREATE TABLE`), Go, Rust, Ruby, Kotlin, Swift y Bash, además del IntelliSense de JS/TS/HTML/CSS. Incluye fragmentos (`def`, `for`, `main`, `sout`, `log`, `mysql`…), Emmet en HTML (`!`, `ul>li*3`, `div.caja`) y los nombres de tu proyecto. Funciona también en el celular. |
 | **Terminal y Git** | Terminal Bash simulada (`ls`, `cd`, `cat`, `python`, `npm`, `pip`, `git`), clonación, ramas, commits, merges y `git push` directo a GitHub. |
 | **Entornos y servidores** | Soporte para entornos virtuales (`.venv`), vistas previas de FastAPI/Flask/Django y apps de Vite: **React, Preact, Vue, Svelte** y vanilla (`npm create vite@latest app -- --template vue`). Los `.vue` y `.svelte` se compilan en el navegador con el compilador oficial de la versión de tu `package.json`. |
 | **Copiloto en línea** | Como GitHub Copilot: mientras escribes, la IA sugiere en gris lo que sigue (usa tu archivo y los relacionados). **Tab** acepta, **Esc** descarta. Se activa o desactiva con «✨ Copiloto» en la barra de estado. |
 | **Bases de datos** | En local (`DEBUG=1`) se conecta directamente a tu MySQL de XAMPP; si MySQL está apagado, crea automáticamente una base SQLite funcional en `.codigocamp/bd/`. |
 | **Asistente IA** | Propone cambios sobre tus archivos con vista previa para aceptar o rechazar cada uno. Primero analiza el archivo y hace **ediciones puntuales** (solo las líneas del error o de lo que pediste: no toca el diseño ni lo demás). Si una propuesta reescribe casi todo un archivo, la marca con ⚠️. |
-| **Idioma** | Español o inglés (Configuración → Apariencia, o el botón 🇺🇸/🇪🇸 en las páginas de entrada). Cambia menús, botones y avisos; las lecciones y retos siguen en español. Se guarda en la cuenta. |
 | **Contactos** | En Chats, «📇 Buscar en mis contactos» (app de Android o Chrome en Android): muestra quién ya está en CódigoCamp para agregarlo y permite invitar al resto por WhatsApp, SMS o correo. Solo viaja al servidor el sha256 de cada correo; la agenda no se guarda. Cada quien decide si lo pueden encontrar (Configuración → Cuenta). |
 | **Widgets** | Codi, la mascota, cambia de ánimo con tu racha (feliz, en llamas, preocupado, alarma, dormido), cuenta atrás cuando la racha está en peligro, pestaña **Hoy** con meta y encargos, y **⚡ Reto rápido** para responder una pregunta de repaso desde el widget. Deslizar cambia de vista. |
 | **Celular** | Pestañas Archivos · Código · Terminal · IA. Para renombrar o **eliminar** un archivo o carpeta: botón **⋯** de la fila o mantener pulsado. |
@@ -347,3 +357,9 @@ node --test tests/*.test.mjs
 | Error 400 (`redirect_uri_mismatch`) en Google | Verifica que `GOOGLE_REDIRECT_URI` en `.env` y Google Cloud tengan `http://localhost:5000/auth/google/callback/` con la barra `/` al final. |
 | No llegan los correos | Ejecuta `flask --app app probar-correo tu@correo.com` y verifica que uses una contraseña de aplicación de Gmail. |
 | Workbench se cierra con el diagrama | Ejecuta `flask --app app reparar-workbench`. |
+
+## 12. Consultas de la base de datos de CódigoCamp
+
+Todas estas consultas están también en `base de datos/consultas_codigocamp` (ábrelo en MySQL Workbench y ejecútalo después de `codigocamp.sql`). Para cada tabla hay una consulta básica y otra útil con filtros, `JOIN` o agregaciones.
+
+

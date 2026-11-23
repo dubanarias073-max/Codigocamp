@@ -56,6 +56,10 @@ function reproducirTono(frecuencia, inicio, duracion, forma, frecuenciaFinal = f
 }
 
 function reproducirRespuesta(correcta) {
+  // Codi (la mascota del menú) reacciona a cada respuesta
+  dispatchEvent(new CustomEvent("codi", { detail: correcta
+    ? { animo: "celebra", frase: ["¡Correcto! 🎉", "¡Eso es!", "¡Lo tienes!", "¡Muy bien!"][Math.floor(Math.random() * 4)], ms: 2200 }
+    : { animo: "preocupado", frase: ["¡Casi! Lee la explicación", "No pasa nada, ¡sigue!", "Uy… revisemos juntos"][Math.floor(Math.random() * 3)], ms: 2600 } }));
   if (sonar(correcta ? "correcto" : "incorrecto")) return;   // sonidos con temática de código (js/sonidos.js)
   if (!sonidoActivo || !audioContext || audioContext.state !== "running") return;
   const ahora = audioContext.currentTime;

@@ -8,7 +8,7 @@
 
   var CURSOS = { html: 'HTML', css: 'CSS', bd: 'Bases de datos', javascript: 'JavaScript', python: 'Python', typescript: 'TypeScript',
     java: 'Java', csharp: 'C#', kotlin: 'Kotlin', swift: 'Swift', php: 'PHP', ruby: 'Ruby', go: 'Go', rust: 'Rust', c: 'C', cpp: 'C++',
-    terminal: 'Terminales', git: 'Git', github: 'GitHub', docker: 'Docker', node: 'Node.js', nosql: 'NoSQL', react: 'React' };
+    terminal: 'Terminales', git: 'Git', github: 'GitHub', docker: 'Docker', node: 'Node.js', nosql: 'NoSQL', react: 'React', reactnative: 'React Native' };
   // Qué curso recomendar según lo que quiere crear
   var RECOMIENDA = { web: 'html', movil: 'kotlin', juegos: 'csharp', datos: 'python', auto: 'terminal', bd: 'bd' };
 
@@ -179,4 +179,12 @@
       try { localStorage.setItem('cc_tema', t); } catch (e) {} }).catch(function () {});
 
   mostrar(0);
+})();
+
+// Si hiciste la prueba de CódigoCamp antes de registrarte, tu nivel ya viene marcado
+(function () {
+  var nivel = null;
+  try { nivel = new URLSearchParams(location.search).get('nivel') || localStorage.getItem('cc_prueba_nivel'); } catch (e) { /* nada */ }
+  var op = nivel && document.querySelector('input[name="nivel"][value="' + nivel + '"]');
+  if (op) { op.checked = true; op.dispatchEvent(new Event('change', { bubbles: true })); }
 })();

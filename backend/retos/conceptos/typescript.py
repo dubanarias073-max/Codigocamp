@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Genéricos y tipos avanzados", "Tipos reutilizables, utilitarios y transformaciones", ts_e4.LISTA),
     ("TypeScript profesional", "Configuración, asincronía, herramientas y buenas prácticas", ts_e5.LISTA),
 ]
+
+from .typescript_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

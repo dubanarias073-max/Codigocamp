@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Excepciones, genéricos y LINQ", "Errores controlados, tipos genéricos, lambdas y consultas", cs_e4.LISTA),
     ("C# moderno y profesional", "Asincronía, hilos, archivos, herramientas y buenas prácticas", cs_e5.LISTA),
 ]
+
+from .csharp_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Tipos, interfaces y errores", "Modela datos y comportamientos con tipos propios", go_e4.LISTA),
     ("Concurrencia y herramientas", "Coordina tareas y aprovecha las herramientas modernas de Go", go_e5.LISTA),
 ]
+
+from .go_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

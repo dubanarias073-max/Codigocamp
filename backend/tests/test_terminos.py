@@ -28,14 +28,14 @@ class TerminosTest(unittest.TestCase):
         return self.c.get("/api/auth/me/").get_json()["user"]
 
     def test_version_sale_de_la_pagina(self):
-        self.assertEqual(terminos.version_actual(), "2026-11-20")
+        self.assertEqual(terminos.version_actual(), "2026-11-24")
 
     def test_onboarding_exige_aceptar(self):
         r = self.c.post("/api/perfil/", json=self.datos, headers=self.csrf)
         self.assertEqual(r.status_code, 400)
         self.assertIn("Términos", r.get_json()["error"])
         self.assertFalse(self.yo()["terminos"])
-        r = self.c.post("/api/perfil/", json={**self.datos, "terminos": "2026-11-20"}, headers=self.csrf)
+        r = self.c.post("/api/perfil/", json={**self.datos, "terminos": "2026-11-24"}, headers=self.csrf)
         self.assertEqual(r.status_code, 200, r.get_data(as_text=True))
         self.assertTrue(self.yo()["terminos"])
 

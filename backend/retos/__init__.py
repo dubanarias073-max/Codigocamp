@@ -16,7 +16,7 @@ from .base import PREGUNTAS_POR_LECCION, XP_ETAPA
 
 # Mismo `slug` que la tabla `cursos`; el archivo se llama igual (javascript.py, csharp.py...).
 ORDEN = ["html", "css", "javascript", "python", "sql", "bd", "typescript", "java", "csharp",
-         "kotlin", "swift", "php", "ruby", "go", "rust", "c", "cpp", "terminal", "git", "github", "docker", "node", "nosql", "react"]
+         "kotlin", "swift", "php", "ruby", "go", "rust", "c", "cpp", "terminal", "git", "github", "docker", "node", "nosql", "react", "reactnative"]
 
 # Cursos que se crean solos en la tabla `cursos` si faltan (los demás vienen de codigocamp.sql).
 CURSOS_NUEVOS = {
@@ -27,6 +27,7 @@ CURSOS_NUEVOS = {
     "github": dict(nombre="GitHub", tipo="lenguaje", sigla="GH", color="#a78bfa", descripcion="Repositorios, equipo, Actions, Pages y seguridad", orden=22),
     "nosql": dict(nombre="NoSQL", tipo="bd", sigla="NoSQL", color="#22c55e", descripcion="MongoDB, Redis, Firestore, grafos y más", orden=23),
     "react": dict(nombre="React", tipo="lenguaje", sigla="RE", color="#61dafb", descripcion="Interfaces con componentes, hooks, rutas y Next.js", orden=24),
+    "reactnative": dict(nombre="React Native", tipo="lenguaje", sigla="RN", color="#38bdf8", descripcion="Apps para Android y iPhone con React y Expo", orden=25),
 }
 
 

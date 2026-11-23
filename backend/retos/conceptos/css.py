@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Flexbox y Grid", "Organiza el diseño de la página con fila, columna y cuadrícula", css_e4.LISTA),
     ("Responsive y efectos", "Adapta la página a cualquier pantalla y añade movimiento", css_e5.LISTA),
 ]
+
+from .css_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

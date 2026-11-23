@@ -100,7 +100,7 @@ class Profile(db.Model):
     __tablename__ = "perfiles"
     ROLES = {"estudiante", "cambio", "programador", "curioso"}
     NIVELES = {"cero", "probado", "basico", "avanzado"}
-    IDIOMAS = {"es", "en"}
+    IDIOMAS = {"es"}
     TEMAS = {"auto", "claro", "oscuro"}  # auto = predeterminado (sigue el tema del dispositivo)
 
     id = db.Column(db.Integer, primary_key=True)
@@ -113,7 +113,7 @@ class Profile(db.Model):
     zona_horaria = db.Column(db.String(64), nullable=True)  # la detecta el dispositivo (p. ej. America/Bogota)
     onboarding_completo = db.Column(db.Boolean, nullable=False, default=False)
     tema = db.Column(db.Enum("auto", "claro", "oscuro", name="tema"), nullable=False, default="auto")
-    idioma = db.Column(db.String(2), nullable=False, default="es", server_default="es")   # idioma de la interfaz: es / en
+    idioma = db.Column(db.String(2), nullable=False, default="es", server_default="es")   # la app es solo en español (columna conservada por compatibilidad)
     buscable_correo = db.Column(db.Boolean, nullable=False, default=True, server_default="1")   # tus contactos te encuentran por tu correo
     alias = db.Column(db.String(20), unique=True, nullable=True)
     codigo = db.Column(db.String(8), unique=True, nullable=True)
@@ -329,6 +329,20 @@ class Message(db.Model):
     autor = db.relationship("User")
 
 
+class ChatBorrado(db.Model):
+    """«Eliminar chat» solo para quien lo pide (borrado lógico por usuario, como un arreglo deletedBy): esa persona deja
+    de ver los mensajes hasta `hasta_mensaje_id`; la otra conserva todo su historial. Si la conversación sigue, los
+    mensajes nuevos sí aparecen. Cuando las dos personas borraron, esos mensajes se eliminan de verdad."""
+    __tablename__ = "chats_borrados"
+    __table_args__ = (db.UniqueConstraint("usuario_id", "amistad_id", name="uq_chat_borrado"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    amistad_id = db.Column(db.Integer, db.ForeignKey("amistades.id", ondelete="CASCADE"), nullable=False, index=True)
+    hasta_mensaje_id = db.Column(db.Integer, nullable=False, default=0)
+    creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
 class TutorUsage(db.Model):
     __tablename__ = "uso_tutor"
 
@@ -501,3 +515,32 @@ class AppLoginCode(db.Model):
     usado = db.Column(db.Boolean, nullable=False, default=False)
     # sha256 del secreto que guarda la app mientras espera (así entra aunque el navegador no logre volver a la app)
     espera_hash = db.Column(db.String(64), nullable=True, index=True)
+
+
+class Traduccion(db.Model):
+    """Textos de CódigoCamp traducidos por la IA (retos, lecciones, avisos): se traducen una sola vez y se reutilizan."""
+    __tablename__ = "traducciones"
+    __table_args__ = (db.UniqueConstraint("idioma", "huella", name="uq_traduccion"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    idioma = db.Column(db.String(5), nullable=False)
+    huella = db.Column(db.String(40), nullable=False)   # sha1 del texto original
+    original = db.Column(db.Text, nullable=False)
+    texto = db.Column(db.Text, nullable=False)
+    creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class Conector(db.Model):
+    """Un computador o celular que su dueño conectó a Trabajo con el Conector de CódigoCamp (codigocamp-conector.py).
+    Mientras el programa está abierto en ese equipo, la terminal de Trabajo ejecuta comandos de verdad en la carpeta que
+    la persona eligió. Solo se guarda la huella del token (el token completo lo tiene únicamente el equipo)."""
+    __tablename__ = "conectores"
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE", name="fk_conectores_usuario"), nullable=False, index=True)
+    token_hash = db.Column(db.String(64), nullable=False, unique=True)
+    equipo = db.Column(db.String(80), nullable=False, default="Mi equipo")
+    sistema = db.Column(db.String(40), nullable=False, default="")
+    carpeta = db.Column(db.String(400), nullable=False, default="")
+    creado = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    ultimo = db.Column(db.DateTime(timezone=True), nullable=True)

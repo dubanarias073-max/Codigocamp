@@ -419,3 +419,6 @@ ETAPAS_CONCEPTOS = [
     ("Actions a fondo", "Caché, contextos, condiciones, entornos, reutilización, OIDC y depuración", E7),
     ("API, automatización y comunidad", "API REST y GraphQL, apps, webhooks, Copilot y open source", E8),
 ]
+
+from .github_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

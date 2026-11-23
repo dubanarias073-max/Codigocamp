@@ -139,3 +139,59 @@ def docker_orden():
         return api_error("No se pudo ejecutar la orden de Docker.", 500)
     finally:
         cupo_docker.release()
+
+
+# ------------------------------------------------------------------ detección de errores (sin ejecutar) ----
+@bp.post("/api/trabajo/analizar/")
+@login_required
+def analizar_codigo():
+    """Errores y avisos de un archivo de Trabajo (Python, Java, C/C++, Go, PHP, Ruby, Bash, Lua), como los subrayados de VS Code."""
+    from servicios.analizador import MAX_CODIGO, analizar, lenguaje_de
+    from utilidades import too_many
+    data = json_body()
+    codigo = data.get("codigo")
+    ruta = str(data.get("ruta") or "")[:300]
+    if not isinstance(codigo, str):
+        return api_error("Falta el código.")
+    if len(codigo) > MAX_CODIGO:
+        return jsonify(problemas=[], aviso="El archivo es muy grande para revisarlo.")
+    if too_many(f"analizar:{current_user.id}", 90, 60):
+        return jsonify(problemas=None, aviso="Muchas revisiones seguidas; espera un momento.")
+    lang = lenguaje_de(ruta, data.get("lenguaje"))
+    if not lang:
+        return jsonify(problemas=[], lenguaje=None)
+    return jsonify(problemas=analizar(codigo, ruta, lang), lenguaje=lang)
+
+
+# ------------------------------------------------------- servidor de PHP real (php -S) para Trabajo ----
+@bp.post("/api/trabajo/php/<accion>")
+@login_required
+def php_servidor(accion):
+    """php -S en el servidor de CódigoCamp: iniciar / sincronizar / pedir / detener (ver servicios/servidores_dev.py)."""
+    import base64
+
+    from servicios import servidores_dev as sd
+    from utilidades import too_many
+    data = json_body()
+    uid = current_user.id
+    try:
+        if accion == "iniciar":
+            if too_many(f"php-iniciar:{uid}", 20, 60):
+                return api_error("Espera un momento antes de volver a encender PHP.", 429)
+            version = sd.iniciar(uid, data.get("archivos") or [], str(data.get("docroot") or ""), data.get("router") or None)
+            return jsonify(ok=True, version=version)
+        if accion == "sincronizar":
+            sd.sincronizar(uid, data.get("archivos") or [])
+            return jsonify(ok=True)
+        if accion == "pedir":
+            if too_many(f"php-pedir:{uid}", 600, 60):
+                return api_error("Demasiadas peticiones seguidas.", 429)
+            cuerpo = base64.b64decode(data.get("cuerpo") or "") if data.get("cuerpo") else b""
+            estado, cab, datos, log = sd.pedir(uid, str(data.get("metodo") or "GET")[:10], str(data.get("ruta") or "/")[:4000],
+                                               [(str(k), str(v)) for k, v in (data.get("cabeceras") or [])[:80]], cuerpo)
+            return jsonify(status=estado, headers=cab, cuerpo=sd.b64(datos), log=log)
+        if accion == "detener":
+            return jsonify(ok=sd.detener(uid))
+    except sd.ErrorServidor as e:
+        return api_error(str(e), 409)
+    return api_error("Acción desconocida.", 404)

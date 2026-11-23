@@ -1,0 +1,28 @@
+"""Docker · referencia completa (etapa 6)."""
+from .tabla import filas
+
+E6 = filas(r"""
+docker run con opciones ¦ docker run -d ¦ opciones más usadas al crear un contenedor ¦ arrancar un servicio con nombre, puerto y reinicio ¦ docker run -d --name web -p 8080:80 --restart unless-stopped nginx ¦ arranca nginx en segundo plano en el 8080 ¦ olvidar -d y bloquear la terminal
+docker run --rm ¦ --rm ¦ opción que borra el contenedor al terminar ¦ ejecutar una herramienta sin dejar basura ¦ docker run --rm -v "$PWD":/app -w /app node:22 npm test ¦ corre las pruebas y borra el contenedor ¦ acumular cientos de contenedores detenidos
+docker run -it ¦ -it ¦ opciones para usar un contenedor de forma interactiva ¦ abrir una terminal dentro de una imagen ¦ docker run -it --rm ubuntu bash ¦ abre bash dentro de un Ubuntu temporal ¦ olvidar -t y ver una terminal sin formato
+docker stop, start y restart ¦ docker stop ¦ comandos para detener y arrancar contenedores ¦ apagar la base de datos cuando no la usas ¦ docker stop mysql⏎docker start mysql⏎docker restart web ¦ detiene, arranca y reinicia contenedores ¦ usar docker kill cuando stop basta
+docker cp ¦ docker cp ¦ comando para copiar archivos entre el equipo y un contenedor ¦ sacar un respaldo de dentro del contenedor ¦ docker cp mysql:/tmp/respaldo.sql ./respaldo.sql ¦ copia el respaldo al equipo ¦ editar archivos dentro del contenedor en vez de usar volúmenes
+docker stats y top ¦ docker stats ¦ comandos para ver el consumo de los contenedores ¦ saber qué contenedor usa más memoria ¦ docker stats --no-stream⏎docker top web ¦ muestra CPU y memoria de cada contenedor ¦ adivinar qué contenedor hace lento el equipo
+docker tag y push ¦ docker push ¦ comandos para etiquetar y subir imágenes a un registro ¦ publicar tu imagen en Docker Hub ¦ docker tag mi-app ana/mi-app:1.0⏎docker login⏎docker push ana/mi-app:1.0 ¦ etiqueta y sube la imagen ¦ subir imágenes con secretos dentro
+docker network create ¦ docker network create ¦ crear redes propias para que los contenedores se hablen por nombre ¦ conectar la API con la base de datos ¦ docker network create red⏎docker run -d --name bd --network red mysql:8⏎docker run -d --network red -e DB_HOST=bd mi-api ¦ conecta la API con la base por su nombre ¦ usar localhost dentro del contenedor para llegar a otro
+docker volume ¦ docker volume ls ¦ comandos para manejar volúmenes ¦ ver y limpiar los datos guardados ¦ docker volume ls⏎docker volume inspect datos-mysql⏎docker volume prune ¦ lista, revisa y limpia volúmenes ¦ hacer prune y borrar datos importantes
+Variables con --env-file ¦ --env-file ¦ cargar variables de entorno desde un archivo ¦ pasar la configuración sin escribirla en el comando ¦ docker run --env-file .env mi-api ¦ carga las variables del archivo .env ¦ meter el .env dentro de la imagen
+docker compose up y down ¦ docker compose down -v ¦ comandos para levantar y bajar todo el proyecto ¦ arrancar la app completa con un comando ¦ docker compose up -d --build⏎docker compose ps⏎docker compose down ¦ construye, levanta y baja los servicios ¦ usar down -v sin querer y borrar la base de datos
+Compose con override ¦ docker-compose.override.yml ¦ archivo que ajusta la configuración solo en desarrollo ¦ tener opciones distintas en tu equipo y en producción ¦ # docker-compose.override.yml⏎services:⏎  api:⏎    volumes: ["./src:/app/src"]⏎    environment: { DEBUG: "1" } ¦ agrega volumen y modo depuración solo en desarrollo ¦ subir el override con datos personales
+Compose include y extends ¦ include ¦ formas de reutilizar archivos de Compose ¦ compartir servicios comunes entre proyectos ¦ include:⏎  - ./bd/compose.yaml⏎services:⏎  api: { build: ., depends_on: [mysql] } ¦ incluye la base de datos desde otro archivo ¦ copiar los mismos servicios en cada proyecto
+Builder y buildx ¦ docker buildx ¦ herramienta moderna para construir imágenes ¦ crear imágenes para varias arquitecturas ¦ docker buildx build --platform linux/amd64,linux/arm64 -t ana/app:1.0 --push . ¦ construye y sube para dos arquitecturas ¦ construir solo para tu procesador y fallar en el servidor
+docker init ¦ docker init ¦ comando que genera Dockerfile y Compose para tu proyecto ¦ empezar a usar Docker sin escribir todo desde cero ¦ cd mi-proyecto⏎docker init ¦ crea Dockerfile, compose.yaml y .dockerignore ¦ usar los archivos generados sin revisarlos
+docker scout ¦ docker scout ¦ herramienta que revisa vulnerabilidades de una imagen ¦ saber si tu imagen tiene paquetes inseguros ¦ docker scout quickview mi-app⏎docker scout cves mi-app ¦ muestra las vulnerabilidades de la imagen ¦ publicar imágenes sin revisarlas
+Contextos de Docker ¦ docker context ¦ forma de manejar Docker en otros equipos desde tu terminal ¦ desplegar en un servidor remoto por SSH ¦ docker context create servidor --docker "host=ssh://ana@mi-servidor"⏎docker context use servidor⏎docker ps ¦ usa el Docker del servidor desde tu equipo ¦ olvidar cambiar de contexto y borrar cosas en producción
+Podman ¦ podman ¦ alternativa a Docker sin servicio en segundo plano ¦ usar contenedores sin permisos de administrador ¦ podman run -d -p 8080:80 nginx⏎alias docker=podman ¦ arranca nginx con Podman ¦ esperar que todas las opciones de Compose funcionen igual
+Desplegar en la nube con contenedores ¦ Cloud Run ¦ servicios que ejecutan tu imagen sin manejar servidores ¦ publicar tu API rápido ¦ gcloud run deploy mi-api --image ana/mi-api:1.0 --region us-central1 --allow-unauthenticated ¦ publica la API en Cloud Run ¦ olvidar que el contenedor debe escuchar en el puerto de la variable PORT
+""")
+
+ETAPAS_REF = [
+    ("Docker a fondo: comandos y Compose", "Opciones de run, red, volúmenes, Compose avanzado, buildx, init, scout, contextos y la nube", E6),
+]

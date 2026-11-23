@@ -72,14 +72,6 @@ $("buscable").checked = user.buscable_correo !== false;
 $("buscable").onchange = async () => {
   try { await api("/api/ajustes/", { buscable_correo: $("buscable").checked }); aviso("Guardado"); } catch (x) { aviso(x.message, true); $("buscable").checked = !$("buscable").checked; }
 };
-document.querySelectorAll("[name=idioma]").forEach((r) => {
-  r.checked = r.value === (window.CC_IDIOMA || "es");
-  r.onchange = async () => {
-    window.ccIdioma?.(r.value);
-    try { await api("/api/ajustes/", { idioma: r.value }); } catch { /* queda guardado en este navegador */ }
-    location.reload();
-  };
-});
 document.querySelectorAll("[name=tema]").forEach((r) => {
   r.checked = r.value === (user.tema || "auto");
   r.onchange = async () => { aplicarTema(r.value); try { await api("/api/ajustes/", { tema: r.value }); } catch (x) { aviso(x.message, true); } };
@@ -92,7 +84,7 @@ import("/js/temporada.js").then(({ temporadaActiva, activarTemporada, temporadaD
   if (t) $("temporadaTxt").textContent += ` Ahora: ${t.icono} ${t.nombre}`;
   $("temporada").onchange = () => activarTemporada($("temporada").checked);
 });
-$("sonido").onchange = () => { try { localStorage.setItem("cc_sonido", $("sonido").checked ? "1" : "0"); } catch { aviso("No se pudo guardar en este navegador.", true); } };
+$("sonido").onchange = () => { try { localStorage.setItem("cc_sonido", $("sonido").checked ? "1" : "0"); if ($("sonido").checked) import("/js/sonidos.js").then((m) => m.sonar("premio")); } catch { aviso("No se pudo guardar en este navegador.", true); } };
 $("movimiento").checked = pref("cc_menos_mov", "0") === "1";
 $("movimiento").onchange = () => {
   try { localStorage.setItem("cc_menos_mov", $("movimiento").checked ? "1" : "0"); } catch { /* nada */ }

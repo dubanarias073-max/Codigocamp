@@ -37,15 +37,12 @@ test("contactos: huella sha256 del correo en minúsculas y enlaces de invitació
   assert.equal(e.correo, null);
 });
 
-test("idioma: traduce interfaz y patrones, conserva lo que no conoce", () => {
+test("idioma: la app es solo en español (ccT no cambia nada y se borra la preferencia vieja)", () => {
   const w = {};
-  const ctx = { window: w, document: { documentElement: {}, addEventListener() {} }, localStorage: { getItem: () => "en", setItem() {} },
-    location: { pathname: "/pages/inicio.html" }, MutationObserver: class { observe() {} }, NodeFilter: {} };
+  const borradas = [];
+  const ctx = { window: w, document: { documentElement: {} }, localStorage: { removeItem: (k) => borradas.push(k) } };
   new Function(...Object.keys(ctx), readFileSync(new URL("../js/i18n.js", import.meta.url), "utf8"))(...Object.values(ctx));
-  assert.equal(w.ccT("Configuración"), "Settings");
-  assert.equal(w.ccT("  Guardar  "), "  Save  ");
-  assert.equal(w.ccT("5 días de racha"), "5-day streak");
-  assert.equal(w.ccT("Primer paso · Completa tu primera lección"), "First step · Complete your first lesson");
-  assert.equal(w.ccT("Configuración · CódigoCamp"), "Settings · CódigoCamp");
-  assert.equal(w.ccT("Hola profe"), "Hola profe");
+  assert.equal(w.CC_IDIOMA, "es");
+  assert.equal(w.ccT("Configuración"), "Configuración");
+  assert.ok(borradas.includes("cc_idioma"));
 });

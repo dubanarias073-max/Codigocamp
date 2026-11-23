@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <script src="/js/i18n.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prueba de CódigoCamp · ¿Qué tanto sabes?</title>
+  <meta name="description" content="Haz la prueba de CódigoCamp: 12 retos cortos de lógica y código para conocer tu nivel antes de empezar.">
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0d1b1a">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/portada.css">
+  <link rel="stylesheet" href="/css/prueba.css">
+</head>
+<body class="pag-prueba">
+  <header class="p-cab">
+    <a class="logo" href="/" aria-label="Volver a la portada"><img src="/img/logo-icon.png" alt="" width="32" height="32"><span class="logo-txt">codigocamp</span></a>
+    <div class="p-progreso" aria-hidden="true"><span id="pBarra"></span></div>
+    <a class="p-cerrar" href="/" aria-label="Salir de la prueba">✕</a>
+  </header>
+  <ol class="p-secciones" id="pSecciones" aria-label="Secciones de la prueba"></ol>
+  <main class="p-main">
+    <div class="p-codi-fila"><div class="p-codi" id="pCodi"></div><p class="p-burbuja" id="pBurbuja" aria-live="polite"></p></div>
+    <section class="p-reto" id="pReto" aria-live="polite"></section>
+  </main>
+  <footer class="p-pie" id="pPie">
+    <div class="p-msg" id="pMsg" aria-live="assertive"></div>
+    <div class="p-botones">
+      <button type="button" class="p-saltar" id="pSaltar">No lo sé</button>
+      <button type="button" class="p-comprobar" id="pComprobar" disabled>Comprobar</button>
+    </div>
+  </footer>
+  <div class="p-confeti" id="pConfeti" aria-hidden="true"></div>
+  <script type="module" src="/js/prueba.js"></script>
+</body>
+</html>

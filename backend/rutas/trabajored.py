@@ -80,6 +80,10 @@ def _url_permitida(url):
     motivo = problema_host(p.hostname)
     if motivo:
         return motivo + (" Si es tu propio backend, usa la vista previa (fetch a /api o a http://localhost:<puerto>)." if "red local" in motivo else "")
+    from servicios.seguridad_enlaces import revisar_enlace
+    r = revisar_enlace(url, consultar_externos=False)
+    if r["nivel"] == "bloqueado":
+        return f"🛡️ CódigoCamp bloqueó esta dirección: {r['motivo']}"
     return None
 
 

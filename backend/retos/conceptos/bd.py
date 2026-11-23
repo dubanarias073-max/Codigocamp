@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Consultas avanzadas", "Resume, agrupa y combina datos de varias tablas", bd_e4.LISTA),
     ("Rendimiento y práctica profesional", "Hazlo rápido, seguro y listo para producción", bd_e5.LISTA),
 ]
+
+from .bd_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

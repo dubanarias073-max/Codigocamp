@@ -57,3 +57,43 @@
 @media (max-width:340px){
   .bar .btn.sm{padding:7px 8px;font-size:12px}
 }
+
+/* ===== Codi programando en la portada ===== */
+.portada-vis.con-codi{padding-bottom:228px}
+.portada-vis.con-codi .flot-tutor{display:none}
+.codi-escena{position:absolute;left:4px;bottom:0;width:210px;height:220px;pointer-events:none;z-index:3}
+.ce-codi{position:absolute;left:30px;top:16px;width:150px;height:150px;filter:drop-shadow(0 10px 24px rgba(34,211,238,.35))}
+.ce-codi svg{width:150px;height:150px}
+.ce-laptop{position:absolute;left:24px;top:118px;width:162px;height:72px;filter:drop-shadow(0 8px 18px rgba(0,0,0,.5))}
+.ce-mano{position:absolute;top:166px;width:16px;height:12px;border-radius:50%;background:#2b4170;border:2px solid #5ef2ff;opacity:0;transition:opacity .2s}
+.ce-mano.izq{left:72px}.ce-mano.der{left:120px}
+.codi-escena.tecleando .ce-mano{opacity:1;animation:ce-teclea .18s ease-in-out infinite alternate}
+.codi-escena.tecleando .ce-mano.der{animation-delay:.09s}
+@keyframes ce-teclea{to{transform:translateY(4px)}}
+.codi-escena.tecleando .ce-codi{animation:ce-balanceo .5s ease-in-out infinite alternate}
+@keyframes ce-balanceo{from{transform:rotate(-1.5deg)}to{transform:rotate(1.5deg) translateY(1px)}}
+.ce-burbuja{position:absolute;left:168px;top:40px;padding:7px 12px;border-radius:14px 14px 14px 4px;white-space:nowrap;font:800 13px system-ui,sans-serif;
+  color:#0b1020;background:#e0f2fe;box-shadow:0 8px 20px rgba(0,0,0,.35)}
+.ce-burbuja.sale{animation:ce-burbuja .35s cubic-bezier(.2,1.4,.4,1)}
+@keyframes ce-burbuja{from{transform:scale(.6) translateY(8px);opacity:0}}
+.ce-engranes{position:absolute;left:2px;top:0;font-size:22px;color:#5ef2ff;opacity:.75}
+.ce-eng{position:absolute;display:inline-block;line-height:1}
+.ce-eng.g1{left:0;top:24px;animation:ce-gira 3s linear infinite}
+.ce-eng.g2{left:20px;top:8px;font-size:15px;color:#a3e635;animation:ce-gira 2s linear infinite reverse}
+.codi-escena.compilando .ce-eng{animation-duration:.6s}
+@keyframes ce-gira{to{transform:rotate(360deg)}}
+.ce-simbolos{position:absolute;left:20px;top:40px;width:170px;height:110px}
+.ce-simbolos span{position:absolute;bottom:0;font:800 14px ui-monospace,monospace;text-shadow:0 0 8px currentColor;animation:ce-sube 2.6s ease-out forwards}
+@keyframes ce-sube{0%{transform:translate(0,0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translate(var(--dx),-150px) scale(1.1);opacity:0}}
+.codi-escena.compilando .ce-laptop{animation:ce-brillo .3s ease-in-out infinite alternate}
+@keyframes ce-brillo{to{filter:drop-shadow(0 0 16px rgba(163,230,53,.8))}}
+.ed-res.ok{animation:ce-ok .5s ease}
+@keyframes ce-ok{from{background:rgba(163,230,53,.5)}}
+.ed-code{min-height:7.5em}
+.portada-vis.con-codi .flot-racha{bottom:60px}
+@media (max-width:640px){
+  .portada-vis.con-codi{padding-bottom:200px}
+  .codi-escena{left:0;transform:scale(.86);transform-origin:left bottom}
+  .portada-vis.con-codi .flot-racha{display:none}
+}
+@media (prefers-reduced-motion:reduce){.codi-escena *{animation:none!important}}

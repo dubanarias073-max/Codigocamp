@@ -59,7 +59,7 @@ COSMETICOS = [
     # ---- Accesorios de Codi (la mascota los lleva puestos en toda la página)
     {"clave": "codi_bigote", "tipo": "codi", "nombre": "Bigote elegante", "precio": 60, "rareza": "comun", "descripcion": "Codi se pone serio... o eso intenta."},
     {"clave": "codi_flor", "tipo": "codi", "nombre": "Flor en la cabeza", "precio": 70, "rareza": "comun", "descripcion": "Una flor rosada para un Codi tierno."},
-    {"clave": "codi_gafas_nerd", "tipo": "codi", "nombre": "Gafas de nerd", "precio": 80, "rareza": "comun", "descripcion": "Para leer documentación por horas."},
+    {"clave": "codi_gafas_nerd", "retirado": True, "tipo": "codi", "nombre": "Gafas de nerd", "precio": 80, "rareza": "comun", "descripcion": "Para leer documentación por horas."},
     {"clave": "codi_corbatin", "tipo": "codi", "nombre": "Corbatín", "precio": 90, "rareza": "comun", "descripcion": "Codi de gala para el día de la entrevista."},
     {"clave": "codi_bufanda", "tipo": "codi", "nombre": "Bufanda", "precio": 100, "rareza": "comun", "descripcion": "Abrigado para programar en las noches frías."},
     {"clave": "codi_gorro_lana", "tipo": "codi", "nombre": "Gorro de lana", "precio": 110, "rareza": "comun", "descripcion": "Con pompón y todo."},
@@ -75,6 +75,24 @@ COSMETICOS = [
     {"clave": "codi_corona", "tipo": "codi", "nombre": "Corona real", "precio": 900, "rareza": "epico", "descripcion": "El rey (o la reina) de la racha."},
     {"clave": "codi_birrete", "tipo": "codi", "nombre": "Birrete de graduado", "precio": 1600, "rareza": "legendario", "descripcion": "Para quien ya se graduó de programador."},
     {"clave": "codi_astronauta", "tipo": "codi", "nombre": "Casco de astronauta", "precio": 2000, "rareza": "legendario", "descripcion": "Codi listo para desplegar en la Luna."},
+    # ---- Más legendarios de videojuego: uno en cada parte de la tienda
+    {"clave": "fondo_lava_jefe", "tipo": "fondo", "nombre": "Guarida del jefe", "precio": 2700, "rareza": "legendario", "descripcion": "Rocas flotantes que no paran de moverse sobre un río de lava: el último nivel."},
+    {"clave": "fondo_salto_luz", "tipo": "fondo", "nombre": "Salto al hiperespacio", "precio": 3100, "rareza": "legendario", "descripcion": "Las estrellas se estiran en rayos de luz. Se mueve."},
+    {"clave": "cursor_sable_cian", "tipo": "cursor", "nombre": "Espada de energía", "precio": 2400, "rareza": "legendario", "descripcion": "Una espada de energía cian que brilla en cada movimiento, como en los juegos de ciencia ficción."},
+    {"clave": "tema_synthwave", "tipo": "tema", "nombre": "Tema synthwave", "precio": 2000, "rareza": "legendario", "descripcion": "Rosa neón, morado y cian de videojuego de los 80."},
+    {"clave": "marco_fuego_azul", "tipo": "marco", "nombre": "Fuego azul", "precio": 2900, "rareza": "legendario", "descripcion": "Llamas azules que giran sin parar alrededor de tu foto."},
+    {"clave": "efecto_rayo", "tipo": "efecto", "nombre": "Rayo", "precio": 2500, "rareza": "legendario", "descripcion": "Cada clic cae un rayo con onda expansiva y chispas."},
+    {"clave": "dedo_cola_cometa", "tipo": "dedo", "nombre": "Cometa", "precio": 2300, "rareza": "legendario", "descripcion": "Tu mouse o tu dedo dejan la cola de un cometa con estrellas."},
+    {"clave": "codi_alas", "tipo": "codi", "nombre": "Alas pixel", "precio": 3400, "rareza": "legendario", "descripcion": "Alas de 8 bits que se agitan: Codi listo para volar al siguiente mundo."},
+    # ---- Legendarios de videojuego (karts, jungla, plataformas; diseños originales de CódigoCamp)
+    {"clave": "codi_explorador", "tipo": "codi", "nombre": "Casco de explorador", "precio": 650, "rareza": "epico", "descripcion": "Para aventuras en la jungla del código, con hoja y todo."},
+    {"clave": "codi_kart", "tipo": "codi", "nombre": "Kart turbo", "precio": 3200, "rareza": "legendario", "descripcion": "Codi al volante de su kart rojo número 01, con turbo de fuego. ¡Bandera a cuadros!"},
+    {"clave": "fondo_jungla", "tipo": "fondo", "nombre": "Jungla pixel", "precio": 1400, "rareza": "legendario", "descripcion": "Lianas y hojas pixel bajo la luz que entra entre los árboles."},
+    {"clave": "fondo_pista_arcoiris", "tipo": "fondo", "nombre": "Circuito arcoíris", "precio": 2800, "rareza": "legendario", "descripcion": "Una pista de colores en el espacio para las carreras más rápidas."},
+    {"clave": "fondo_castillo", "tipo": "fondo", "nombre": "Castillo del último nivel", "precio": 2500, "rareza": "legendario", "descripcion": "El castillo pixel bajo la luna donde espera el jefe final."},
+    {"clave": "marco_estrella", "tipo": "marco", "nombre": "Estrella arcoíris", "precio": 3000, "rareza": "legendario", "descripcion": "Todos los colores girando a toda velocidad: modo invencible."},
+    {"clave": "efecto_powerup", "tipo": "efecto", "nombre": "¡Power up!", "precio": 2600, "rareza": "legendario", "descripcion": "Cada clic es un power up: estrellas de todos los colores."},
+    {"clave": "dedo_estela_arcoiris", "tipo": "dedo", "nombre": "Estela arcoíris", "precio": 2200, "rareza": "legendario", "descripcion": "Dejas una estela pixel de todos los colores, como un kart con turbo."},
     # ---- Videojuegos: RPG, mazmorras, naves, carreras y jefes finales (diseños originales)
     {"clave": "codi_banda_ninja", "tipo": "codi", "nombre": "Banda ninja", "precio": 150, "rareza": "comun", "descripcion": "Codi en modo sigilo: nadie ve venir su código."},
     {"clave": "codi_carreras", "tipo": "codi", "nombre": "Casco de carreras", "precio": 360, "rareza": "raro", "descripcion": "Número 01 en la pista de los algoritmos."},
@@ -106,7 +124,7 @@ COSMETICOS = [
     {"clave": "fondo_arcade", "tipo": "fondo", "nombre": "Sala arcade", "precio": 450, "rareza": "epico", "descripcion": "Neón, estrellas y líneas de pantalla de máquina arcade."},
     {"clave": "fondo_islas", "tipo": "fondo", "nombre": "Islas flotantes", "precio": 380, "rareza": "raro", "descripcion": "Islas pixel que flotan en un cielo de videojuego."},
     {"clave": "fondo_cueva", "tipo": "fondo", "nombre": "Cueva de cristales", "precio": 820, "rareza": "epico", "descripcion": "Cristales pixel que brillan en la oscuridad de la mina."},
-    {"clave": "cursor_pico", "tipo": "cursor", "nombre": "Pico de cristal", "precio": 420, "rareza": "epico", "descripcion": "Un pico pixel morado para picar cualquier error."},
+    {"clave": "cursor_pico", "tipo": "cursor", "nombre": "Pico de cristal", "precio": 420, "rareza": "epico", "descripcion": "Un pico de cristal morado para picar cualquier error."},
     {"clave": "tema_arcade", "tipo": "tema", "nombre": "Tema arcade", "precio": 280, "rareza": "raro", "descripcion": "Amarillo moneda, morado y rojo de máquina arcade."},
     {"clave": "marco_arcade", "tipo": "marco", "nombre": "Marco arcade", "precio": 520, "rareza": "epico", "descripcion": "Luces de colores que parpadean como un tablero de puntajes."},
     {"clave": "efecto_bloques", "tipo": "efecto", "nombre": "Rompebloques", "precio": 380, "rareza": "raro", "descripcion": "Cada clic rompe un bloque de piedra en pedacitos pixel."},
@@ -243,7 +261,8 @@ COSMETICOS = [
     {"clave": "tema_mito", "tipo": "tema", "nombre": "Mito", "precio": 0, "rareza": "legendario", "exclusivo": True, "descripcion": "Exclusivo del cofre «Cien días»."},
 ]
 POR_CLAVE = {c["clave"]: c for c in COSMETICOS}
-EN_TIENDA = [c for c in COSMETICOS if not c.get("exclusivo")]
+EN_TIENDA = [c for c in COSMETICOS if not c.get("exclusivo") and not c.get("retirado")]
+RETIRADOS = {c["clave"] for c in COSMETICOS if c.get("retirado")}   # ya no se venden (quien lo tenía lo conserva)
 
 # Los cofres de logro: (clave, nombre, tipo de cofre, qué medir, meta, premio)
 COFRES = [

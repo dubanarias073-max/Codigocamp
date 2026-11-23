@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Formularios y objetos", "Modela datos, clases y relaciones entre tipos", php_e4.LISTA),
     ("PHP moderno", "Valida datos y conoce recursos avanzados de PHP 8", php_e5.LISTA),
 ]
+
+from .php_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

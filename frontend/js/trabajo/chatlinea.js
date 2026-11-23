@@ -75,7 +75,7 @@ export function abrirChatEnLinea({ editor, monaco, ruta, lenguaje, pedir, instru
       nodo.querySelector("[data-si]").focus();
     } catch (e) { pintarPregunta(texto, e.message || "La IA no respondió."); }
   };
-  const aceptar = () => { aplicado = null; cerrar(); editor.focus(); };
+  const aceptar = () => { aplicado = null; cerrar(); editor.focus(); import("/js/sonidos.js").then((m) => m.sonar("correcto")).catch(() => {}); };
   const descartar = (y = true) => {
     if (aplicado) {
       editor.executeEdits("ia", [{ range: aplicado, text: original, forceMoveMarkers: true }]);

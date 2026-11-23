@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Objetos y módulos", "Modela objetos con clases, bloques y módulos reutilizables", ruby_e4.LISTA),
     ("Ruby avanzado y errores", "Usa herramientas modernas y maneja fallos con cuidado", ruby_e5.LISTA),
 ]
+
+from .ruby_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Rutas, datos y estilos", "React Router, APIs, estilos y carga diferida", react_e4.LISTA),
     ("React profesional", "TypeScript, pruebas, estado global, Next.js y despliegue", react_e5.LISTA),
 ]
+
+from .react_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

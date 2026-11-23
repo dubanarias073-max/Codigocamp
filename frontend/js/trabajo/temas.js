@@ -13,8 +13,8 @@ const reglas = (c) => [
 
 export const TEMAS = {
   "codigocamp": { nombre: "CódigoCamp (sigue el tema de la página)" },
-  "dark-plus": { nombre: "Dark+ (el oscuro de VS Code)", base: "vs-dark", reglasPropias: [], colores: { "editor.background": "#1e1e1e" } },
-  "light-plus": { nombre: "Light+ (el claro de VS Code)", base: "vs", reglasPropias: [], colores: { "editor.background": "#ffffff" } },
+  "dark-plus": { nombre: "Oscuro clásico", base: "vs-dark", reglasPropias: [], colores: { "editor.background": "#1e1e1e" } },
+  "light-plus": { nombre: "Claro clásico", base: "vs", reglasPropias: [], colores: { "editor.background": "#ffffff" } },
   "hc-black": { nombre: "Alto contraste oscuro", base: "hc-black", reglasPropias: [], colores: {} },
   "hc-light": { nombre: "Alto contraste claro", base: "hc-light", reglasPropias: [], colores: {} },
   "monokai": { nombre: "Monokai", base: "vs-dark", c: { fg: "#f8f8f2", com: "#88846f", key: "#f92672", str: "#e6db74", num: "#ae81ff", tipo: "#66d9ef", fn: "#a6e22e", var: "#f8f8f2", tag: "#f92672", attr: "#a6e22e" },

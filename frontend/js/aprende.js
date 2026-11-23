@@ -9,7 +9,7 @@ const avisoEnLinea = new Set();
 const IDIOMA_MONACO = { html: 'html', css: 'css', javascript: 'javascript', python: 'python', sql: 'sql', bd: 'sql',
   typescript: 'typescript', java: 'java', c: 'c', cpp: 'cpp', csharp: 'csharp', php: 'php', go: 'go', rust: 'rust',
   swift: 'swift', kotlin: 'kotlin', ruby: 'ruby', terminal: 'shell', git: 'shell', docker: 'dockerfile', node: 'javascript',
-  github: 'yaml', nosql: 'javascript', react: 'typescript' };
+  github: 'yaml', nosql: 'javascript', react: 'typescript', reactnative: 'typescript' };
 let editorMonaco = null;
 
 const { prog } = await iniciar("aprende");
@@ -40,6 +40,7 @@ const CONFIG = {
   github:     { k: "github", n: "GitHub", c: "#a78bfa", run: "srv" },
   nosql:      { k: "nosql", n: "NoSQL", c: "#22c55e", run: "srv" },
   react:      { k: "react", n: "React", c: "#61dafb", run: "react" },
+  reactnative: { k: "reactnative", n: "React Native", c: "#38bdf8", run: "rn" },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -173,6 +174,7 @@ function pintar() {
     : L.run === 'web' ? 'Se ve al instante'
     : L.run === 'ver' ? 'Ejemplos para copiar'
     : L.run === 'react' ? 'Se ve al instante (React 19)'
+    : L.run === 'rn' ? 'Se ve en un celular simulado'
     : 'Se ejecuta en tu navegador';
   $('vista').hidden = true; $('vista').removeAttribute('srcdoc'); out.hidden = false;
   $('prev').disabled = idx === 0;
@@ -193,6 +195,7 @@ $('next').onclick = () => {
   (hechas[lang] ||= []);
   if (!hechas[lang].includes(idx)) hechas[lang].push(idx);
   guardar();
+  import('/js/sonidos.js').then((m) => m.sonar('premio')).catch(() => {});
   api('/api/progreso/leccion/', { curso: LEC[lang].f, leccion: LEC[lang].l[idx][0] })
     .then((r) => import('/js/cofres.js').then((m) => m.abrirPremiosNuevos(r?.desafios_completados || [])))
     .catch(() => {});
@@ -245,6 +248,17 @@ const RUN = {
     const { transpilarModulo } = await import('/js/trabajo/ejecucion.js');
     const js = await transpilarModulo(prepararReact(code), 'App.tsx');
     const v = $('vista'); v.srcdoc = paginaReact(js); v.hidden = false; out.hidden = true;
+    return ['', 0];
+  },
+
+  // React Native: se dibuja en un celular simulado (react-native-web + Expo y React Navigation simulados)
+  async rn(code) {
+    const { prepararRN, paginaRN, MENSAJE_FRAGMENTO } = await import('/js/aprende-rn.js');
+    const listo = prepararRN(code);
+    if (!listo) return [MENSAJE_FRAGMENTO, 0];
+    const { transpilarModulo } = await import('/js/trabajo/ejecucion.js');
+    const js = await transpilarModulo(listo, 'App.tsx');
+    const v = $('vista'); v.srcdoc = await paginaRN(js); v.hidden = false; out.hidden = true;
     return ['', 0];
   },
 
@@ -311,7 +325,7 @@ const RUN = {
     const L = LEC[k];
     const sal = SAL?.[L.f]?.[idx];
     const entrada = $('entradaCaja').hidden ? '' : $('entrada').value;
-    if (sal !== undefined && code.trim() === L.l[idx][3].trim() && !entrada) return [sal, 0];
+    if (sal != null && code.trim() === L.l[idx][3].trim() && !entrada) return [sal, 0];
     if (!SERVIDOR.has(L.f)) return ['Estos ejemplos se practican en Trabajo → Terminal (o en tu propio equipo). Pulsa «Restablecer» para ver el resultado esperado de la lección.', 0];
     try {
       const d = await api('/api/run', { lenguaje: L.f, codigo: code, entrada });
@@ -431,6 +445,7 @@ async function ejecutar() {
   }
   b.disabled = false;
   // ¿Error? Codi (el tutor de IA) lo explica con tu código y la salida
+  import('/js/sonidos.js').then((m) => m.sonar(out.className === 'err' ? 'programa_error' : 'programa_ok')).catch(() => {});
   if (out.className === 'err') {
     const L = LEC[lang];
     const preg = `Estoy en la lección «${L.l[idx][0]}» de ${L.n}. Mi código da este error:\n\n${out.textContent.slice(0, 1500)}\n\nMi código:\n${ed.value.slice(0, 4000)}\n\nExplícame en palabras simples qué está mal y cómo arreglarlo.`;

@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Unir tablas y subconsultas", "Combina tablas y consultas para responder preguntas más completas", sql_e4.LISTA),
     ("Rendimiento y práctica profesional", "Índices, ventanas, seguridad y buenas prácticas", sql_e5.LISTA),
 ]
+
+from .sql_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

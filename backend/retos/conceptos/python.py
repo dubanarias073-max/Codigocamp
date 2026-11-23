@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Listas, diccionarios y colecciones", "Maneja muchos datos a la vez", py_e4.LISTA),
     ("Errores, archivos y objetos", "Haz programas robustos y organizados", py_e5.LISTA),
 ]
+
+from .python_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

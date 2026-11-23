@@ -6,7 +6,7 @@
 .pag-ia .app .centro, .pag-ia .app.ancho .centro { max-width: none; margin: 0; width: 100%; height: 100vh; height: 100dvh; padding: 0; animation: none; }
 .pag-ia .ia-cuerpo { display: grid; grid-template-columns: 276px minmax(0, 1fr); height: 100%; min-height: 0; }
 
-.pag-ia svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pag-ia svg:not(.codi):not(.codi *) { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .ia-ico { flex: none; display: inline-grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 10px; background: none; color: var(--sub); cursor: pointer; transition: background .15s, color .15s; }
 .ia-ico:hover { background: var(--panel2); color: var(--txt); }
 .ia-ico:focus-visible, .ia-enviar:focus-visible, .ia-conv:focus-visible, .ia-nueva:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
@@ -112,8 +112,8 @@
 .pag-ia .sugerencias button { padding: 8px 14px; border: 1px solid var(--borde); border-radius: 99px; background: var(--panel); color: var(--txt); font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; transition: border-color .15s, background .15s; }
 .pag-ia .sugerencias button:hover { border-color: color-mix(in srgb, var(--acc) 60%, var(--borde)); background: var(--panel2); }
 
-/* ---------- tablet y celular ---------- */
-@media (max-width: 1100px) {
+/* ---------- historial de chats en menú hamburguesa (PC, tablet y celular) ---------- */
+@media all {
   .pag-ia .ia-cuerpo { grid-template-columns: 1fr; }
   .ia-lista { position: fixed; z-index: 70; inset: 0 auto 0 0; width: min(320px, 86vw); border-right: 1px solid var(--borde); border-radius: 0 18px 18px 0; box-shadow: 0 0 40px rgba(0, 0, 0, .25); transform: translateX(-105%); transition: transform .22s ease; padding-top: max(14px, env(safe-area-inset-top)); }
   .ia-lista.abierta { transform: none; }
@@ -156,3 +156,6 @@
   .ia-cab-btns .ia-ico span { display: inline; }
   .ia-cab-btns [data-conv="borrar"] { color: var(--rojo); }
 }
+.msg-av { overflow: visible; background: none; }
+.msg-av svg { width: 30px; height: 30px; stroke: none; }
+.ia-codi svg { stroke: none; width: 110px; height: 110px; }

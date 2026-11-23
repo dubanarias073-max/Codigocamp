@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Clases y seguridad de tipos", "Modela objetos y controla valores ausentes con null safety", kotlin_e4.LISTA),
     ("Kotlin avanzado y herramientas", "Aplica abstracciones avanzadas y comprende el entorno de construcción", kotlin_e5.LISTA),
 ]
+
+from .kotlin_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

@@ -209,3 +209,6 @@ ETAPAS_CONCEPTOS = [
     ("Datos y seguridad", "MySQL, ORMs, Redis, tokens, OAuth, roles, XSS, CSRF y tiempo real", E7),
     ("Calidad y producción", "Pruebas, depuración, rendimiento, colas, GraphQL, Docker y CI", E8),
 ]
+
+from .node_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

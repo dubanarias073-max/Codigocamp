@@ -25,14 +25,14 @@ from seguridad import configurar_seguridad  # noqa: E402
 def _crear_tablas_nuevas(app):
     """Crea las tablas que agregan las versiones nuevas si la base aún no las tiene (no toca las que ya existen).
     Así no hace falta ejecutar a mano migracion_archivos.sql. Si MySQL no está encendido, se intentará al reiniciar."""
-    from models import AIConversation, AIMessage, AppLoginCode, AppliedMigration, Attachment, DailyActivity, UserSession, EmailSettings, EquippedCosmetics, KnownDevice, Message, OpenedChest, OwnedCosmetic, Profile, ProfilePhoto, StreakReward, TermsAcceptance, UserWorkspace, WorkspaceFile
+    from models import AIConversation, AIMessage, AppLoginCode, AppliedMigration, Attachment, DailyActivity, UserSession, EmailSettings, EquippedCosmetics, KnownDevice, Message, OpenedChest, OwnedCosmetic, Profile, ProfilePhoto, StreakReward, TermsAcceptance, Traduccion, UserWorkspace, WorkspaceFile, Conector, ChatBorrado
     try:
         with app.app_context():
             from servicios.workbench import reparar
             cambios = reparar(db.engine)
             if cambios:
                 app.logger.info("Base ajustada para el diagrama de MySQL Workbench: %s", "; ".join(cambios))
-            nuevos = (Profile, UserWorkspace, WorkspaceFile, KnownDevice, EmailSettings, OwnedCosmetic, EquippedCosmetics, OpenedChest, ProfilePhoto, Attachment, AppliedMigration, UserSession, AIConversation, AIMessage, TermsAcceptance, AppLoginCode, Message, DailyActivity, StreakReward)
+            nuevos = (Profile, UserWorkspace, WorkspaceFile, KnownDevice, EmailSettings, OwnedCosmetic, EquippedCosmetics, OpenedChest, ProfilePhoto, Attachment, AppliedMigration, UserSession, AIConversation, AIMessage, TermsAcceptance, AppLoginCode, Message, DailyActivity, StreakReward, Traduccion, Conector, ChatBorrado)
             for modelo in nuevos:
                 modelo.__table__.create(bind=db.engine, checkfirst=True)
             from servicios.workbench import agregar_columnas
@@ -54,6 +54,8 @@ mimetypes.add_type("application/vnd.android.package-archive", ".apk")
 
 def create_app(test_config=None):
     app = Flask(__name__)
+    # WebSocket del Conector: mensajes de hasta 50 MB (archivos) y ping cada 25 s para que los proxies no lo corten
+    app.config.setdefault("SOCK_SERVER_OPTIONS", {"max_message_size": 50 * 1024 * 1024, "ping_interval": 25})
     # Detrás de un túnel o proxy (Tailscale Funnel, Nginx, Cloudflare): PROXY_CONFIABLE=1 hace que la IP real de cada
     # persona y el https lleguen a Flask (límites de intentos por persona, enlaces correctos). Sin proxy, déjalo en 0.
     proxies = int(os.getenv("PROXY_CONFIABLE", "0") or 0)

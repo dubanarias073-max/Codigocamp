@@ -305,6 +305,36 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** intent://… (algunas páginas lo usan para abrir apps): se abre la app o la página de respaldo. */
+    private void abrirIntent(String url) {
+        try {
+            Intent i = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+            i.addCategory(Intent.CATEGORY_BROWSABLE);
+            i.setComponent(null);
+            try { startActivity(i); }
+            catch (ActivityNotFoundException e) {
+                String respaldo = i.getStringExtra("browser_fallback_url");
+                if (respaldo != null) abrirEnNavegador(Uri.parse(respaldo));
+                else Toast.makeText(this, "No hay una app para abrir ese enlace.", Toast.LENGTH_LONG).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "No se pudo abrir ese enlace.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** ¿Ese enlace debe abrirse fuera de la app? (WhatsApp, SMS, correo, teléfono y páginas que no son de CódigoCamp ni del inicio de sesión) */
+    private boolean esExterno(Uri u) {
+        String e = u.getScheme() == null ? "" : u.getScheme();
+        if (!"http".equals(e) && !"https".equals(e)) return true;
+        String h = u.getHost() == null ? "" : u.getHost();
+        return !(esDeCodigoCamp(u) || h.endsWith("github.com") || h.endsWith("google.com"));
+    }
+
+    private void abrirFuera(Uri u) {
+        if ("intent".equals(u.getScheme())) abrirIntent(u.toString());
+        else abrirEnNavegador(u);
+    }
+
     private void abrirEnNavegador(Uri uri) {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, uri));
@@ -356,7 +386,7 @@ public class MainActivity extends Activity {
                 return true;
             }
             if (("http".equals(esquema) || "https".equals(esquema)) && esDeCodigoCamp(u)) return false;
-            if ("intent".equals(esquema)) return true;
+            if ("intent".equals(esquema)) { abrirIntent(u.toString()); return true; }
             abrirEnNavegador(u);   // GitHub, documentación y demás páginas: en el navegador del celular
             return true;
         }
@@ -406,7 +436,24 @@ public class MainActivity extends Activity {
             Dialog ventana = new Dialog(MainActivity.this, android.R.style.Theme_Material_NoActionBar);
             ventana.requestWindowFeature(Window.FEATURE_NO_TITLE);
             ventana.setContentView(hija, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            hija.setWebViewClient(new WebViewClient());
+            // target=_blank hacia WhatsApp, SMS, correo u otras páginas: se abren con su app, no dentro de esta ventana
+            hija.setWebViewClient(new WebViewClient() {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView w, WebResourceRequest p) {
+                    if (!esExterno(p.getUrl())) return false;
+                    abrirFuera(p.getUrl());
+                    ventana.dismiss();
+                    return true;
+                }
+                @Override
+                public void onPageStarted(WebView w, String url, android.graphics.Bitmap icono) {
+                    Uri u = Uri.parse(url);
+                    if (url.startsWith("about:") || !esExterno(u)) return;
+                    w.stopLoading();
+                    abrirFuera(u);
+                    ventana.dismiss();
+                }
+            });
             hija.setWebChromeClient(new WebChromeClient() {
                 @Override
                 public void onCloseWindow(WebView w) { ventana.dismiss(); }

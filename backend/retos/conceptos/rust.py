@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Propiedad y estructuras", "Comprende préstamos y crea tipos propios", rust_e4.LISTA),
     ("Errores y abstracciones", "Maneja fallos y usa herramientas avanzadas", rust_e5.LISTA),
 ]
+
+from .rust_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

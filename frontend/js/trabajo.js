@@ -1,6 +1,7 @@
 // Trabajo: espacio de trabajo con aspecto y comportamiento de VS Code.
 // Este archivo solo conecta las piezas (js/trabajo/*): guardado, explorador, editor, terminal, vista previa y asistente.
 import { api, aviso as avisoSimple, iniciar } from "/js/app.js";
+import { sonar } from "/js/sonidos.js";
 import { Almacen } from "/js/trabajo/almacen.js";
 import { crearAlmacenamiento } from "/js/trabajo/almacenamiento.js";
 import { dialogo, aviso, menuContextual } from "/js/trabajo/dialogos.js";
@@ -12,16 +13,19 @@ import { modulosDePagina, proxyDeVite, usaModulos } from "/js/trabajo/modulos.js
 import { Explorador } from "/js/trabajo/explorador.js";
 import * as FS from "/js/trabajo/fs.js";
 import { clonar, publicar } from "/js/trabajo/github.js";
-import { ClienteArchivos, esMarcador } from "/js/trabajo/archivos.js";
+import { ClienteArchivos, esMarcador, formatoBytes, leerMarcador } from "/js/trabajo/archivos.js";
 import { importarEn } from "/js/trabajo/importar.js";
 import { Entradas } from "/js/trabajo/entradas.js";
 import { VisorArchivo } from "/js/trabajo/visor.js";
 import { registrarEnMonaco } from "/js/trabajo/autocompletar.js";
-import { EditorMonaco, alCambiarProblemas, cambiarTema, cargarMonaco, crearDiff, monaco as monacoVivo, problemas, sincronizarModelos } from "/js/trabajo/monaco.js";
+import { EditorMonaco, alCambiarProblemas, cambiarTema, cargarMonaco, crearDiff, marcarEjecucion, monaco as monacoVivo, problemas, sincronizarModelos } from "/js/trabajo/monaco.js";
+import { erroresDeSalida } from "/js/trabajo/errores-salida.js";
 import { abrirPaleta } from "/js/trabajo/paleta.js";
 import { abrirDialogoAjustes, abrirDialogoAtajos, guardarAjustes, leerAjustes, opcionesMonaco } from "/js/trabajo/ajustes.js";
 import { abrirBuscador } from "/js/trabajo/buscar.js";
 import { PanelGit } from "/js/trabajo/gitpanel.js";
+import { PanelGitEquipo } from "/js/trabajo/gitequipo.js";
+import * as Conector from "/js/trabajo/conector.js";
 import { iconoArchivo } from "/js/trabajo/iconos.js";
 import { infoLenguaje } from "/js/trabajo/resaltado.js";
 import { carpetaDelPaquete, ejecutarNpm, ejecutarPip } from "/js/trabajo/paquetes.js";
@@ -38,7 +42,7 @@ import { formato } from "/js/formato-ia.js";
 import { CSS_ADJUNTOS, crearAdjuntador } from "/js/adjuntar.js";
 import { PanelInferior, iconoPanel } from "/js/trabajo/terminal.js";
 import { construirVistaPrevia, paginaPrincipal, paginaQueUsa, paginaRemotaConPuente, resolverEnlace, vistaDeRespuesta } from "/js/trabajo/vista.js";
-import { incrustarRecursos, resolverDestino, urlDeArchivo } from "/js/trabajo/virtual.js";
+import { incrustarRecursos, resolverDestino, urlDeArchivo, ORIGEN_VIRTUAL } from "/js/trabajo/virtual.js";
 import { alCambiarServidores, marcarCambio, servidores } from "/js/trabajo/servidorpy.js";
 
 // El editor de VS Code (Monaco) empieza a cargar ya, en paralelo con el resto (está en /vendor, sin CDN).
@@ -78,6 +82,7 @@ const textoEstado = {
   sesion: ["⚠ Sesión vencida", "problema", "Tu sesión venció. Recarga la página e inicia sesión de nuevo."],
   error: ["⚠ No se pudo guardar", "problema", "El servidor rechazó el guardado."],
   errorLocal: ["⚠ Sin espacio local", "problema", "No hay espacio para guardar en este navegador."],
+  equipo: ["🖥 En tu equipo", "", "Trabajas directamente en tu computador o celular: lo que guardas se escribe allá, no en la nube. Tu proyecto de la nube sigue en tu cuenta."],
 };
 // Con el guardado automático apagado, el texto escrito en los editores NO pasa al proyecto hasta que se guarda (Ctrl+S).
 // Aquí se anotan los archivos con texto sin guardar.
@@ -101,8 +106,8 @@ function mostrarEstado() {
   el.textContent = texto;
   el.className = `estado-item ${clase}`.trim();
   el.title = mensaje || ayuda;
-  if (estado !== "guardado") avisarProblema(estado, mensaje, ayuda);
-  $("expNube").textContent = estado === "guardado" ? "CUENTA" : estado === "guardando" || estado === "iniciando" ? "…" : "LOCAL";
+  if (estado !== "guardado" && estado !== "equipo") avisarProblema(estado, mensaje, ayuda);
+  $("expNube").textContent = estado === "equipo" ? "EQUIPO" : estado === "guardado" ? "CUENTA" : estado === "guardando" || estado === "iniciando" ? "…" : "LOCAL";
   if (estado === "guardado") avisosEstado.clear();
 }
 function avisarProblema(estado, mensaje, ayuda) {
@@ -133,6 +138,8 @@ let vistaGit = false;
 let vistaExt = false;
 let panelExt = null;
 let panelGit = null;
+let panelGitEquipo = null;
+let equipoAbierto = null; // { id, equipo, sistema, carpeta } si la carpeta abierta es de tu computador o celular
 let mapaGit = new Map();   // colores de Git del árbol y las pestañas
 let temporizadorDecoracion = 0, decorando = false, decorarOtraVez = false;
 let tModelos;
@@ -177,6 +184,7 @@ const shell = new Shell({
 });
 // ---------------------------------------------------------------- celular: una sección a la vez ----
 const MOVIL = matchMedia("(max-width: 760px)");
+let terminalEnSilencio = false;   // terminales que abre Trabajo solo (al abrir o cambiar de carpeta): en el celular no te sacan de donde estás
 function seccionMovil(cual) {
   $("ide").dataset.movil = cual;
   for (const b of document.querySelectorAll("#movilTabs [data-movil]")) {
@@ -195,6 +203,12 @@ document.getElementById("movilTabs").addEventListener("click", (e) => {
 const panel = new PanelInferior({
   raiz: $("terminalPanel"), shell, proyecto, claveHistorial: HIST_STORAGE,
   alOcupado: (corriendo) => pintarEjecutar(corriendo),
+  alPuerto: (acc, x) => accionPuerto(acc, x),
+  alSalida: (texto, codigo) => {
+    problemasDeEjecucion(texto, codigo);
+    // En la carpeta de tu equipo: lo que hizo el comando (git, npm, crear archivos…) aparece enseguida en el proyecto
+    if (equipoAbierto && panel.activa?.remota) { void entradas.sincronizarAhora(false); programarDecoracionGit(300); }
+  },
   alIA: (linea) => preguntarIA(`Este comando falló en la terminal: \`${linea}\`. Explícame el error en palabras simples y arréglalo (si hay que cambiar archivos, propón los cambios; si falta instalar algo, dime el comando exacto).`, { editar: true }),
   alCambiar: (abierto) => {
     ui.panel = abierto;
@@ -203,7 +217,7 @@ const panel = new PanelInferior({
     $("contenido").classList.toggle("panel-max", abierto && panel.maximizado);
     $("terminalToggle").setAttribute("aria-expanded", String(abierto));
     $("terminalToggle").classList.toggle("activo", abierto);
-    if (MOVIL.matches) { if (abierto) seccionMovil("terminal"); else if ($("ide").dataset.movil === "terminal") seccionMovil("codigo"); }
+    if (MOVIL.matches) { if (abierto && !terminalEnSilencio) seccionMovil("terminal"); else if ($("ide").dataset.movil === "terminal") seccionMovil("codigo"); }
     guardarUI();
   },
 });
@@ -366,7 +380,8 @@ function pintarPestanas() {
     const nombre = r === VISTA ? "Vista previa" : FS.nombreBase(r);
     const icono = r === VISTA ? '<svg class="ico-vista" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.1"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>' : iconoArchivo(r);
     const g = mapaGit.get(r);
-    return `<div class="pestana${on ? " on" : ""}${sucios.has(r) ? " sucio" : ""}${g ? ` g-${g}` : ""}" role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-ruta="${r.replace(/"/g, "&quot;")}" title="${r === VISTA ? "Vista previa de la página" : r}">${icono}<span class="nom">${nombre}</span><button type="button" class="cerrar" tabindex="-1" aria-label="Cerrar ${nombre}">${x}</button></div>`;
+    const pr = mapaProblemas.get(r);
+    return `<div class="pestana${on ? " on" : ""}${sucios.has(r) ? " sucio" : ""}${g ? ` g-${g}` : ""}${pr ? (pr.e ? " p-error" : " p-aviso") : ""}" role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-ruta="${r.replace(/"/g, "&quot;")}" title="${r === VISTA ? "Vista previa de la página" : r}">${icono}<span class="nom">${nombre}</span><button type="button" class="cerrar" tabindex="-1" aria-label="Cerrar ${nombre}">${x}</button></div>`;
   }).join("");
   $("pestanas").querySelector(".pestana.on")?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
@@ -374,7 +389,8 @@ function pintarPestanas() {
 function pintarMigas() {
   const r = ui.activo;
   if (!r) { $("migas").innerHTML = ""; return; }
-  const partes = r === VISTA ? ["mi-proyecto", paginaVista || "Vista previa"] : ["mi-proyecto", ...r.split("/")];
+  const raizMigas = equipoAbierto ? nombreProyectoVisible() : "mi-proyecto";
+  const partes = r === VISTA ? [raizMigas, paginaVista || "Vista previa"] : [raizMigas, ...r.split("/")];
   $("migas").innerHTML = partes.map((p, i) => `<span class="${i === partes.length - 1 ? "ultima" : ""}">${p.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`).join("");
 }
 
@@ -463,12 +479,20 @@ async function pedirAServidor(url, { method = "GET", headers = [], body = null }
   if (!srv) throw new Error(`No hay ningún servidor en ${u.host}`);
   return srv.pedir({ method, url: u.pathname + u.search, headers, body });
 }
+/** Apps que corren fuera del navegador (Expo Snack, contenedores de Docker): se muestran con su dirección real. */
+function vistaExterna(x, url) {
+  const destino = x.externo + (x.framework === "Expo" ? "" : new URL(url).pathname + new URL(url).search);
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:#111}iframe{border:0;width:100%;height:100%}</style></head>
+<body><iframe src="${destino.replace(/"/g, "&quot;")}" allow="clipboard-read; clipboard-write; camera; microphone; geolocation; fullscreen" referrerpolicy="no-referrer-when-downgrade"></iframe></body></html>`;
+}
 async function mostrarServidor(url, peticion = {}) {
   const turno = ++turnoServidor;
   setTimeout(pintarPestanasVista);
   $("vistaRuta").hidden = true;
   $("vistaUrlForm").hidden = false;
   $("vistaUrl").value = url;
+  const ext = servidores.get(Number(new URL(url).port || 80));
+  if (ext?.externo) { urlServidor = url; ponerVista(vistaExterna(ext, url)); return; }
   let actual = url, r, opciones = { headers: [["accept", "text/html,application/json;q=0.9,*/*;q=0.8"]], ...peticion };
   try {
     for (let saltos = 0; saltos < 6; saltos += 1) {
@@ -489,25 +513,85 @@ async function mostrarServidor(url, peticion = {}) {
   $("vistaUrl").value = actual;
   ponerVista(vistaDeRespuesta({ url: actual, ...r }));
 }
-$("vistaUrlForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  let v = $("vistaUrl").value.trim();
+$("vistaUrlForm").addEventListener("submit", (e) => { e.preventDefault(); irADireccion($("vistaUrl").value); });
+/** Abre lo que escribiste o pegaste en la barra de la vista previa: una página de tu proyecto, tu servidor o otra web. */
+function irADireccion(texto) {
+  let v = String(texto || "").trim();
   if (!v) return;
+  $("vistaUrl").value = v;
+  const enProyecto = (u) => { try { const x = new URL(u); return x.origin === ORIGEN_VIRTUAL || (enlaceLive && u.startsWith(enlaceLive)); } catch { return false; } };
+  if (!urlServidor && (v.startsWith("/") || /^[\w.-]+\.html?(\?|#|$)/i.test(v) || enProyecto(v))) {
+    // Una página de tu proyecto: /contacto.html, contacto.html o la dirección «en vivo» de esa página
+    if (enlaceLive && v.startsWith(enlaceLive)) v = "/" + v.slice(enlaceLive.length).replace(/^\/+/, "");
+    const url = new URL(v.startsWith("http") ? v : (v.startsWith("/") ? v : `/${v}`), urlVirtual || `${ORIGEN_VIRTUAL}/`);
+    void navegarVista(`${ORIGEN_VIRTUAL}${url.pathname}${url.search}${url.hash}`);
+    return;
+  }
   if (v.startsWith("/")) v = new URL(v, urlServidor || "http://127.0.0.1:8000").href;
   else if (!/^https?:\/\//i.test(v)) v = "http://" + v;
+  let local = false;
+  try { local = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/i.test(new URL(v).hostname); } catch { aviso("Esa dirección no es válida.", { tipo: "error" }); return; }
+  if (!local && !servidores.get(Number(new URL(v).port || 80))) { window.open(v, "_blank", "noopener"); return; }   // otra web: en una pestaña nueva
   urlServidor = v;
+  modoServidor(true);
   mostrarServidor(v);
-});
+}
+/** Lo que se copia: la dirección de tu servidor, o el enlace «en vivo» de la página (se abre en cualquier navegador). */
+async function direccionParaCopiar() {
+  if (urlServidor) return $("vistaUrl").value || urlServidor;
+  if (equipoAbierto && paginaVista) return urlDeRuta(paginaVista);
+  await guardarAhora();
+  if (!enlaceLive) await pedirEnlaceLive();
+  let ruta = "";
+  try { ruta = new URL(urlVirtual).pathname.replace(/^\/+/, ""); } catch { ruta = paginaVista && paginaVista !== "index.html" ? rutaEnUrl(paginaVista) : ""; }
+  return enlaceLive + ruta;
+}
+$("vistaUrlCopiar").onclick = async () => {
+  try { const u = await direccionParaCopiar(); await navigator.clipboard.writeText(u); aviso(`Dirección copiada: ${u}`, { tipo: "info", ms: 3000 }); }
+  catch (x) { $("vistaUrl").select(); aviso(x?.message && !/denied|permission/i.test(x.message) ? x.message : "Selecciona la dirección y cópiala con Ctrl+C.", { tipo: "error" }); }
+};
+$("vistaUrlPegar").onclick = async () => {
+  try { const t = (await navigator.clipboard.readText()).trim(); if (!t) { aviso("No hay nada copiado.", { tipo: "error" }); return; } irADireccion(t.split(/\s+/)[0]); }
+  catch { $("vistaUrl").value = ""; $("vistaUrl").focus(); aviso("Pega la dirección aquí (Ctrl+V o mantén pulsado → Pegar) y pulsa ↵.", { tipo: "info", ms: 5000 }); }
+};
 alCambiarServidores((mapa) => {
   const lista = [...mapa.values()];
   $("estServidor").hidden = !lista.length;
-  $("estServidor").textContent = lista.map((x) => `${x.framework || "Python"} :${x.puerto}`).join(" · ");
+  $("estServidor").textContent = "📡 " + lista.map((x) => `${x.framework || "Python"} :${x.puerto}`).join(" · ");
   if (urlServidor && ui.activo === VISTA) mostrarServidor(urlServidor);
 });
-$("estServidor").onclick = () => {
-  const s = [...servidores.values()][0];
-  if (s) abrirUrlServidor(s.url + (s.framework === "FastAPI" ? "/docs" : "/"));
-};
+// Panel PUERTOS: abrir en la vista previa o en una pestaña / el navegador
+function accionPuerto(acc, x) {
+  const url = `http://localhost:${x.puerto}/${x.framework === "FastAPI" ? "docs" : ""}`;
+  if (acc === "pestana" && x.externo) { window.open(x.framework === "Expo" ? x.celular.replace("platform=mydevice", "platform=web") : x.externo, "_blank", "noopener"); return; }
+  if (acc === "pestana") { urlServidor = url; if (!ui.abiertos.includes(VISTA)) ui.abiertos.push(VISTA); activar(VISTA); return; }
+  abrirUrlServidor(url);
+}
+// Como VS Code: «Tu aplicación que se ejecuta en el puerto 3000 está disponible»
+const puertosVistos = new Set();
+alCambiarServidores((mapa) => {
+  for (const p of puertosVistos) if (!mapa.has(p)) puertosVistos.delete(p);
+  for (const x of mapa.values()) {
+    if (puertosVistos.has(x.puerto)) continue;
+    puertosVistos.add(x.puerto);
+    document.querySelector(".aviso-puerto")?.remove();
+    const av = document.createElement("div");
+    av.className = "aviso-puerto"; av.setAttribute("role", "status");
+    av.innerHTML = `<p><span>ℹ️</span><span>Tu aplicación (${x.framework}) que se ejecuta en el puerto <b>${x.puerto}</b> está disponible.</span></p>
+      <div class="botones"><button type="button" data-a="puertos">Ver puertos</button>${x.celular ? '<button type="button" data-a="celular">Abrir en el celular</button>' : ""}<button type="button" class="pri" data-a="abrir">${x.externo ? "Abrir en el navegador" : "Abrir en una pestaña"}</button></div>`;
+    av.onclick = (e) => {
+      const a = e.target.closest("[data-a]")?.dataset.a;
+      if (!a) return;
+      if (a === "puertos") { panel.abrir({ enfocar: false }); panel.mostrarPestana("puertos"); }
+      else if (a === "celular") window.open(x.celular, "_blank", "noopener");
+      else accionPuerto("pestana", x);
+      av.remove();
+    };
+    document.body.appendChild(av);
+    setTimeout(() => av.remove(), 9000);
+  }
+});
+$("estServidor").onclick = () => { panel.abrir({ enfocar: false }); panel.mostrarPestana("puertos"); };
 
 // ------------------------------------------- dirección virtual de la vista previa (como Vite) ----
 // La vista tiene una dirección http://localhost:5173/… (virtual.js): location, history, localStorage y cookies
@@ -534,6 +618,7 @@ function guardarAlmacen(raiz, tipo, datos) {
 }
 function mostrarDireccion(url) {
   try { const u = new URL(url); $("vistaRuta").textContent = `${u.pathname}${u.search}${u.hash}`; $("vistaRuta").title = url; } catch { /* nada */ }
+  if (!urlServidor && document.activeElement !== $("vistaUrl")) $("vistaUrl").value = url;
   anotarHistorial(url);
 }
 /** Lo que pide la página (un script, una hoja de estilos, una imagen) a una dirección virtual. */
@@ -607,8 +692,8 @@ function renderVista() {
   modoServidor(Boolean(urlServidor));
   if (urlServidor) { mostrarServidor(urlServidor); return; }
   if (remotoVista && urlVirtual) { navegarVista(urlVirtual); return; }
-  $("vistaRuta").hidden = false;
-  $("vistaUrlForm").hidden = true;
+  $("vistaRuta").hidden = true;
+  $("vistaUrlForm").hidden = false;
   guardarArchivos();
   const py = proyecto();
   paginaVista = paginaPrincipal(py, paginaVista);
@@ -935,6 +1020,20 @@ function pintarPopLive() {
 }
 $("vistaExterna").onclick = async (e) => {
   e.stopPropagation();
+  // Trabajando en tu equipo: la página se abre en el navegador de tu equipo (el enlace «en vivo» es del proyecto de la nube)
+  if (equipoAbierto && almacen.modoEquipo) {
+    if (urlServidor) { window.open(urlServidor, "_blank", "noopener"); return; }
+    if (!paginaVista) { aviso("Crea un archivo .html para abrirlo en el navegador.", { tipo: "error" }); return; }
+    guardarArchivos();
+    await entradas.sincronizarAhora(false);
+    const win = /windows/i.test(equipoAbierto.sistema || ""), mac = /mac/i.test(equipoAbierto.sistema || "");
+    const ruta = rutaCompleta(paginaVista);
+    const t = terminalEquipo(equipoAbierto);
+    const q = (x) => (win ? `'${x.replace(/'/g, "''")}'` : `'${x.replace(/'/g, "'\\''")}'`);
+    t.lanzar(win ? (t.real ? `Start-Process ${q(ruta)}` : `start "" "${ruta}"`) : `${mac ? "open" : "xdg-open"} ${q(ruta)}`);
+    aviso(`Abriendo ${paginaVista} en el navegador de ${equipoAbierto.equipo}…`, { tipo: "info", ms: 4000 });
+    return;
+  }
   const pop = $("livePop");
   if (!pop.hidden) { pop.hidden = true; return; }
   pop.hidden = false;
@@ -985,12 +1084,24 @@ window.addEventListener("message", (e) => {
       });
   } else if (m.cc === "ir" && (urlServidor || /^https?:/i.test(String(m.url)))) mostrarServidor(new URL(String(m.url), urlServidor ?? undefined).href);
   else if (m.cc === "form" && (urlServidor || /^https?:/i.test(String(m.url)))) mostrarServidor(new URL(String(m.url), urlServidor ?? undefined).href, { method: m.method, headers: m.headers, body: m.body?.byteLength ? new Uint8Array(m.body) : null });
+  else if (m.cc === "externo") abrirExterno(String(m.href || ""));
   else if (m.cc === "nav" && urlServidor) { if (/^https?:/i.test(m.href)) window.open(m.href, "_blank", "noopener"); else mostrarServidor(new URL(String(m.href), urlServidor).href); }
   else if (m.cc === "nav") {
     const destino = resolverEnlace(proyecto(), paginaVista || "", m.href);
     if (destino) { paginaVista = destino; enVivo.scroll = { pagina: null, y: 0 }; renderVista(); } else panel.escribirConsola("warn", `El enlace «${m.href}» no apunta a ninguna página de tu proyecto.`);
   }
 });
+
+/** Enlaces externos de tu página (https://, www., mailto:, tel:): se abren fuera, en una pestaña nueva del navegador. */
+function abrirExterno(href) {
+  let u;
+  try { u = new URL(href); } catch { return; }
+  if (!/^(https?|mailto|tel):$/.test(u.protocol)) return;
+  // Se revisa antes de abrir: virus, estafas y suplantaciones se bloquean (js/enlaces.js)
+  import("/js/enlaces.js").then(async (m) => {
+    if (await m.abrirSeguro(u.href) && u.protocol.startsWith("http")) aviso(`Abriendo ${u.hostname} en una pestaña nueva`, { tipo: "info", ms: 1800 });
+  });
+}
 
 function ejecutarActual() {
   guardarArchivos(); // ejecutar siempre usa lo último que escribiste
@@ -1006,6 +1117,17 @@ function ejecutarActual() {
   if (pagina) { abrirVista(pagina); return; }
   // .jsx / .tsx (o un .js/.ts con React): se ve el componente en la vista previa.
   if (esReact(ruta, proyecto().files[ruta])) { verComponente(ruta); return; }
+  // Carpeta de tu equipo abierta: se ejecuta allá, con el Python, Node, Java… que tengas instalado
+  if (equipoAbierto) {
+    const t = terminalEquipo(equipoAbierto);
+    const c0 = comandoEnEquipo(ruta, equipoAbierto, t.real ? null : t.sesion.cwd);
+    const c = c0 && t.real ? paraShellDe(equipoAbierto, c0) : c0;
+    if (c) {
+      panel.abrir({ enfocar: false }); panel.mostrarPestana("terminal"); panel.activar(t);
+      void entradas.sincronizarAhora(false).then(() => t.lanzar(c));
+      return;
+    }
+  }
   const comando = comandoParaArchivo(ruta, panel.activa?.sesion.cwd ?? "");
   if (!comando) { aviso(`No sé ejecutar archivos .${FS.extension(ruta) || "sin extensión"}. Los de texto solo se editan.`); return; }
   panel.correr(comando);
@@ -1121,6 +1243,7 @@ function ofrecerDeshacer(ruta, eliminado) {
 function proyectoCambio(info = {}) {
   const { origen } = info;
   if (origen === "aviso") { aviso(info.error, { tipo: "error" }); return; }
+  if (origen === "avisoInfo") { aviso(info.texto, { tipo: "info", ms: 2500 }); return; }
   if (origen === "ui") { guardarUI(); return; }
   if (origen !== "remoto") almacen.cambiar();
   if (info.movido) renombrarRutas(info.movido[0], info.movido[1]);
@@ -1136,9 +1259,9 @@ function proyectoCambio(info = {}) {
   else if (origen !== "editor") { explorador.render(); pintarPestanas(); pintarMigas(); }
   if (origen !== "editor") pintarGit();
   programarDecoracionGit(origen === "editor" ? 1500 : 400);
-  if (origen !== "ui") marcarCambio();
+  if (origen !== "ui") marcarCambio(origen);
   programarModelos();
-  if (vistaGit && origen !== "editor") panelGit?.render();
+  if (vistaGit && origen !== "editor") renderGit();
   if (vistaExt && origen !== "editor") panelExt?.render();
   if (info.origen === "importar" && info.rutas?.length === 1 && FS.tieneArchivo(proyecto(), info.rutas[0])) abrir(info.rutas[0], { enfocar: false });
   entradas?.alCambiarProyecto(info);
@@ -1167,7 +1290,7 @@ async function guardarAhora() {
   }
   guardarArchivos();
   const ok = await almacen.guardarAhora();
-  if (ok) aviso("Proyecto guardado en tu cuenta.", { ms: 2200 });
+  if (ok) { aviso("Proyecto guardado en tu cuenta.", { ms: 2200 }); sonar("guardar"); }
 }
 
 function pintarAutoguardado() {
@@ -1190,7 +1313,32 @@ function alternarAutoguardado() {
 }
 
 // Aviso del navegador al salir con cambios sin guardar
-addEventListener("beforeunload", (e) => { if (sucios.size) { e.preventDefault(); e.returnValue = ""; } });
+// Al cerrar la ventana: aviso si quedó algo sin guardar o si tu sesión de GitHub sigue activa en este navegador
+let navegandoDentro = false;
+document.addEventListener("click", (e) => { const a = e.target.closest?.("a[href]"); if (a && new URL(a.href, location.href).origin === location.origin) navegandoDentro = true; }, true);
+const githubRecordado = () => sesionGitHub.lista.some((c) => c.recordar);
+addEventListener("beforeunload", (e) => {
+  if (sucios.size || (githubRecordado() && !navegandoDentro)) { e.preventDefault(); e.returnValue = "Tu sesión de GitHub sigue activa en este navegador."; }
+  navegandoDentro = false;
+});
+// Indicador en la barra de abajo: «GitHub: @usuario» mientras haya una sesión guardada (clic → cerrarla)
+function pintarGitHubActivo() {
+  const b = $("estGitHub");
+  const c = sesionGitHub.lista;
+  b.hidden = !c.length;
+  if (!c.length) return;
+  const recordadas = c.filter((x) => x.recordar).length;
+  b.innerHTML = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" style="vertical-align:-2px"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.82 1.23.82.72 1.23 1.88.87 2.34.67.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg> @${String(sesionGitHub.activaLogin || c[0].login).replace(/[<&"]/g, "")}${recordadas ? " · recordada" : ""}`;
+  b.title = recordadas ? "Tu sesión de GitHub está GUARDADA en este navegador: si es un computador compartido, ciérrala al terminar (clic aquí)." : "Sesión de GitHub activa solo en esta pestaña (clic para cerrarla)";
+  b.classList.toggle("recordada", recordadas > 0);
+}
+$("estGitHub").onclick = async () => {
+  const r = await dialogo({ titulo: "Sesión de GitHub", mensaje: `Estás conectado a GitHub como @${sesionGitHub.activaLogin}. Si este computador es compartido (sala, biblioteca, el de un amigo), cierra la sesión antes de irte: así nadie más podrá usar tus repositorios.`,
+    botones: [{ valor: "cerrar", texto: "Cerrar sesión de GitHub", peligro: true }, { valor: "no", texto: "Mantenerla", cancelar: true }] });
+  if (r === "cerrar") { sesionGitHub.cerrarTodas(); aviso("Sesión de GitHub cerrada en este navegador", { tipo: "info" }); }
+};
+sesionGitHub.alCambiar(pintarGitHubActivo);
+pintarGitHubActivo();
 
 // ------------------------------------------------------------------------------ explorador ----
 const explorador = new Explorador({
@@ -1198,16 +1346,77 @@ const explorador = new Explorador({
   alAbrir: (ruta) => abrir(ruta),
   alCambiar: proyectoCambio,
   alBorrar: ofrecerDeshacer,
-  alAbrirTerminalEn: (carpeta) => panel.correr(`cd ${FS.rutaAbsoluta(carpeta)}`),
+  alAbrirTerminalEn: (carpeta) => {
+    if (!equipoAbierto) { panel.correr(`cd ${FS.rutaAbsoluta(carpeta)}`); return; }
+    const t = terminalEquipo(equipoAbierto);   // en tu equipo: la terminal del equipo, en esa carpeta
+    panel.abrir({ enfocar: false }); panel.mostrarPestana("terminal"); panel.activar(t);
+    const ruta = carpeta ? rutaCompleta(carpeta) : equipoAbierto.carpeta;
+    t.lanzar(/windows/i.test(equipoAbierto.sistema || "") ? `cd '${ruta.replace(/'/g, "''")}'` : `cd '${ruta.replace(/'/g, "'\\''")}'`);
+  },
   alSoltarArchivos: (o) => entradas.soltados(o),
   alSubirEn: (carpeta) => entradas.subirArchivos(carpeta),
   alDescargar: (ruta) => entradas.descargarArchivo(ruta),
+  rutaCompleta: (ruta) => rutaCompleta(ruta),
+  urlDe: (ruta) => (FS.tieneArchivo(proyecto(), ruta) ? () => urlDeRuta(ruta) : null),
+  entrarEn: (ruta) => (equipoAbierto ? () => irACarpetaEquipo(rutaCompleta(ruta)) : null),
 });
+/** Ruta completa del archivo: la de tu equipo (C:\…\index.html) o la del espacio de Trabajo (/workspace/…). */
+function rutaCompleta(ruta) {
+  if (!equipoAbierto) return `/workspace/${ruta}`;
+  const win = /windows/i.test(equipoAbierto.sistema || "");
+  const base = equipoAbierto.carpeta.replace(/[\\/]+$/, "");
+  return win ? `${base}\\${ruta.replace(/\//g, "\\")}` : `${base}/${ruta}`;
+}
+/** Dirección para abrir el archivo en un navegador: en tu equipo, file:///…; en la nube, el enlace «en vivo». */
+async function urlDeRuta(ruta) {
+  if (equipoAbierto) return `file:///${rutaCompleta(ruta).replace(/\\/g, "/").replace(/^\/+/, "")}`.replace(/ /g, "%20");
+  await guardarAhora();
+  const base = enlaceLive || await pedirEnlaceLive();
+  return base + rutaEnUrl(ruta);
+}
 entradas = new Entradas({
   proyecto, archivos, usuarioId: CUENTA, botonCarpeta: $("estCarpeta"),
   cambio: (info) => proyectoCambio(info),
   antesDeLeer: () => guardarArchivos(),
+  elegirOrigen: () => elegirOrigenCarpeta(),
+  alEquipo: (eq, motivo, nombre) => alCambiarEquipo(eq, motivo, nombre),
+  alAntesEquipo: (o) => entrarAlEquipo(o),
+  abrirConector: () => abrirConector(),
+  conector: { fsEquipo: Conector.fsEquipo, listarEquipos: Conector.listarEquipos },
 });
+// ------------------------------------------------------- Documentos (Word, Excel, PowerPoint, PDF) ----
+const ES_DOCUMENTO = /\.(docx|xlsx|xlsm|pptx|pdf|doc|xls|ppt|odt|ods|odp|rtf)$/i;
+entradas.alDocumentos = () => verDocumentos();
+async function verDocumentos() {
+  const d = document.createElement("dialog");
+  d.className = "ide-dialogo ancho dialogo-docs";
+  document.body.appendChild(d);
+  const tipoDe = (r) => { const e = FS.extension(r).toLowerCase(); return ["docx", "doc", "odt", "rtf"].includes(e) ? ["W", "Word"] : ["xlsx", "xlsm", "xls", "ods"].includes(e) ? ["X", "Excel"] : ["pptx", "ppt", "odp"].includes(e) ? ["P", "PowerPoint"] : ["PDF", "PDF"]; };
+  const pintar = () => {
+    const docs = Object.keys(proyecto().files).filter((r) => ES_DOCUMENTO.test(r)).sort();
+    d.innerHTML = `<form method="dialog"><h3>📎 Documentos del proyecto</h3>
+      <p class="con-intro">Sube documentos de Word, Excel, PowerPoint o PDF y míralos aquí mismo, sin descargarlos. Se guardan en tu cuenta (carpeta <code>documentos</code>).</p>
+      <div class="docs-lista">${docs.length ? docs.map((r) => { const [ico, nombre] = tipoDe(r); const m = leerMarcador(proyecto().files[r]); return `<div class="docs-fila" data-r="${escH(r)}"><span class="doc-ico doc-ico-${ico.toLowerCase()}">${ico === "PDF" ? "PDF" : ico}</span><span class="docs-nombre"><b>${escH(FS.nombreBase(r))}</b><small>${escH(nombre)}${m ? ` · ${formatoBytes(m.tamano)}` : ""} · ${escH(FS.carpetaDe(r) || "raíz")}</small></span><button type="button" class="ide-boton primario" data-a="ver">Ver</button><button type="button" class="ide-boton" data-a="bajar" title="Descargar" aria-label="Descargar ${escH(r)}">⬇</button><button type="button" class="ide-boton peligro" data-a="borrar" title="Eliminar" aria-label="Eliminar ${escH(r)}">🗑</button></div>`; }).join("")
+        : '<p class="docs-vacio">Todavía no hay documentos. Súbelos con el botón de abajo o arrástralos al explorador.</p>'}</div>
+      <div class="ide-dialogo-botones"><button type="button" class="ide-boton primario" data-a="subir">⬆ Subir documentos</button><button class="ide-boton" value="">Cerrar</button></div></form>`;
+  };
+  pintar();
+  d.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-a]");
+    if (!b) return;
+    const r = b.closest("[data-r]")?.dataset.r;
+    if (b.dataset.a === "subir") { const nuevos = await entradas.subirDocumentos("documentos"); pintar(); if (nuevos?.length === 1) { d.close(); abrir(nuevos[0]); } return; }
+    if (b.dataset.a === "ver") { d.close(); abrir(r); return; }
+    if (b.dataset.a === "bajar") { const m = proyecto().files[r]; const a = document.createElement("a"); a.href = archivos.url(m, { descargar: true, nombre: FS.nombreBase(r) }); a.download = FS.nombreBase(r); a.click(); return; }
+    if (b.dataset.a === "borrar") {
+      const ok = await dialogo({ titulo: `¿Eliminar «${FS.nombreBase(r)}»?`, mensaje: "Se quita del proyecto.", botones: [{ texto: "Eliminar", valor: true, peligro: true }, { texto: "Cancelar", valor: false, cancelar: true }] });
+      if (ok) { FS.borrar(proyecto(), r); proyectoCambio({ origen: "ui-archivos" }); explorador.render(); pintar(); }
+    }
+  });
+  d.addEventListener("close", () => d.remove());
+  d.showModal();
+}
+
 $("masAcciones").onclick = (e) => { const r = e.currentTarget.getBoundingClientRect(); entradas.menu(r.left, r.bottom + 4); };
 $("nuevoArchivo").onclick = () => explorador.nuevo("archivo");
 $("nuevaCarpeta").onclick = () => explorador.nuevo("carpeta");
@@ -1299,6 +1508,7 @@ document.addEventListener("keydown", (e) => {
   const esEnye = k === "ñ" || e.code === "Semicolon" || e.key === "`" || e.code === "Backquote";
   if (ctrl && e.shiftKey && esEnye) { e.preventDefault(); manejarAtajo("nueva-terminal"); }
   else if (ctrl && !e.altKey && (esEnye || k === "j")) { e.preventDefault(); manejarAtajo("terminal"); }
+  else if (ctrl && e.shiftKey && e.key.toLowerCase() === "m") { e.preventDefault(); verProblemas(); }
   else if (ctrl && e.key.toLowerCase() === "b") { e.preventDefault(); alternarExplorador(); }
   else if (ctrl && e.key.toLowerCase() === "s") { e.preventDefault(); guardarAhora(); }
 });
@@ -1356,7 +1566,7 @@ function burbuja(rol, texto) {
 function pintarChat() {
   $("chat").replaceChildren();
   const curso = prog.curso_actual?.nombre;
-  $("cursoAsistente").textContent = curso ? `Tutor de ${curso}` : "Tutor de CódigoCamp";
+  $("cursoAsistente").textContent = curso ? `Tu asistente · ${curso}` : "Tu asistente de programación";
   burbuja("tutor", `¡Hola${user.nombre ? `, ${user.nombre.split(" ")[0]}` : ""}! Pregúntame sobre tu código. Activa **Editar con IA** y puedo proponer cambios en tus archivos (los revisas y aceptas tú).`);
   historial.forEach((m) => burbuja(m.rol, m.texto));
 }
@@ -1430,6 +1640,7 @@ $("preguntar").onsubmit = async (event) => {
   burbuja("yo", pregunta + (nombres.length ? `\n📎 ${nombres.join(", ")}` : ""));
   const copiloto = $("copiloto").checked;
   const espera = burbuja("tutor", copiloto ? "Revisando tu proyecto…" : "Pensando…");
+  dispatchEvent(new CustomEvent("codi", { detail: { animo: "pensando", frase: "Déjame pensar…", ms: 60000 } }));
   const archivo = ui.activo && ui.activo !== VISTA && FS.tieneArchivo(proyecto(), ui.activo) ? ui.activo : null;
   let probs = [];
   try { probs = usarMonaco ? problemas().lista.slice(0, 30).map((x) => `${x.ruta}:${x.linea} ${x.mensaje}`) : []; } catch { /* sin editor */ }
@@ -1445,11 +1656,13 @@ $("preguntar").onsubmit = async (event) => {
     }
     historial.push({ rol: "yo", texto: pregunta || "(archivos)" }, { rol: "tutor", texto: (texto || "") + (cambios ? `\n(Propuse cambios en: ${cambios.map((c) => c.ruta).join(", ")})` : "") });
     historial = historial.slice(-16);
+    dispatchEvent(new CustomEvent("codi", { detail: { animo: "feliz", frase: cambios ? "¡Te propuse cambios! Revísalos" : "¡Listo! Ahí tienes", ms: 2500 } }));
     try { localStorage.setItem(CHAT_STORAGE, JSON.stringify(historial)); }
     catch { avisoSimple("El tutor respondió, pero no se pudo guardar el historial en este navegador.", true); }
   } catch (error) {
     espera.textContent = error.message;
     espera.classList.add("error");
+    dispatchEvent(new CustomEvent("codi", { detail: { animo: "triste", frase: "Uy, no pude responder. ¿Intentamos otra vez?", ms: 3000 } }));
     $("pregunta").value = pregunta;
   }
   $("enviar").disabled = false;
@@ -1488,6 +1701,21 @@ function accionIA(id) {
   if (t) preguntarIA(t, { editar });
 }
 
+/** Menú de la IA (botón ✨ de la barra táctil del celular): lo mismo que el clic derecho del editor en el computador. */
+function menuIA() {
+  const hay = !!seleccionActual();
+  const x = Math.max(12, innerWidth / 2 - 130), y = Math.max(60, innerHeight - 420);
+  menuContextual(x, y, [
+    { texto: hay ? "✨ Pedir un cambio en lo seleccionado…" : "✨ Escribir código aquí con IA…", fn: () => accionIA("ia-linea") },
+    { texto: "💡 Explicar" + (hay ? " lo seleccionado" : " este archivo"), fn: () => accionIA("ia-explicar") },
+    { texto: "🛠️ Arreglar errores", fn: () => accionIA("ia-arreglar") },
+    { texto: "🚀 Mejorar el código", fn: () => accionIA("ia-mejorar") },
+    { texto: "📝 Comentar y documentar", fn: () => accionIA("ia-comentar") },
+    { texto: "🧪 Escribir pruebas", fn: () => accionIA("ia-pruebas") },
+    { texto: "💬 Abrir el chat del asistente", fn: () => accionIA("ia-chat") },
+  ]);
+}
+
 /** Menú del clic derecho en las pestañas (como VS Code). */
 $("pestanas").addEventListener("contextmenu", (e) => {
   const tab = e.target.closest(".pestana");
@@ -1504,7 +1732,8 @@ $("pestanas").addEventListener("contextmenu", (e) => {
     { texto: "Cerrar todas", fn: () => cerrarVarias([...ui.abiertos]) },
     "-",
     ...(r !== VISTA ? [
-      { texto: "Copiar ruta", fn: () => navigator.clipboard?.writeText(`/workspace/${r}`).then(() => avisoSimple("Ruta copiada")) },
+      { texto: "Copiar ruta", fn: () => navigator.clipboard?.writeText(rutaCompleta(r)).then(() => avisoSimple("Ruta copiada")) },
+      { texto: "Copiar URL", fn: async () => { try { await navigator.clipboard.writeText(await urlDeRuta(r)); avisoSimple("URL copiada"); } catch (x) { aviso(x.message || "No se pudo copiar.", { tipo: "error" }); } } },
       { texto: "Copiar ruta relativa", fn: () => navigator.clipboard?.writeText(r).then(() => avisoSimple("Ruta copiada")) },
       { texto: "Mostrar en el explorador", fn: () => { alternarGit(false); alternarExplorador(true); const partes = r.split("/"); for (let k = 1; k < partes.length; k += 1) explorador.expandidas.add(partes.slice(0, k).join("/")); explorador.render(); explorador.seleccionar(r); } },
       "-",
@@ -1552,11 +1781,14 @@ function abrirEnLinea(ruta, linea, col = 1, largo = 0) {
 }
 
 const COMANDOS_PALETA = () => [
+  { etiqueta: "Terminal: conectar mi computador o celular (terminal real)", accion: () => abrirConector() },
+  { etiqueta: "Ver: problemas", atajo: "Ctrl+Shift+M", accion: () => verProblemas() },
   { etiqueta: "Archivo: nuevo archivo", accion: () => explorador.nuevo("archivo") },
   { etiqueta: "Archivo: nueva carpeta", accion: () => explorador.nuevo("carpeta") },
   { etiqueta: "Archivo: guardar", atajo: "Ctrl+S", accion: () => guardarAhora() },
   { etiqueta: "Archivo: cerrar el editor", accion: () => ui.activo && cerrarPestana(ui.activo) },
   { etiqueta: "Archivo: subir archivos…", accion: () => entradas.subirArchivos("") },
+  { etiqueta: "Documentos: Word, Excel, PowerPoint y PDF…", accion: () => verDocumentos() },
   { etiqueta: "Archivo: importar .zip…", accion: () => entradas.importarZip() },
   { etiqueta: "Archivo: descargar el proyecto (.zip)", accion: () => entradas.descargarZip() },
   { etiqueta: "Archivo: abrir carpeta del computador…", accion: () => entradas.vincularCarpeta() },
@@ -1618,6 +1850,7 @@ function manejarAtajo(accion) {
   else if (accion === "ejecutar") ejecutarActual();
   else if (accion === "terminal") { if (Date.now() - (manejarAtajo.ultimaTerminal ?? 0) > 250) { manejarAtajo.ultimaTerminal = Date.now(); panel.alternar(); } }
   else if (accion === "nueva-terminal") { panel.abrir(); panel.mostrarPestana("terminal"); panel.nueva(); }
+  else if (accion === "ia-menu") menuIA();
   else if (accion.startsWith("ia-")) accionIA(accion);
   else if (accion === "tema") elegirTema();
   else if (accion === "markdown") vistaMarkdown();
@@ -1647,16 +1880,548 @@ function manejarAtajo(accion) {
   }
 }
 
+let mapaProblemas = new Map();   // ruta → {e, a}: archivos dañados en rojo en el árbol y en las pestañas
 function pintarProblemas() {
   const b = $("estProblemas");
   if (!usarMonaco) { b.hidden = true; return; }
   const p = problemas();
+  panel.pintarProblemas(p);
+  const mapa = new Map();
+  for (const x of p.lista) { const v = mapa.get(x.ruta) || { e: 0, a: 0 }; if (x.grave) v.e++; else v.a++; mapa.set(x.ruta, v); }
+  const cambio = [...mapa].map(([r, v]) => `${r}${v.e}${v.a}`).join() !== [...mapaProblemas].map(([r, v]) => `${r}${v.e}${v.a}`).join();
+  mapaProblemas = mapa;
+  if (cambio) { explorador.decorarProblemas(mapa); pintarPestanas(); }
   b.hidden = false;
   b.innerHTML = `<span class="prob-e">⊗ ${p.errores}</span> <span class="prob-a">⚠ ${p.advertencias}</span>`;
   b.title = p.errores || p.advertencias ? "Problemas que encontró el editor (clic para verlos)" : "Sin problemas";
 }
 
+// ------------------------------------------------- Conector: terminal en tu computador o celular de verdad ----
+const escH = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+async function abrirConector() {
+  const C = await import("/js/trabajo/conector.js");
+  document.querySelector(".dialogo-conector")?.remove();
+  const d = document.createElement("dialog");
+  d.className = "ide-dialogo dialogo-conector";
+  document.body.appendChild(d);
+  let vigilando = null, codigoActual = null, conocidos = new Set();
+  const cerrar = () => { clearInterval(vigilando); d.close(); };
+  d.addEventListener("close", () => { clearInterval(vigilando); d.remove(); });
+
+  const abrirTerminal = (eq) => {
+    cerrar();
+    panel.abrir({ enfocar: false });
+    const t = terminalReal(eq);
+    requestAnimationFrame(() => t.enfocar());
+  };
+  const abrirCarpetaDe = async (eq) => {
+    cerrar();
+    const anterior = eq.carpeta;
+    const carpeta = await elegirCarpetaEquipo(eq);
+    if (carpeta && await carpetaManejable(eq, carpeta, anterior)) await entradas.vincularEquipo({ ...eq, carpeta }, carpeta);
+  };
+  const pintar = async () => {
+    const equipos = await C.listarEquipos();
+    const vivos = equipos.filter((e) => e.en_linea);
+    const so = /Android/i.test(navigator.userAgent) ? "android" : /Win/i.test(navigator.platform) ? "windows" : "unix";
+    d.innerHTML = `<form method="dialog">
+      <h3>🖥 Tu computador o celular en Trabajo</h3>
+      <p class="con-intro">Abre una carpeta de tu computador o celular y trabaja en ella como en un editor de escritorio: los archivos, la terminal, Git, Python, Node, Java, Flutter, Docker… son <b>los de tu equipo, de verdad</b>. Solo funciona mientras <b>tú</b> tengas abierto el Conector en ese equipo y después de confirmar tu <b>PIN, huella o contraseña</b> de ese equipo.</p>
+      <p class="con-aviso">⚠️ Los comandos corren con <b>tus permisos</b> en ese equipo (empiezan en la carpeta elegida, pero pueden llegar a otras). Ciérralo con Ctrl+C cuando termines; si no lo usas por 30 minutos se cierra solo.</p>
+      ${equipos.length ? `<div class="con-equipos">${equipos.map((e) => `<div class="con-eq ${e.en_linea ? "vivo" : ""}" data-id="${e.id}">
+          <span class="con-punto" title="${e.en_linea ? "Conectado" : "Desconectado"}"></span>
+          <div class="con-info"><b>${escH(e.equipo)}</b><small>${escH(e.sistema)} · ${escH(e.carpeta || "")}</small>${e.en_linea && e.antivirus ? `<small class="con-av ${e.antivirus.activo === false ? "apagado" : ""}">🛡️ ${escH(e.antivirus.nombre || "Antivirus")}${e.antivirus.activo === false ? " — enciéndelo para estar protegido" : e.antivirus.revisa ? " · revisa los programas y archivos que entran y salen" : ""}</small>` : ""}</div>
+          <div class="con-acc">${e.en_linea ? `<button type="button" class="ide-boton primario" data-a="carpeta" title="Elige una carpeta de ese equipo y trabaja en ella como en un editor de escritorio">📂 Abrir carpeta</button>
+            <button type="button" class="ide-boton" data-a="terminal">Solo terminal</button>` : `<small class="con-off">Abre el Conector en ese equipo para usarlo</small>`}
+            <button type="button" class="ide-boton peligro" data-a="olvidar" title="Desconectar y olvidar este equipo">✕</button></div></div>`).join("")}</div>` : ""}
+      <details class="con-nuevo" ${vivos.length ? "" : "open"}><summary>Conectar ${equipos.length ? "otro" : "un"} equipo</summary>
+        <label class="con-acepto"><input type="checkbox" id="conAcepto"> <span>Leí y acepto la <a href="/pages/terminos.html#conector" target="_blank" rel="noopener">sección 7 de los Términos</a>: <b>soy responsable</b> de los comandos que se ejecuten en mi terminal, de los cambios en mis archivos y bases de datos locales, y de guardar en secreto mi código y mi token del Conector.</span></label>
+        <ol class="con-pasos" id="conPasos">
+          <li>Instala <b>Python 3</b> si no lo tienes (<a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a>; en Android usa la app <b>Termux</b> y escribe <code>pkg install python</code>).</li>
+          <li><a class="ide-boton" href="/api/conector/programa" download="${escH(Conector.archivoConector)}">⬇ Descargar el Conector</a> (se guarda como <code>${escH(Conector.archivoConector)}</code>, por ejemplo en Descargas). <small class="con-nota-version">Si ya tenías un Conector, descarga este nuevo: el nombre trae la versión para que no abras el anterior por error.</small></li>
+          <li>Abre una terminal en esa carpeta y escribe:
+            <div class="con-sistemas" role="tablist">${[["windows", "Windows"], ["unix", "Mac / Linux"], ["android", "Android (Termux)"]].map(([k, t]) => `<button type="button" role="tab" data-so="${k}" class="${k === so ? "on" : ""}">${t}</button>`).join("")}</div>
+            <div class="con-comando"><code id="conCmd">—</code><button type="button" class="ide-boton" data-a="copiar">Copiar</button></div>
+            <small class="con-codigo">Código: <b id="conCodigo">…</b> <span id="conVence"></span></small></li>
+          <li>Responde <b>s</b> y confirma con el <b>PIN, la huella o la contraseña</b> de tu equipo (Windows Hello, la contraseña de tu Mac o Linux, o la huella en Android con la app <b>Termux:API</b> y <code>pkg install termux-api</code>). ¡Listo! Aquí aparecerá tu equipo y eliges la carpeta de tu proyecto.</li>
+        </ol>
+        <p class="con-nota">🛡️ CódigoCamp bloquea siempre los comandos peligrosos (borrar el disco o el sistema, apagar, desactivar el antivirus, robar contraseñas, control remoto, mineros) y los enlaces con virus o estafas. El antivirus de tu equipo revisa los programas y archivos que entran, salen o se ejecutan. Nunca se abren carpetas del sistema ni de contraseñas, el Conector no abre puertos y puedes desconectarlo aquí cuando quieras.</p>
+      </details>
+      <div class="ide-dialogo-botones"><button class="ide-boton" value="cerrar">Cerrar</button></div></form>`;
+    let soActual = so;
+    const comando = () => {
+      const c = codigoActual || "CODIGO";
+      const f = Conector.archivoConector;
+      return soActual === "windows" ? `py ${f} ${c}` : soActual === "android" ? `pkg install python termux-api && cd ~/storage/downloads && python ${f} ${c}` : `python3 ${f} ${c}`;
+    };
+    const pintarCmd = () => { const el = d.querySelector("#conCmd"); if (el) el.textContent = comando(); const k = d.querySelector("#conCodigo"); if (k) k.textContent = codigoActual || "…"; };
+    d.querySelectorAll("[data-so]").forEach((b) => b.onclick = () => { soActual = b.dataset.so; d.querySelectorAll("[data-so]").forEach((x) => x.classList.toggle("on", x === b)); pintarCmd(); });
+    pintarCmd();
+    d.querySelector('[data-a="copiar"]').onclick = () => navigator.clipboard?.writeText(comando()).then(() => aviso("Comando copiado", { tipo: "info", ms: 1500 }));
+    d.querySelectorAll(".con-eq [data-a]").forEach((b) => b.onclick = async () => {
+      const eq = equipos.find((e) => e.id === Number(b.closest("[data-id]").dataset.id));
+      const a = b.dataset.a;
+      if (a === "terminal") return abrirTerminal(eq);
+      if (a === "carpeta") return abrirCarpetaDe(eq);
+      if (a === "olvidar") { await api(`/api/conector/${eq.id}`, null, "DELETE").catch(() => fetchBorrar(eq.id)); conocidos.delete(eq.id); return pintar(); }
+    });
+    return equipos;
+  };
+  const fetchBorrar = (id) => fetch(`/api/conector/${id}`, { method: "DELETE", headers: { "X-CSRFToken": (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || "" } });
+  const iniciales = await pintar();
+  iniciales.forEach((e) => conocidos.add(e.id));
+  d.showModal();
+  // El código solo se pide después de aceptar las condiciones del Conector (se recuerda para esta versión de los términos)
+  const CLAVE_ACEPTO = "cc_conector_acepto";
+  const versionTerminos = "2026-11-24";
+  const pedirCodigo = async () => {
+    try { codigoActual = (await api("/api/conector/codigo", { acepto: true })).codigo; } catch (e) { aviso(e.message, { tipo: "error" }); }
+    d.querySelector("#conCodigo") && (d.querySelector("#conCodigo").textContent = codigoActual || "—");
+    d.querySelector("#conCmd") && d.querySelector(".con-sistemas .on")?.click();
+  };
+  const casilla = d.querySelector("#conAcepto");
+  const marcarPasos = () => d.querySelector("#conPasos")?.classList.toggle("bloqueado", !casilla?.checked);
+  if (casilla) {
+    casilla.checked = localStorage.getItem(CLAVE_ACEPTO) === versionTerminos;
+    marcarPasos();
+    casilla.addEventListener("change", () => {
+      marcarPasos();
+      if (casilla.checked) { localStorage.setItem(CLAVE_ACEPTO, versionTerminos); if (!codigoActual) pedirCodigo(); }
+      else localStorage.removeItem(CLAVE_ACEPTO);
+    });
+    if (casilla.checked) await pedirCodigo();
+  }
+  // Cuando el equipo nuevo se conecta, se abre su terminal sola
+  vigilando = setInterval(async () => {
+    if (!d.open) return;
+    const lista = await C.listarEquipos();
+    const nuevo = lista.find((e) => e.en_linea && !conocidos.has(e.id));
+    if (nuevo) { sonarEquipo(); aviso(`¡${nuevo.equipo} se conectó! Elige la carpeta de tu proyecto.`, { tipo: "info" }); abrirCarpetaDe(nuevo); }
+  }, 2500);
+}
+const sonarEquipo = () => import("/js/sonidos.js").then((m) => m.sonar("notificacion")).catch(() => {});
+
+// ------------------------------------------- carpeta de tu equipo abierta en Trabajo (como un editor de escritorio) ----
+/** La terminal «🖥 equipo» de ese equipo (la crea si no hay), parada en la carpeta abierta. */
+function terminalEquipo(eq) {
+  const abiertas = panel.terminales.filter((x) => x.remota && x.shell.equipo.id === eq.id && !x.cerrada);
+  const t = abiertas.find((x) => x.shell.equipo.carpeta === eq.carpeta) || abiertas[0];
+  if (t) {   // nunca se duplican: si cambió la carpeta, la misma terminal se mueve allá
+    if (t.shell.equipo.carpeta !== eq.carpeta) {
+      t.shell.equipo.carpeta = eq.carpeta;
+      if (t.real) t.lanzar(/windows/i.test(eq.sistema || "") ? `cd '${eq.carpeta.replace(/'/g, "''")}'` : `cd '${eq.carpeta.replace(/'/g, "'\\''")}'`);
+      else t.sesion.cwd = "";
+    }
+    return t;
+  }
+  return terminalReal(eq);
+}
+
+const sinTerminalCompleta = new Set();   // equipos cuyo Conector no trae la terminal completa (versión anterior)
+/** Terminal REAL del equipo (pseudo-terminal + xterm.js, como VS Code). Si el equipo no la soporta, la simple. */
+function terminalReal(eq) { return panel.nueva(especTerminalEquipo(eq)); }
+/** Qué terminal abrir en el equipo: la completa (pseudo-terminal) o, con un Conector viejo, la simple. */
+function especTerminalEquipo(eq) {
+  if (eq.pty === false || sinTerminalCompleta.has(eq.id)) { avisoActualizarConector(eq); return new Conector.ShellRemoto({ ...eq }); }
+  return ({
+    real: true, equipo: { ...eq },
+    alFallar: (t, motivo, extra = {}) => {
+      panel.matar(t);
+      if (extra.actualizar) { sinTerminalCompleta.add(eq.id); avisoActualizarConector(eq, motivo); }
+      else aviso(`No se pudo abrir la terminal completa (${motivo}). Abrí la terminal simple de ${eq.equipo}.`, { tipo: "error", ms: 10000 });
+      const ya = panel.terminales.find((x) => x.remota && !x.real && x.shell.equipo.id === eq.id && !x.cerrada);
+      panel.activar(ya || panel.nueva(new Conector.ShellRemoto({ ...eq })));
+    },
+  });
+}
+// Con un equipo conectado, el + (y Ctrl+Ñ, ▶ Ejecutar…) abren terminales de ese equipo; sin equipo, las de CódigoCamp
+panel.porDefecto = () => (equipoAbierto ? especTerminalEquipo(equipoAbierto) : null);
+let avisoConectorDado = false;
+function avisoActualizarConector(eq, motivo = "") {
+  if (avisoConectorDado) return;
+  avisoConectorDado = true;
+  aviso(`${motivo ? `${motivo}. ` : ""}El Conector de ${eq.equipo} es una versión anterior: por ahora usas la terminal simple. Ciérralo y ábrelo (se ofrece a actualizarse) o descárgalo de nuevo para tener la terminal completa (nano, Tab, colores…).`,
+    { tipo: "error", ms: 20000, accion: { texto: "Descargar Conector", fn: () => { const a = document.createElement("a"); a.href = "/api/conector/programa"; a.download = Conector.archivoConector; a.click(); } } });
+}
+panel.alComandoReal = () => { if (equipoAbierto) { void entradas.sincronizarAhora(false); programarDecoracionGit(300); } };
+// Cuando la terminal del equipo termina de escribir (mkdir, git clone, npm install…), el explorador se pone al día enseguida
+let ultimaSincSalida = 0;
+panel.alSalidaReal = () => {
+  if (!equipoAbierto || Date.now() - ultimaSincSalida < 1500) return;
+  ultimaSincSalida = Date.now();
+  void entradas.sincronizarAhora(false);
+  programarDecoracionGit(300);
+};
+
+/** En PowerShell de Windows 10 no existe «&&»: esas líneas se pasan por cmd. */
+function paraShellDe(eq, linea) {
+  return /windows/i.test(eq?.sistema || "") && /&&|\|\|/.test(linea) ? `cmd /c '${linea.replace(/'/g, "''")}'` : linea;
+}
+
+/** Antes de abrir la carpeta del equipo: se avisa que desde ahora se trabaja directo en el equipo (no en la nube). */
+async function entrarAlEquipo({ equipo, silencioso = false }) {
+  if (!silencioso && !almacen.modoEquipo) {   // cambiar de carpeta en el mismo equipo no vuelve a preguntar
+    const ok = await dialogo({
+      titulo: `🖥 Vas a trabajar directo en ${equipo.equipo}`,
+      mensaje: "Mientras esta carpeta esté abierta, Trabajo funciona como un editor de escritorio conectado a tu equipo:",
+      lista: [
+        "Lo que crees, edites o borres se guarda en tu equipo, NO en la nube de CódigoCamp.",
+        "La terminal es la de tu equipo de verdad: mkdir, nano, git, npm, python… todo lo que puedes hacer en tu computador.",
+        "Tus archivos y carpetas de la nube no se tocan: siguen en tu cuenta y vuelven cuando cierres la carpeta del equipo (menú ⋯ → «Cerrar la carpeta del equipo»).",
+        "Haz copias de lo importante: lo que pase en tu equipo es tu responsabilidad (Términos, sección 7).",
+      ],
+      botones: [{ texto: "Trabajar en mi equipo", valor: true }, { texto: "Cancelar", valor: false, cancelar: true }],
+    });
+    if (!ok) return false;
+  }
+  guardarArchivos();
+  await almacen.entrarModoEquipo();
+  // Las pestañas eran del proyecto de la nube: se cierran (vuelven al cerrar o desconectar el equipo)
+  for (const r of [...ui.abiertos]) if (r !== VISTA) { editores.get(r)?.destruir(); editores.delete(r); sucios.delete(r); }
+  ui.abiertos = ui.abiertos.filter((r) => r === VISTA);
+  ui.activo = ui.abiertos[0] ?? null;
+  urlServidor = null; paginaVista = null; urlVirtual = null; remotoVista = null;
+  archivos.modoLocal(true);
+  proyectoCambio({ origen: "remoto" });
+  return true;
+}
+
+/** Comando para ejecutar un archivo en el equipo con lo que tiene instalado (o null si no se sabe). */
+function comandoEnEquipo(ruta, eq, cwd = "") {
+  const win = /windows/i.test(eq.sistema || ""), android = /android/i.test(eq.sistema || "");
+  let rel;
+  if (cwd === null) {   // terminal real: no se sabe en qué carpeta estás, se usa la ruta completa
+    const sep = win ? "\\" : "/";
+    rel = `${eq.carpeta.replace(/[\\/]+$/, "")}${sep}${win ? ruta.replace(/\//g, "\\") : ruta}`;
+  } else {
+    const desde = (cwd || "").split("/").filter(Boolean), hasta = ruta.split("/");
+    let i = 0;
+    while (i < desde.length && i < hasta.length - 1 && desde[i] === hasta[i]) i++;
+    rel = [...desde.slice(i).map(() => ".."), ...hasta.slice(i)].join("/");
+    if (win) rel = rel.replace(/\//g, "\\");
+  }
+  const q = (x) => (/^[\w.\\/-]+$/.test(x) ? x : `"${x}"`);
+  const f = q(rel);
+  const sinExt = rel.replace(/\.[^.\\/]+$/, "");
+  const ejecutable = win ? q(`${sinExt}.exe`) : q(sinExt.includes("/") ? sinExt : `./${sinExt}`);   // con && se pasa por cmd en Windows
+  const ext = FS.extension(ruta).toLowerCase();
+  const py = win ? "py" : android ? "python" : "python3";
+  return {
+    py: `${py} ${f}`, js: `node ${f}`, mjs: `node ${f}`, cjs: `node ${f}`, ts: `npx tsx ${f}`, java: `java ${f}`,
+    c: `gcc ${f} -o ${q(win ? `${sinExt}.exe` : sinExt)} && ${ejecutable}`, cpp: `g++ ${f} -o ${q(win ? `${sinExt}.exe` : sinExt)} && ${ejecutable}`,
+    go: `go run ${f}`, rs: `rustc ${f} -o ${q(win ? `${sinExt}.exe` : sinExt)} && ${ejecutable}`, rb: `ruby ${f}`, php: `php ${f}`,
+    dart: `dart run ${f}`, kt: `kotlinc ${f} -include-runtime -d ${q(`${sinExt}.jar`)} && java -jar ${q(`${sinExt}.jar`)}`, swift: `swift ${f}`,
+    lua: `lua ${f}`, pl: `perl ${f}`, r: `Rscript ${f}`, sh: `bash ${f}`, bat: win ? `cmd /c ${f}` : null, cmd: win ? `cmd /c ${f}` : null, ps1: `powershell -NoProfile -File ${f}`,
+  }[ext] ?? null;
+}
+
+// ------------------------------------------ servicios locales del equipo (XAMPP, MySQL, MongoDB…) en la pestaña PUERTOS ----
+let serviciosEquipo = null;
+async function refrescarServicios() {
+  if (!equipoAbierto) { panel.ponerServiciosEquipo(""); return; }
+  const eq = equipoAbierto;
+  if (!serviciosEquipo) panel.ponerServiciosEquipo(`<div class="serv-equipo"><b>🖥 Servicios de ${escH(eq.equipo)}</b><p class="serv-nota">Buscando XAMPP, MySQL, MongoDB…</p></div>`);
+  try { serviciosEquipo = await Conector.fsEquipo(eq, "servicios"); }
+  catch (e) { panel.ponerServiciosEquipo(`<div class="serv-equipo"><b>🖥 Servicios de ${escH(eq.equipo)}</b><p class="serv-nota">${escH(e.message)}</p></div>`); return; }
+  const mismoPC = !/android/i.test(eq.sistema || "") && !/Android|iPhone|iPad/i.test(navigator.userAgent);
+  const filas = serviciosEquipo.servicios.map((x) => `<div class="serv-fila ${x.activo ? "on" : ""}">
+      <span class="serv-punto" title="${x.activo ? "Encendido" : "Apagado"}"></span>
+      <span class="serv-nombre"><b>${escH(x.nombre)}</b><small>localhost:${x.puerto} · ${x.activo ? "encendido" : "apagado"}</small></span>
+      <span class="serv-acc">
+        ${x.tipo === "web" && x.activo ? `<button type="button" class="ide-boton" data-serv="abrir" data-url="http://localhost:${x.puerto}/" ${mismoPC ? "" : 'title="Ábrelo en el navegador de ese equipo"'}>Abrir</button>` : ""}
+        ${x.phpmyadmin && serviciosEquipo.servicios.some((w) => w.id === "web" && w.activo) ? '<button type="button" class="ide-boton" data-serv="abrir" data-url="http://localhost/phpmyadmin/">phpMyAdmin</button>' : ""}
+        ${x.consola ? `<button type="button" class="ide-boton ${x.activo ? "primario" : ""}" data-serv="consola" data-cmd="${escH(x.consola)}" ${x.activo ? "" : "disabled"} title="Abre su consola en la terminal de tu equipo">Consola</button>` : ""}
+      </span></div>`).join("");
+  panel.ponerServiciosEquipo(`<div class="serv-equipo">
+    <div class="serv-cab"><b>🖥 Servicios de ${escH(eq.equipo)}</b><span>${serviciosEquipo.iniciar_xampp ? `<button type="button" class="ide-boton" data-serv="consola" data-cmd="${escH(serviciosEquipo.iniciar_xampp)}">▶ Iniciar XAMPP</button>` : ""}<button type="button" class="icono-btn" data-serv="refrescar" title="Volver a buscar" aria-label="Volver a buscar">⟳</button></span></div>
+    ${filas || '<p class="serv-nota">No se encontraron servicios. Si usas XAMPP, ábrelo y enciende Apache y MySQL; con MongoDB, inicia <code>mongod</code>.</p>'}
+    <p class="serv-nota">Tus bases de datos locales se usan desde la terminal de tu equipo (Consola). ${mismoPC ? "Las páginas de tu servidor local se abren en este navegador." : "Las páginas locales se ven en el navegador de ese equipo."} Lo que cambies en tus bases de datos es tu responsabilidad (Términos, sección 7).</p>
+  </div>`);
+}
+panel.alVerPuertos = () => { void refrescarServicios(); };
+panel.alServicio = (d) => {
+  if (d.serv === "refrescar") { serviciosEquipo = null; return refrescarServicios(); }
+  if (d.serv === "abrir") return abrirExterno(d.url);
+  if (d.serv === "consola" && equipoAbierto) {
+    const t = terminalEquipo(equipoAbierto);
+    panel.mostrarPestana("terminal"); panel.activar(t);
+    t.lanzar(t.real && /windows/i.test(equipoAbierto.sistema || "") && d.cmd.startsWith('"') ? `& ${d.cmd}` : d.cmd);
+  }
+};
+
+/** Nombre de la carpeta abierta del equipo (o «Mi proyecto»). */
+// ------------------------------------------------ moverse por las carpetas de tu equipo (como el Explorador) ----
+const CLAVE_RECIENTES = `cc_carpetas_equipo_${CUENTA}`;
+function recientesEquipo() { try { return JSON.parse(localStorage.getItem(CLAVE_RECIENTES) || "[]"); } catch { return []; } }
+function anotarReciente(eq) {
+  try {
+    const lista = recientesEquipo().filter((r) => !(r.id === eq.id && r.carpeta === eq.carpeta));
+    lista.unshift({ id: eq.id, equipo: eq.equipo, carpeta: eq.carpeta });
+    localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(lista.slice(0, 10)));
+  } catch { /* sin espacio */ }
+}
+/** Partes de la ruta de la carpeta abierta, cada una con su ruta completa: C:\ › Users › duban › Proyectos */
+function migasEquipo(carpeta, sistema) {
+  const win = /windows/i.test(sistema || "") || /^[a-z]:/i.test(carpeta);
+  const sep = win ? "\\" : "/";
+  const partes = carpeta.split(/[\\/]/).filter(Boolean);
+  const inicio = carpeta.startsWith("/") ? "/" : "";
+  return partes.map((p, i) => ({ nombre: p, ruta: inicio + partes.slice(0, i + 1).join(sep) + (i === 0 && /:$/.test(p) ? sep : "") }));
+}
+let cambiandoCarpeta = false;
+/** ¿La carpeta (ya elegida en el Conector) es un proyecto y no algo gigante como Descargas o el disco? Si es gigante,
+ *  el Conector vuelve a la carpeta anterior y se explica (abrirla leería miles de archivos y tardaría muchísimo). */
+async function carpetaManejable(eq, nueva, anterior) {
+  try {
+    const { CARPETAS_IGNORADAS } = await import("/js/trabajo/importar.js");
+    const r = await Conector.fsEquipo(eq, "listar", { ignorar: [...CARPETAS_IGNORADAS] });
+    if (!r.incompleto) return true;
+  } catch { return true; }   // si no se pudo contar, se intenta abrir normal
+  if (anterior) await Conector.fsEquipo(eq, "raiz", { ruta: anterior }).catch(() => {});
+  const nombre = nueva.split(/[\\/]/).filter(Boolean).pop() || nueva;
+  aviso(`📦 «${nombre}» tiene más de 5.000 archivos (¿es tu carpeta de Descargas, Documentos o el disco?). Abre la carpeta de tu proyecto: entra en ella o elígela con ▾.`, { tipo: "error", ms: 12000 });
+  return false;
+}
+/** Va a otra carpeta de tu equipo: lo pendiente se guarda en la actual y Trabajo abre la nueva (explorador, terminal, Git). */
+async function irACarpetaEquipo(ruta) {
+  const eq = equipoAbierto;
+  if (!eq || !ruta || cambiandoCarpeta) return;
+  if (ruta.replace(/[\\/]+$/, "") === eq.carpeta.replace(/[\\/]+$/, "")) return;
+  cambiandoCarpeta = true;
+  $("expRuta").classList.add("cargando");
+  try {
+    guardarArchivos();
+    await entradas.sincronizarAhora(false);   // lo que no se había copiado queda en la carpeta actual
+    let r;
+    try { r = await Conector.fsEquipo(eq, "raiz", { ruta }); }
+    catch (e) { aviso(`🔒 ${e.message}`, { tipo: "error", ms: 9000 }); return; }
+    if (!(await carpetaManejable(eq, r.carpeta, eq.carpeta))) return;
+    const seccion = $("ide").dataset.movil;
+    await entradas.vincularEquipo(eq, r.carpeta);
+    if (MOVIL.matches && seccion && $("ide").dataset.movil !== seccion) seccionMovil(seccion);   // en el celular sigues en Archivos
+  } finally { cambiandoCarpeta = false; $("expRuta").classList.remove("cargando"); }
+}
+/** Elegir otra carpeta del equipo con el explorador de carpetas (empieza en la actual). */
+async function otraCarpetaEquipo() {
+  const eq = equipoAbierto;
+  if (!eq) return;
+  guardarArchivos();
+  await entradas.sincronizarAhora(false);
+  const carpeta = await elegirCarpetaEquipo(eq);
+  const seccion = $("ide").dataset.movil;
+  if (carpeta && carpeta !== eq.carpeta && await carpetaManejable(eq, carpeta, eq.carpeta)) await entradas.vincularEquipo(eq, carpeta);
+  if (MOVIL.matches && seccion && $("ide").dataset.movil !== seccion) seccionMovil(seccion);
+}
+function pintarRutaEquipo() {
+  const nav = $("expRuta");
+  if (!equipoAbierto || vistaGit || vistaExt) { nav.hidden = true; return; }
+  const migas = migasEquipo(equipoAbierto.carpeta, equipoAbierto.sistema);
+  const visibles = migas.length > 3 ? migas.slice(-3) : migas;
+  const padre = migas.length > 1 ? migas[migas.length - 2] : null;
+  nav.hidden = false;
+  nav.title = equipoAbierto.carpeta;
+  nav.innerHTML = `<button type="button" class="exp-ruta-subir" data-ir="${escH(padre?.ruta || "")}" ${padre ? "" : "disabled"} title="Subir a la carpeta de arriba${padre ? ` (${escH(padre.nombre)})` : ""}" aria-label="Subir a la carpeta de arriba">⬆</button>
+    <div class="exp-ruta-migas">${migas.length > 3 ? '<button type="button" data-a="mas" title="Ver más carpetas">…</button><span>›</span>' : ""}${visibles.map((m, i) => i === visibles.length - 1
+      ? `<button type="button" class="actual" data-a="elegir" title="Elegir otra carpeta de ${escH(equipoAbierto.equipo)}">${escH(m.nombre)} ▾</button>`
+      : `<button type="button" data-ir="${escH(m.ruta)}" title="Ir a ${escH(m.ruta)}">${escH(m.nombre)}</button><span>›</span>`).join("")}</div>`;
+  nav.querySelector(".exp-ruta-migas").scrollLeft = 1e6;
+}
+$("expRuta").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.disabled) return;
+  if (b.dataset.ir) void irACarpetaEquipo(b.dataset.ir);
+  else if (b.dataset.a === "elegir" || b.dataset.a === "mas") void otraCarpetaEquipo();
+});
+/** Menú ⋯ con tu equipo abierto: subir, otra carpeta y las recientes. */
+function itemsCarpetaEquipo() {
+  const eq = equipoAbierto;
+  if (!eq) return [];
+  const migas = migasEquipo(eq.carpeta, eq.sistema);
+  const padre = migas.length > 1 ? migas[migas.length - 2] : null;
+  const recientes = recientesEquipo().filter((r) => r.id === eq.id && r.carpeta !== eq.carpeta).slice(0, 6);
+  const corto = (c) => c.split(/[\\/]/).filter(Boolean).slice(-2).join("/");
+  return [
+    ...(padre ? [{ texto: `⬆ Subir a «${padre.nombre}»`, fn: () => irACarpetaEquipo(padre.ruta) }] : []),
+    { texto: `📂 Abrir otra carpeta de ${eq.equipo}…`, fn: () => otraCarpetaEquipo() },
+    ...(recientes.length ? [{ texto: "Carpetas recientes:", deshabilitado: true, fn: () => {} }, ...recientes.map((r) => ({ texto: `\u2003🕘 ${corto(r.carpeta)}`, fn: () => irACarpetaEquipo(r.carpeta) }))] : []),
+    "-",
+  ];
+}
+
+function nombreProyectoVisible() {
+  return equipoAbierto ? (equipoAbierto.carpeta.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "Mi proyecto") : "Mi proyecto";
+}
+
+/** La carpeta abierta pasó a ser (o dejó de ser) la de un equipo: terminal, Git y ▶ Ejecutar usan ese equipo.
+ *  motivo «cerrar»: se cerró la carpeta del equipo → vuelve el proyecto de la nube. «espera»: se cortó la conexión. */
+function alCambiarEquipo(eq, motivo, nombreEquipo = "") {
+  const antes = equipoAbierto;
+  equipoAbierto = eq;
+  const donde = document.getElementById("bienvenidaDonde");
+  if (donde) donde.textContent = eq || almacen.modoEquipo ? "Todo se guarda en tu equipo (no en la nube)." : "Todo se guarda en tu cuenta.";
+  if (!eq && (motivo === "cerrar" || motivo === "desconectado") && almacen.modoEquipo) {
+    // Se cerró la carpeta o se desconectó el equipo: se suelta todo lo del equipo y vuelve el proyecto de CódigoCamp
+    for (const r of [...ui.abiertos]) if (r !== VISTA) { editores.get(r)?.destruir(); editores.delete(r); sucios.delete(r); }
+    ui.abiertos = ui.abiertos.filter((r) => r === VISTA);
+    ui.activo = ui.abiertos[0] ?? null;
+    urlServidor = null; paginaVista = null; urlVirtual = null; remotoVista = null;
+    almacen.salirModoEquipo();
+    archivos.modoLocal(false);
+    proyectoCambio({ origen: "remoto" });
+    activar(ui.activo, { enfocar: false });
+    aviso(motivo === "desconectado"
+      ? `🔌 Se desconectó ${nombreEquipo || antes?.equipo || "tu equipo"}. Trabajo volvió a tu proyecto guardado en CódigoCamp (lo que hiciste allá sigue en tu equipo). Para volver: abre el Conector y ⋯ → Abrir carpeta.`
+      : "☁️ Volviste a tu proyecto de la nube, tal como lo dejaste.", { tipo: motivo === "desconectado" ? "error" : "info", ms: motivo === "desconectado" ? 12000 : 6000 });
+    if (donde) donde.textContent = "Todo se guarda en tu cuenta.";
+  }
+  document.body.classList.toggle("con-equipo", Boolean(eq));
+  if (!eq && antes) {
+    // Desconectado o carpeta cerrada: vuelven las terminales normales de CódigoCamp
+    const remotas = panel.terminales.filter((x) => x.remota);
+    if (remotas.length) {
+      terminalEnSilencio = true;
+      const estaba = panel.abierto;
+      const nueva = panel.nueva(null);
+      remotas.forEach((x) => panel.matar(x));
+      panel.activar(nueva);
+      if (!estaba) panel.cerrar();
+      terminalEnSilencio = false;
+    }
+  }
+  if (!vistaGit && !vistaExt) $("expTituloSeccion").textContent = nombreProyectoVisible();
+  $("expTituloSeccion").title = eq ? `${eq.carpeta} · ${eq.equipo}` : "";
+  if (eq) anotarReciente(eq);
+  pintarRutaEquipo();
+  pintarMigas();
+  if (eq && (!antes || antes.id !== eq.id || antes.carpeta !== eq.carpeta)) {
+    terminalEnSilencio = true;
+    const t = terminalEquipo(eq);
+    // Conectado: solo terminales del equipo (las de CódigoCamp trabajaban sobre el proyecto de la nube)
+    for (const x of panel.terminales.filter((x) => !x.remota || x.shell.equipo.id !== eq.id)) if (x !== t) panel.matar(x);
+    if (!MOVIL.matches) { panel.abrir({ enfocar: false }); panel.activar(t); }
+    terminalEnSilencio = false;
+    const nombre = eq.carpeta.replace(/\\/g, "/").split("/").filter(Boolean).pop() || eq.carpeta;
+    if (!antes || antes.id !== eq.id) aviso(`🖥 Estás trabajando en «${nombre}» de ${eq.equipo}: lo que guardas se guarda allá (no en la nube). La terminal, Git y ▶ Ejecutar son los de tu equipo.`, { tipo: "info", ms: 9000 });
+  }
+  mostrarPanelesGit();
+  if (vistaGit) renderGit();
+  programarDecoracionGit(200);
+  serviciosEquipo = null;
+  if (panel.pestana === "puertos") void refrescarServicios(); else if (!eq) panel.ponerServiciosEquipo("");
+}
+
+/** «Abrir carpeta»: ¿de cuál equipo? (o solo con el navegador). Devuelve { equipo, carpeta } | "navegador" | null. */
+async function elegirOrigenCarpeta() {
+  const { soporteCarpeta } = await import("/js/trabajo/carpeta.js");
+  const nav = soporteCarpeta();
+  const equipos = await Conector.listarEquipos();
+  const vivos = equipos.filter((e) => e.en_linea);
+  const d = document.createElement("dialog");
+  d.className = "ide-dialogo ancho dialogo-origen";
+  const icono = (so) => (/android/i.test(so) ? "📱" : "🖥");
+  d.innerHTML = `<form method="dialog"><h3>📂 Abrir una carpeta</h3>
+    <p class="con-intro">Elige dónde está. Con tu <b>computador o celular conectado</b> trabajas como en un editor de escritorio: la terminal, Git, Python, Node… son los de tu equipo y todo se guarda en su carpeta.</p>
+    <div class="origenes">
+      ${vivos.map((e) => `<button type="button" class="origen" data-eq="${e.id}"><span class="origen-ico">${icono(e.sistema)}</span><span><b>${escH(e.equipo)}</b><small>${escH(e.sistema)} · conectado${e.antivirus?.nombre ? ` · 🛡️ ${escH(e.antivirus.nombre)}` : ""}</small></span><i>›</i></button>`).join("")}
+      <button type="button" class="origen ${vivos.length ? "" : "destacado"}" data-v="conectar"><span class="origen-ico">🔌</span><span><b>${vivos.length ? "Conectar otro equipo" : "Conectar mi computador o celular"}</b><small>Terminal y Git reales · Windows, Mac, Linux o Android · pide tu PIN o huella</small></span><i>›</i></button>
+      <button type="button" class="origen" data-v="navegador" ${nav.disponible ? "" : "disabled"}><span class="origen-ico">🌐</span><span><b>Solo con este navegador</b><small>${nav.disponible ? "Sin instalar nada · la terminal es la de CódigoCamp" : escH(nav.motivo)}</small></span><i>›</i></button>
+    </div>
+    <div class="ide-dialogo-botones"><button class="ide-boton" value="">Cancelar</button></div></form>`;
+  document.body.appendChild(d);
+  const r = await new Promise((ok) => {
+    d.addEventListener("click", (e) => {
+      const b = e.target.closest(".origen");
+      if (!b || b.disabled) return;
+      ok(b.dataset.eq ? vivos.find((x) => x.id === Number(b.dataset.eq)) : b.dataset.v);
+      d.close();
+    });
+    d.addEventListener("close", () => { d.remove(); ok(null); });
+    d.showModal();
+  });
+  if (r === "conectar") { abrirConector(); return null; }
+  if (!r || r === "navegador") return r;
+  const anterior = r.carpeta;
+  const carpeta = await elegirCarpetaEquipo(r);
+  if (carpeta && !(await carpetaManejable(r, carpeta, anterior))) return null;
+  return carpeta ? { equipo: { ...r, carpeta }, carpeta } : null;
+}
+
+/** Explorador de carpetas del equipo (como «Abrir carpeta» de un editor). Devuelve la carpeta elegida, ya abierta en el Conector. */
+async function elegirCarpetaEquipo(eq) {
+  const d = document.createElement("dialog");
+  d.className = "ide-dialogo ancho dialogo-carpetas";
+  document.body.appendChild(d);
+  let actual = null, cargando = false;
+  const pintar = (x, error = "") => {
+    actual = x;
+    const partes = x.ruta.split(/[\\/]/).filter(Boolean);
+    const sep = x.separador || "/";
+    const inicio = x.ruta.startsWith("/") ? "/" : "";
+    const migas = partes.map((p, i) => `<button type="button" data-ir="${escH(inicio + partes.slice(0, i + 1).join(sep) + (i === 0 && /:$/.test(p) ? sep : ""))}">${escH(p)}</button>`).join("<span>›</span>");
+    const nombre = partes[partes.length - 1] || x.ruta;
+    d.innerHTML = `<form method="dialog"><h3>${/android/i.test(eq.sistema) ? "📱" : "🖥"} Carpetas de ${escH(eq.equipo)}</h3>
+      <div class="cf-raices">${(x.raices || []).map((r) => `<button type="button" data-ir="${escH(r.ruta)}" class="${r.ruta === x.ruta ? "on" : ""}">${escH(r.nombre)}</button>`).join("")}</div>
+      <div class="cf-migas">${x.padre ? `<button type="button" class="cf-subir" data-ir="${escH(x.padre)}" title="Subir un nivel" aria-label="Subir un nivel">⬆</button>` : ""}<div>${migas}</div></div>
+      <div class="cf-lista" role="listbox" aria-label="Carpetas">${x.carpetas.length ? x.carpetas.map((c) => `<button type="button" role="option" data-ir="${escH(x.ruta.replace(/[\\/]$/, "") + sep + c)}"><span>📁</span>${escH(c)}</button>`).join("") : '<p class="cf-vacia">No hay carpetas aquí.</p>'}</div>
+      ${error ? `<p class="cf-error">${escH(error)}</p>` : ""}
+      ${x.elegible ? "" : '<p class="cf-nota">Entra a la carpeta de tu proyecto (o créala). Por seguridad no se abre todo el disco, tu carpeta personal completa ni carpetas del sistema.</p>'}
+      <div class="ide-dialogo-botones"><button type="button" class="ide-boton" data-a="nueva">＋ Nueva carpeta</button><button class="ide-boton" value="">Cancelar</button><button type="button" class="ide-boton primario" data-a="abrir" ${x.elegible ? "" : "disabled"}>Abrir «${escH(nombre)}»</button></div></form>`;
+  };
+  const ir = async (ruta) => {
+    if (cargando) return;
+    cargando = true;
+    d.classList.add("cargando");
+    try { pintar(await Conector.fsEquipo(eq, "explorar", { ruta })); }
+    catch (e) { if (actual) pintar(actual, e.message); else { aviso(e.message, { tipo: "error" }); d.close(); } }
+    finally { cargando = false; d.classList.remove("cargando"); }
+  };
+  d.innerHTML = '<form method="dialog"><h3>Leyendo las carpetas de tu equipo…</h3><p class="con-intro">Un momento.</p></form>';
+  d.showModal();
+  await ir(eq.carpeta || "");
+  return new Promise((ok) => {
+    let elegida = null;
+    d.addEventListener("click", async (e) => {
+      const b = e.target.closest("button");
+      if (!b || cargando) return;
+      if (b.dataset.ir) return ir(b.dataset.ir);
+      if (b.dataset.a === "nueva") {
+        const nombre = prompt("Nombre de la carpeta nueva", "mi-proyecto");
+        if (!nombre?.trim()) return;
+        try { const r = await Conector.fsEquipo(eq, "nueva", { ruta: actual.ruta, nombre: nombre.trim() }); await ir(r.ruta); }
+        catch (x) { pintar(actual, x.message); }
+      }
+      if (b.dataset.a === "abrir") {
+        cargando = true;
+        b.textContent = "Abriendo…";
+        try { const r = await Conector.fsEquipo(eq, "raiz", { ruta: actual.ruta }); elegida = r.carpeta; d.close(); }
+        catch (x) { cargando = false; pintar(actual, x.message); }
+      }
+    });
+    d.addEventListener("close", () => { d.remove(); ok(elegida); });
+  });
+}
+
+/** Lo que salió en la terminal al ejecutar → problemas con archivo y línea (o se limpian si todo salió bien). */
+function problemasDeEjecucion(texto, codigo) {
+  if (!usarMonaco) return;
+  const py = proyecto();
+  const rutas = Object.keys(py.files);
+  const lista = codigo === 0 && !/Traceback|Error\b|error:/.test(texto || "") ? [] : erroresDeSalida(texto, rutas);
+  marcarEjecucion(lista, (r) => (FS.tieneArchivo(py, r) && !esMarcador(py.files[r]) ? py.files[r] : null));
+  // Codi reacciona: se preocupa si hay errores y celebra cuando los arreglas
+  const graves = lista.filter((p) => p.grave);
+  if (graves.length) dispatchEvent(new CustomEvent("codi", { detail: { animo: "preocupado", frase: `Hay un error en ${graves[0].ruta.split("/").pop()}, línea ${graves[0].linea}. Míralo en PROBLEMAS`, ms: 4500 } }));
+  else if (codigo === 0 && problemasDeEjecucion.huboError) dispatchEvent(new CustomEvent("codi", { detail: { animo: "celebra", frase: "¡Arreglado! Tu programa ya funciona 🎉", ms: 3500 } }));
+  problemasDeEjecucion.huboError = graves.length > 0 || (codigo !== 0 && codigo !== 130);
+  if (lista.some((p) => p.grave)) {
+    const b = $("estProblemas");
+    b.classList.remove("prob-aviso"); void b.offsetWidth; b.classList.add("prob-aviso");   // la barra parpadea para que se note
+  }
+}
+
 function verProblemas() {
+  // Como el editor profesional: abre el panel PROBLEMAS (y en celular, la lista rápida)
+  if (!MOVIL.matches) { panel.abrir({ enfocar: false }); panel.mostrarPestana("problemas"); return; }
   const p = problemas();
   abrirPaleta({
     titulo: p.lista.length ? "Problemas: elige uno para ir a esa línea" : "No hay problemas en los archivos abiertos o de código",
@@ -1678,6 +2443,7 @@ function verDiff(ruta, antes, despues) {
 // Colores de Git en el árbol y las pestañas (como VS Code): amarillo M = modificado, verde U = nuevo, rojo ! = conflicto.
 function programarDecoracionGit(ms = 400) {
   clearTimeout(temporizadorDecoracion);
+  if (equipoAbierto) ms = Math.max(ms, 1500); // cada lectura va hasta tu equipo
   temporizadorDecoracion = setTimeout(decorarGit, ms);
 }
 /** Lo instalado con pip: en el Python global y en los entornos virtuales del proyecto. */
@@ -1695,6 +2461,7 @@ function actualizarFaltantes() {
 }
 async function decorarGit() {
   actualizarFaltantes();
+  if (equipoAbierto) { await panelGitEquipo.estado().catch(() => null); return; }
   if (decorando) { decorarOtraVez = true; return; }
   const py = proyecto();
   const dirs = Object.keys(py.git?.repos || {});
@@ -1737,6 +2504,25 @@ panelGit = new PanelGit({
   pedirIA: async (diff) => (await api("/api/tutor/commit/", { diff })).texto,
   pedir: async (titulo, ejemplo) => { const v = prompt(`${titulo}\nEjemplo: ${ejemplo}`); return v ? v.trim() : null; },
 });
+// Git real de tu computador o celular cuando la carpeta abierta es de allá (Conector)
+const cajaGitEquipo = document.createElement("div");
+cajaGitEquipo.id = "panelGitEquipo";
+cajaGitEquipo.className = $("panelGit").className;
+cajaGitEquipo.hidden = true;
+$("panelGit").after(cajaGitEquipo);
+panelGitEquipo = new PanelGitEquipo({
+  raiz: cajaGitEquipo, equipo: () => equipoAbierto, proyecto, aviso, verDiff, abrir: (r) => abrir(r),
+  git: (eq, args) => Conector.gitEquipo(eq, args),
+  correr: (linea) => { const t = terminalEquipo(equipoAbierto); panel.abrir({ enfocar: false }); panel.mostrarPestana("terminal"); panel.activar(t); if (linea) t.lanzar(t.real ? paraShellDe(equipoAbierto, linea) : linea); },
+  pedirIA: async (diff) => (await api("/api/tutor/commit/", { diff })).texto,
+  alEstado: (mapa) => { mapaGit = mapa; $("numGit").hidden = !mapa.size; $("numGit").textContent = String(mapa.size); explorador.decorarGit(mapa); pintarPestanas(); },
+  alCambiar: () => { void entradas.sincronizarAhora(false); },
+});
+function mostrarPanelesGit() {
+  $("panelGit").hidden = !vistaGit || Boolean(equipoAbierto);
+  cajaGitEquipo.hidden = !vistaGit || !equipoAbierto;
+}
+function renderGit() { if (equipoAbierto) panelGitEquipo.render(); else panelGit?.render(); }
 panelExt = new PanelExtensiones({
   raiz: $("panelExt"), proyecto, aviso,
   cwd: () => panel.activa?.sesion.cwd ?? "",
@@ -1748,11 +2534,12 @@ function vistaLateral(cual) {
   vistaGit = cual === "git"; vistaExt = cual === "ext";
   if (cual !== "archivos") alternarExplorador(true);
   $("arbol").hidden = cual !== "archivos";
-  $("panelGit").hidden = !vistaGit;
+  mostrarPanelesGit();
   $("panelExt").hidden = !vistaExt;
-  $("expTituloSeccion").textContent = vistaGit ? "Control de código fuente" : vistaExt ? "Extensiones" : "Mi proyecto";
+  $("expTituloSeccion").textContent = vistaGit ? "Control de código fuente" : vistaExt ? "Extensiones" : nombreProyectoVisible();
+  pintarRutaEquipo();
   for (const [id, on] of [["verArchivos", cual === "archivos"], ["verGit", vistaGit], ["verExtensiones", vistaExt]]) { $(id).classList.toggle("activo", on); $(id).setAttribute("aria-pressed", String(on)); }
-  if (vistaGit) panelGit.render();
+  if (vistaGit) renderGit();
   if (vistaExt) {
     if (actualizarFaltantes() && !FS.tieneArchivo(proyecto(), "package.json")) panelExt.tipo = "pip";
     panelExt.enfocar = true; panelExt.render();
@@ -1768,6 +2555,10 @@ $("abrirRapido").onclick = () => manejarAtajo("abrir-rapido");
 $("estProblemas").onclick = verProblemas;
 
 // ------------------------------------------------------------------------------- arranque ----
+// Codi en el asistente: la misma mascota interactiva; «Hablar con Codi» lleva a la caja de preguntas.
+import("/js/mascota.js").then(({ activarMascota }) => activarMascota($("asistenteCodi"), {
+  animo: "saludo", tam: 42, alHablar: () => { alternarAsistente(true); $("pregunta").focus(); },
+})).catch(() => {});
 fijarAnchoExp(ui.anchoExp);
 pintarAutoguardado();
 alternarExplorador(ui.explorador !== false);
@@ -1776,6 +2567,8 @@ pintarChat();
 pintarGit();
 explorador.render();
 sincronizarModelos(proyecto(), (t) => !esMarcador(t));
+panel.alIrAProblema = (ruta, linea) => abrirEnLinea(ruta, linea);
+panel.alEquipo = () => abrirConector();
 pintarProblemas();
 alCambiarProblemas(() => { clearTimeout(pintarProblemas.t); pintarProblemas.t = setTimeout(pintarProblemas, 250); });
 
@@ -1793,3 +2586,24 @@ if (ladoActivo()) renderVista();
 programarDecoracionGit(900);
 if (ui.panel) panel.abrir({ enfocar: false });
 void entradas.iniciar();
+
+// Correctores del navegador (LanguageTool, Grammarly…): se pegan a los campos ocultos de Monaco y xterm y dibujan una
+// burbuja con un número encima del código («80»). En el editor y en la terminal no tienen nada que corregir.
+(() => {
+  const ATR = { spellcheck: "false", autocorrect: "off", autocapitalize: "off", "data-gramm": "false", "data-gramm_editor": "false", "data-enable-grammarly": "false", "data-lt-active": "false", "data-ms-editor": "false" };
+  const marcar = (raiz) => {
+    for (const el of raiz.querySelectorAll?.(".monaco-editor textarea, .xterm textarea, .term textarea, .term input, .term-entrada, #terminalPanel textarea") || []) {
+      if (el.dataset.ltActive === "false") continue;
+      for (const [k, v] of Object.entries(ATR)) el.setAttribute(k, v);
+    }
+  };
+  marcar(document);
+  new MutationObserver((cambios) => {
+    for (const c of cambios) for (const n of c.addedNodes) {
+      if (n.nodeType === 1 && (n.tagName === "TEXTAREA" || n.tagName === "INPUT" || n.firstElementChild && n.querySelector("textarea"))) marcar(n.parentElement || n);
+    }
+  })
+    .observe(document.body, { childList: true, subtree: true });
+})();
+
+entradas.itemsEquipo = () => itemsCarpetaEquipo();

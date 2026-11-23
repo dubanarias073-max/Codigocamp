@@ -22,7 +22,7 @@ export function montarCalendario(raiz) {
     const dias = new Map(d.dias.map((x) => [x.fecha, x]));
     const total = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate();
     const hueco = (mes.getDay() + 6) % 7;   // la semana empieza el lunes
-    let html = ["L", "M", "X", "J", "V", "S", "D"].map((x) => `<span class="cal-cab">${x}</span>`).join("") + "<span></span>".repeat(hueco);
+    let html = ["L", "M", "M", "J", "V", "S", "D"].map((x) => `<span class="cal-cab">${x}</span>`).join("") + "<span></span>".repeat(hueco);
     for (let n = 1; n <= total; n += 1) {
       const f = `${clave}-${String(n).padStart(2, "0")}`;
       const x = dias.get(f);

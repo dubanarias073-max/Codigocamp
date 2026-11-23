@@ -4,6 +4,7 @@
 import { clase, formatoBytes, leerMarcador } from "./archivos.js";
 import { extension, nombreBase } from "./fs.js";
 
+const OFFICE = { docx: "Word", doc: "Word", xlsx: "Excel", xlsm: "Excel", xls: "Excel", pptx: "PowerPoint", ppt: "PowerPoint", odt: "Documento", ods: "Hoja de cálculo", odp: "Presentación", rtf: "Documento" };
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export class VisorArchivo {
@@ -22,7 +23,7 @@ export class VisorArchivo {
     this.#pintar();
   }
 
-  get lenguaje() { const m = leerMarcador(this.texto); return m ? { imagen: "Imagen", video: "Video", audio: "Audio", pdf: "PDF" }[clase(m.tipo)] ?? "Archivo" : "Archivo"; }
+  get lenguaje() { const m = leerMarcador(this.texto); return OFFICE[this.ext] ?? (m ? { imagen: "Imagen", video: "Video", audio: "Audio", pdf: "PDF" }[clase(m.tipo)] ?? "Archivo" : "Archivo"); }
   leer() { return this.texto; }
   establecer(texto) { if (texto !== this.texto) { this.texto = texto; this.#pintar(); } }
   renombrar(ruta) { this.ruta = ruta; this.ext = extension(ruta); this.#pintar(); }
@@ -39,7 +40,8 @@ export class VisorArchivo {
     const src = esc(this.url(this.texto));
     const descarga = esc(this.url(this.texto, { descargar: true, nombre }));
     const tipoCorto = m.tipo.split("/")[1].replace(/^x-/, "").toUpperCase();
-    const k = clase(m.tipo);
+    const k = OFFICE[this.ext] ? "documento" : clase(m.tipo);
+    if (k === "documento") { this.#documento(m, nombre, descarga); return; }
     const etiqueta = { imagen: `<img src="${this.ruta}" alt="">`, video: `<video src="${this.ruta}" controls></video>`, audio: `<audio src="${this.ruta}" controls></audio>`, pdf: `<a href="${this.ruta}">Abrir PDF</a>` }[k];
     const medio = {
       imagen: `<img alt="${esc(nombre)}" src="${src}">`,
@@ -68,5 +70,31 @@ export class VisorArchivo {
     for (const el of [img, vid, this.raiz.querySelector("audio")]) {
       el?.addEventListener("error", () => { medidas.outerHTML = '<span class="visor-error">No se pudo cargar: el archivo ya no está en tu cuenta, no hay conexión o el navegador no reproduce este formato.</span>'; });
     }
+  }
+
+  /** Word, Excel y PowerPoint: se ven aquí mismo, sin descargarlos (js/trabajo/office.js, en un marco aislado). */
+  #documento(m, nombre, descarga) {
+    const tipo = OFFICE[this.ext];
+    const icono = { Word: "W", Excel: "X", PowerPoint: "P" }[tipo] || "D";
+    this.raiz.classList.add("visor-doc");
+    this.raiz.innerHTML = `<div class="doc-cab doc-${icono}"><span class="doc-ico">${icono}</span><span class="doc-nombre"><b>${esc(nombre)}</b><small>${esc(tipo)} · ${formatoBytes(m.tamano)} · <span class="doc-nota">Abriendo…</span></small></span>
+      <button type="button" class="btn sm" data-doc="completa" title="Ver en pantalla completa">⛶</button><a class="btn sm" href="${descarga}" download="${esc(nombre)}">Descargar</a></div>
+      <div class="doc-cuerpo"><div class="doc-cargando"><span class="doc-giro"></span>Preparando la vista previa…</div></div>`;
+    const cuerpo = this.raiz.querySelector(".doc-cuerpo");
+    const nota = this.raiz.querySelector(".doc-nota");
+    this.raiz.querySelector('[data-doc="completa"]').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : cuerpo.requestFullscreen?.())?.catch?.(() => {});
+    const yo = this.texto;
+    fetch(this.url(this.texto), { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error("No se pudo cargar el archivo (¿sin conexión?)."))))
+      .then(async (buf) => {
+        const { mostrarOffice } = await import("./office.js");
+        if (yo !== this.texto) return;
+        const r = await mostrarOffice(cuerpo, new Uint8Array(buf), this.ext);
+        nota.textContent = r.nota || "Vista previa (solo lectura)";
+      })
+      .catch((e) => {
+        nota.textContent = "Sin vista previa";
+        cuerpo.innerHTML = `<div class="visor-generico"><b>${esc(nombre)}</b><span>${esc(e.message || "No se pudo mostrar este documento.")}</span><a class="btn sm" href="${descarga}" download="${esc(nombre)}">Descargar</a></div>`;
+      });
   }
 }

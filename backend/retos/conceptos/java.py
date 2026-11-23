@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Excepciones, genéricos y colecciones", "Errores controlados, tipos genéricos, lambdas y streams", java_e4.LISTA),
     ("Java moderno y profesional", "Hilos, fechas, archivos, herramientas y buenas prácticas", java_e5.LISTA),
 ]
+
+from .java_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

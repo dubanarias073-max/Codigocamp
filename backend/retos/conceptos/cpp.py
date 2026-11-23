@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Memoria, plantillas y excepciones", "Punteros inteligentes, genéricos, errores y archivos", cpp_e4.LISTA),
     ("C++ moderno y profesional", "Herramientas modernas, concurrencia y buenas prácticas", cpp_e5.LISTA),
 ]
+
+from .cpp_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

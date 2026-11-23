@@ -71,10 +71,8 @@ def ajustes():
         profile.tema = data["tema"]
     if "buscable_correo" in data:
         profile.buscable_correo = bool(data["buscable_correo"])
-    if "idioma" in data:
-        if data["idioma"] not in Profile.IDIOMAS:
-            return api_error("Idioma no válido.")
-        profile.idioma = data["idioma"]
+    if "idioma" in data:   # la app es solo en español
+        profile.idioma = "es"
     if "meta" in data:
         if data["meta"] not in {5, 10, 15, 30}:
             return api_error("Meta no válida.")

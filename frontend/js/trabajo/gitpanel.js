@@ -172,7 +172,7 @@ export class PanelGit {
       const e = await motor.estado(this.proyecto(), this.repo);
       if (!e.preparados.length) await this.#git(["add", "-A"]);
       const r = await this.#git(["commit", "-m", mensaje]);
-      if (r.codigo === 0) { ta.value = ""; this.aviso(r.salida.split("\n")[0], { ms: 4000 }); }
+      if (r.codigo === 0) { ta.value = ""; this.aviso(r.salida.split("\n")[0], { ms: 4000 }); import("/js/sonidos.js").then((m) => m.sonar("moneda")).catch(() => {}); }
     });
   }
 

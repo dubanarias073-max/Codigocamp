@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Opcionales y abstracciones", "Modela ausencia de datos y crea abstracciones seguras", swift_e4.LISTA),
     ("Swift avanzado y herramientas", "Explora memoria, concurrencia y herramientas del ecosistema", swift_e5.LISTA),
 ]
+
+from .swift_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

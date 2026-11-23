@@ -52,7 +52,7 @@ class ArchivosAPITest(unittest.TestCase):
 
     def test_cualquier_tipo_se_guarda_en_disco_y_solo_lo_inofensivo_se_muestra(self):
         casos = [(PNG, "a.png", "image/png", True), (MP4, "v.mp4", "video/mp4", True), (PDF, "d.pdf", "application/pdf", True),
-                 (EXE, "x.exe", "application/octet-stream", False), (SVG, "s.svg", "application/octet-stream", False),
+                 (b"\x00\x01binario", "x.bin", "application/octet-stream", False), (SVG, "s.svg", "application/octet-stream", False),
                  (b"col1,col2\n1,2\n", "datos.csv", "text/csv", True)]
         for datos, nombre, tipo, en_navegador in casos:
             r = self._subir(datos, nombre)
@@ -68,11 +68,20 @@ class ArchivosAPITest(unittest.TestCase):
             self.assertEqual(lectura.headers["X-Content-Type-Options"], "nosniff")
             if en_navegador:
                 self.assertNotIn("attachment", lectura.headers.get("Content-Disposition", ""), nombre)
+
             else:
                 self.assertEqual(lectura.mimetype, "application/octet-stream", nombre)
                 self.assertIn("attachment", lectura.headers["Content-Disposition"], nombre)
             lectura.close()
         self.assertEqual(WorkspaceFile.query.count(), len(casos))
+
+    def test_el_antivirus_bloquea_programas_y_no_los_guarda(self):
+        for datos, nombre in [(EXE, "x.exe"), (EXE, "tarea.pdf"), (b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*", "nota.txt")]:
+            r = self._subir(datos, nombre)
+            self.assertEqual(r.status_code, 422, nombre)
+            self.assertIn("🛡️", r.get_json()["error"])
+        self.assertEqual(WorkspaceFile.query.count(), 0)
+        self.assertEqual([p for p in Path(self.dir).rglob("*") if p.is_file()], [])
 
     def test_rango_para_videos_y_descarga_forzada(self):
         huella = self._subir(MP4, "v.mp4").get_json()["hash"]
@@ -137,14 +146,14 @@ class ArchivosAPITest(unittest.TestCase):
         usado = self._subir(PNG, "a.png").get_json()
         viejo = self._subir(MP4, "v.mp4").get_json()
         reciente = self._subir(PDF, "d.pdf").get_json()
-        en_commit = self._subir(EXE, "x.exe").get_json()
+        en_commit = self._subir(b"\x00\x01binario", "x.bin").get_json()
         antiguo = self._subir(b"ccimg-legado", "l.bin").get_json()
         hace = datetime.now(timezone.utc) - timedelta(hours=2)
         WorkspaceFile.query.filter(WorkspaceFile.hash != reciente["hash"]).update({"creado_en": hace}, synchronize_session=False)
         db.session.commit()
         legado = f"ccimg:v1:{antiguo['hash']}:image/png:12"  # marcadores de la versión anterior siguen valiendo
         proyecto = {"files": {"img/a.png": usado["marcador"], "b.png": legado}, "folders": ["img"],
-                    "git": {"initialized": True, "committed": {"x.exe": en_commit["marcador"]}}}
+                    "git": {"initialized": True, "committed": {"x.bin": en_commit["marcador"]}}}
         self.assertEqual(self.client.put("/api/trabajo/", json=proyecto, headers=self.client.csrf).status_code, 200)
         quedan = {i.hash for i in WorkspaceFile.query.all()}
         self.assertEqual(quedan, {usado["hash"], reciente["hash"], en_commit["hash"], antiguo["hash"]})

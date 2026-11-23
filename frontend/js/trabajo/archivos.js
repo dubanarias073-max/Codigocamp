@@ -11,7 +11,7 @@ export const LIMITES_ARCHIVO = { porArchivo: 1024 ** 3, porCuenta: 10 * 1024 ** 
 /** Un archivo de texto más grande que esto se guarda como archivo (se ve y se descarga, pero no se edita). */
 export const TEXTO_EDITABLE = 1024 * 1024;
 
-const MARCADOR = /^cc(?:img|bin):v1:([a-f0-9]{64}):([a-z]+\/[a-z0-9.+-]{1,60}):(\d{1,13})$/;
+const MARCADOR = /^cc(?:img|bin):v1:([a-f0-9]{64}):([a-z]+\/[a-z0-9.+-]{1,90}):(\d{1,13})$/;
 
 export const esMarcador = (texto) => typeof texto === "string" && texto.startsWith("cc") && MARCADOR.test(texto);
 export function leerMarcador(texto) {
@@ -27,6 +27,17 @@ const POR_EXTENSION = {
   mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm", ogv: "video/ogg", mp3: "audio/mpeg", m4a: "audio/mp4", wav: "audio/wav",
   ogg: "audio/ogg", oga: "audio/ogg", pdf: "application/pdf", ttf: "font/ttf", otf: "font/otf", woff: "font/woff", woff2: "font/woff2",
   zip: "application/zip", txt: "text/plain", csv: "text/csv", json: "application/json",
+  // Documentos de Office y OpenDocument (se ven en Trabajo con el visor de documentos)
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  doc: "application/msword",
+  xls: "application/vnd.ms-excel",
+  ppt: "application/vnd.ms-powerpoint",
+  odt: "application/vnd.oasis.opendocument.text",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  odp: "application/vnd.oasis.opendocument.presentation",
+  rtf: "application/rtf",
 };
 
 /** Tipo MIME por los primeros bytes o la extensión (la misma regla que el servidor). */
@@ -51,7 +62,8 @@ export function tipoDe(cabeza, nombre = "") {
 }
 export const tipoImagen = (bytes) => { const t = tipoDe(bytes); return t.startsWith("image/") ? t : null; };
 
-export const clase = (tipo) => (tipo.startsWith("image/") ? "imagen" : tipo.startsWith("video/") ? "video" : tipo.startsWith("audio/") ? "audio" : tipo === "application/pdf" ? "pdf" : "otro");
+export const clase = (tipo) => (tipo.startsWith("image/") ? "imagen" : tipo.startsWith("video/") ? "video" : tipo.startsWith("audio/") ? "audio" : tipo === "application/pdf" ? "pdf"
+  : /officedocument|msword|ms-excel|ms-powerpoint|opendocument|rtf/.test(tipo) ? "documento" : "otro");
 
 export function formatoBytes(n) {
   if (n < 1024) return `${n} B`;
@@ -77,6 +89,14 @@ const leerCsrf = () => (typeof document === "undefined" ? "" : (document.cookie.
 const tamanoDe = (d) => (d instanceof Blob ? d.size : d.byteLength);
 
 /** Habla con /api/trabajo/archivos/. */
+/** Blob → data:URL sin FileReader (por partes, para no reventar la pila con archivos de varios MB). */
+async function aDataUrl(blob) {
+  const b = new Uint8Array(await blob.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return `data:${blob.type || "application/octet-stream"};base64,${btoa(bin)}`;
+}
+
 export class ClienteArchivos {
   constructor({ fetchFn = (...a) => fetch(...a), csrf = leerCsrf, usarXhr = typeof XMLHttpRequest === "function", reintentos = 8, pausa = 2000 } = {}) {
     Object.assign(this, { fetchFn, csrf, usarXhr, reintentos, pausa });
@@ -116,7 +136,27 @@ export class ClienteArchivos {
    * Sube un archivo (Uint8Array o Blob/File: un File de 1 GB no se carga en memoria) y devuelve su marcador.
    * @param {{ nombre?: string, progreso?: (fraccion:number)=>void }} [o]
    */
+  /** Con la carpeta de tu equipo abierta, los archivos (imágenes, videos…) quedan en la memoria de esta pestaña y en
+   *  tu equipo: no se suben a tu cuenta. */
+  modoLocal(si) {
+    if (si) { this.local = this.local || new Map(); return; }
+    for (const x of this.local?.values() || []) if (x.url) URL.revokeObjectURL(x.url);
+    this.local = null;
+  }
+
+  async #subirLocal(datos, nombre) {
+    const blob = datos instanceof Blob ? datos : new Blob([datos]);
+    const cabeza = new Uint8Array(await blob.slice(0, 64).arrayBuffer());
+    const huella = blob.size <= 256 * 1024 * 1024 ? await crypto.subtle.digest("SHA-256", await blob.arrayBuffer())
+      : await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${nombre}:${blob.size}:${Math.random()}`));
+    const hash = [...new Uint8Array(huella)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const tipo = tipoDe(cabeza, nombre);
+    this.local.set(hash, { blob: new Blob([blob], { type: tipo }) });
+    return crearMarcador({ hash, tipo, tamano: blob.size });
+  }
+
   async subir(datos, { nombre = "", progreso = () => {} } = {}) {
+    if (this.local) return this.#subirLocal(datos, nombre);
     const tamano = tamanoDe(datos);
     if (!tamano) throw new Error("El archivo está vacío.");
     if (tamano > this.maxArchivo) throw new Error(`Pesa ${formatoBytes(tamano)}: el máximo por archivo es ${formatoBytes(this.maxArchivo)}.`);
@@ -150,6 +190,7 @@ export class ClienteArchivos {
   blob(marcador) {
     const m = leerMarcador(marcador);
     if (!m) return Promise.reject(new Error("No es un archivo guardado en la cuenta."));
+    if (this.local?.has(m.hash)) return Promise.resolve(this.local.get(m.hash).blob);
     if (this.cache.has(m.hash)) return this.cache.get(m.hash);
     const p = this.fetchFn(`/api/trabajo/archivos/${m.hash}`, { credentials: "same-origin" }).then(async (r) => {
       if (!r.ok) throw new Error(r.status === 404 ? "El archivo ya no está en tu cuenta." : `No se pudo descargar (${r.status}).`);
@@ -165,6 +206,8 @@ export class ClienteArchivos {
   url(marcador, { descargar = false, nombre = "" } = {}) {
     const m = leerMarcador(marcador);
     if (!m) return null;
+    const x = this.local?.get(m.hash);
+    if (x) { x.url ||= URL.createObjectURL(x.blob); return x.url; }
     const q = new URLSearchParams();
     if (descargar) q.set("descargar", "1");
     if (nombre) q.set("nombre", nombre);
@@ -173,6 +216,14 @@ export class ClienteArchivos {
 
   /** Enlaces temporales para la vista previa aislada (que no envía la sesión). Map hash → URL. */
   async enlaces(py) {
+    if (this.local) {   // vista previa con archivos de tu equipo: se pasan como data: (la vista previa está aislada)
+      const m = new Map();
+      for (const x of Object.values(py.files).map(leerMarcador).filter(Boolean)) {
+        const l = this.local.get(x.hash);
+        if (l && !m.has(x.hash)) m.set(x.hash, l.blob.size <= 12 * 1024 * 1024 ? await aDataUrl(l.blob) : (l.url ||= URL.createObjectURL(l.blob)));
+      }
+      return m;
+    }
     const ahora = Date.now();
     const hashes = [...new Set(Object.values(py.files).map(leerMarcador).filter(Boolean).map((m) => m.hash))];
     const faltan = hashes.filter((h) => !(this.enlacesCache.get(h)?.vence > ahora));

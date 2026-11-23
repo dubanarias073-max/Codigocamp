@@ -129,9 +129,9 @@
       ],
       "screenshots": [
         {
-          "src": "/img/app/icon-512.png",
-          "sizes": "512x512",
-          "label": "Widget de racha"
+          "src": "/img/app/widget-racha.png",
+          "sizes": "600x400",
+          "label": "Tu racha"
         }
       ]
     },
@@ -154,9 +154,9 @@
       ],
       "screenshots": [
         {
-          "src": "/img/app/icon-512.png",
-          "sizes": "512x512",
-          "label": "Widget de racha"
+          "src": "/img/app/widget-reloj.png",
+          "sizes": "600x400",
+          "label": "Reloj del día"
         }
       ]
     },
@@ -179,9 +179,9 @@
       ],
       "screenshots": [
         {
-          "src": "/img/app/icon-512.png",
-          "sizes": "512x512",
-          "label": "Widget de racha"
+          "src": "/img/app/widget-meta.png",
+          "sizes": "600x400",
+          "label": "Meta de hoy"
         }
       ]
     },
@@ -204,9 +204,9 @@
       ],
       "screenshots": [
         {
-          "src": "/img/app/icon-512.png",
-          "sizes": "512x512",
-          "label": "Widget de racha"
+          "src": "/img/app/widget-calendario.png",
+          "sizes": "600x400",
+          "label": "Calendario de racha"
         }
       ]
     }
@@ -219,5 +219,46 @@
       "navigate-existing",
       "auto"
     ]
-  }
+  },
+  "share_target": {
+    "action": "/pages/compartir.html",
+    "method": "GET",
+    "params": {
+      "title": "titulo",
+      "text": "texto",
+      "url": "enlace"
+    }
+  },
+  "screenshots": [
+    {
+      "src": "/img/app/pantalla-pc.png",
+      "sizes": "1400x850",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Inicio de CódigoCamp en el computador"
+    },
+    {
+      "src": "/img/app/pantalla-trabajo.png",
+      "sizes": "1400x850",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Trabajo: editor como VS Code"
+    },
+    {
+      "src": "/img/app/pantalla-cel.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "CódigoCamp en el celular"
+    },
+    {
+      "src": "/img/app/pantalla-cel-ia.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Tutor de IA"
+    }
+  ],
+  "handle_links": "preferred",
+  "prefer_related_applications": false
 }

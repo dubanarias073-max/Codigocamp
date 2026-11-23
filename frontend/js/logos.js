@@ -28,10 +28,11 @@ export const LOGOS = {
   github: `<circle cx="24" cy="24" r="21" fill="#24292f"/><path d="M24 11c-7.2 0-13 5.8-13 13 0 5.7 3.7 10.6 8.9 12.3.7.1.9-.3.9-.6v-2.3c-3.6.8-4.4-1.7-4.4-1.7-.6-1.5-1.4-1.9-1.4-1.9-1.2-.8.1-.8.1-.8 1.3.1 2 1.3 2 1.3 1.2 2 3 1.4 3.8 1.1.1-.8.5-1.4.8-1.7-2.9-.3-5.9-1.4-5.9-6.4 0-1.4.5-2.6 1.3-3.5-.1-.3-.6-1.7.1-3.4 0 0 1.1-.3 3.6 1.3a12 12 0 0 1 6.5 0c2.5-1.7 3.6-1.3 3.6-1.3.7 1.8.3 3.1.1 3.4.8.9 1.3 2.1 1.3 3.5 0 5-3 6.1-5.9 6.4.5.4.9 1.2.9 2.4v3.6c0 .3.2.7.9.6A13 13 0 0 0 37 24c0-7.2-5.8-13-13-13z" fill="#fff"/>`,
   nosql: `<path d="M24 4c5 6 9 12 9 20 0 7-4 13-9 19-5-6-9-12-9-19 0-8 4-14 9-20z" fill="#22c55e"/><path d="M24 6v37" stroke="#14532d" stroke-width="2"/><path d="M24 4c5 6 9 12 9 20 0 7-4 13-9 19" fill="#16a34a"/>`,
   react: `<circle cx="24" cy="24" r="4" fill="#61dafb"/><g fill="none" stroke="#61dafb" stroke-width="2.4"><ellipse cx="24" cy="24" rx="19" ry="7.5"/><ellipse cx="24" cy="24" rx="19" ry="7.5" transform="rotate(60 24 24)"/><ellipse cx="24" cy="24" rx="19" ry="7.5" transform="rotate(120 24 24)"/></g>`,
+  reactnative: `<rect x="13" y="4" width="22" height="40" rx="5" fill="none" stroke="#38bdf8" stroke-width="2.6"/><circle cx="24" cy="23" r="2.6" fill="#38bdf8"/><g fill="none" stroke="#38bdf8" stroke-width="1.8"><ellipse cx="24" cy="23" rx="8.5" ry="3.4"/><ellipse cx="24" cy="23" rx="8.5" ry="3.4" transform="rotate(60 24 23)"/><ellipse cx="24" cy="23" rx="8.5" ry="3.4" transform="rotate(120 24 23)"/></g><rect x="20" y="39" width="8" height="2" rx="1" fill="#38bdf8"/>`,
   node: `<polygon points="24,3 42,13.5 42,34.5 24,45 6,34.5 6,13.5" fill="#5fa04e"/><text x="24" y="30" text-anchor="middle" font-size="13" font-weight="800" fill="#fff" font-family="Inter,Arial,sans-serif">node</text>`,
 };
 
-const NOMBRES = { html: "HTML", css: "CSS", javascript: "JS", typescript: "TS", python: "PY", sql: "SQL", bd: "BD", java: "JV", c: "C", cpp: "C++", csharp: "C#", go: "GO", rust: "RS", swift: "SW", kotlin: "KT", php: "PHP", ruby: "RB", terminal: "$_", git: "GIT", docker: "DK", node: "NODE", github: "GH", nosql: "NoSQL", react: "RE" };
+const NOMBRES = { html: "HTML", css: "CSS", javascript: "JS", typescript: "TS", python: "PY", sql: "SQL", bd: "BD", java: "JV", c: "C", cpp: "C++", csharp: "C#", go: "GO", rust: "RS", swift: "SW", kotlin: "KT", php: "PHP", ruby: "RB", terminal: "$_", git: "GIT", docker: "DK", node: "NODE", github: "GH", nosql: "NoSQL", react: "RE", reactnative: "RN" };
 
 export function logo(slug, tam = 40) {
   const dentro = LOGOS[slug];

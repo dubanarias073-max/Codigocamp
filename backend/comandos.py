@@ -35,6 +35,27 @@ def registrar_comandos(app):
         else:
             print("El catálogo ya estaba actualizado; no se hicieron cambios.")
 
+    @app.cli.command("actualizar-listas")
+    def actualizar_listas():
+        """Descarga las listas públicas de sitios con virus y phishing (para el detector de enlaces).
+        Prográmalo una vez al día (cron / Programador de tareas): flask --app app actualizar-listas"""
+        import requests
+        from servicios.seguridad_enlaces import CARPETA_LISTAS
+        CARPETA_LISTAS.mkdir(parents=True, exist_ok=True)
+        fuentes = {
+            "urlhaus.txt": "https://urlhaus.abuse.ch/downloads/hostfile/",          # malware (abuse.ch)
+            "phishing_army.txt": "https://phishing.army/download/phishing_army_blocklist.txt",
+            "openphish.txt": "https://openphish.com/feed.txt",                       # direcciones de phishing activas
+        }
+        for nombre, url in fuentes.items():
+            try:
+                r = requests.get(url, timeout=60, headers={"User-Agent": "CodigoCamp/1.0"})
+                r.raise_for_status()
+                (CARPETA_LISTAS / nombre).write_text(r.text, encoding="utf-8")
+                print(f"✔ {nombre}: {sum(1 for l in r.text.splitlines() if l and not l.startswith('#'))} entradas")
+            except Exception as e:   # sin internet o la fuente cambió: se conserva la lista anterior
+                print(f"✖ {nombre}: {e}")
+
     @app.cli.command("recordar-rachas")
     @click.option("--nivel", type=click.IntRange(1, 2), default=1, help="1 = aviso de la tarde, 2 = última oportunidad.")
     def recordar_rachas_cmd(nivel):
@@ -63,7 +84,7 @@ def registrar_comandos(app):
                 print(f"  «{modelo}» no está disponible para tu clave. Pon en backend/.env: GEMINI_MODEL={usado}")
         except urllib.error.HTTPError as e:
             texto = e.read()[:800].decode("utf-8", "replace")
-            print(f"✖ {explicar_error_gemini(e.code, texto, modelo)}\n  Respuesta de Gemini: {texto[:300]}")
+            print(f"✖ {explicar_error_gemini(e.code, texto, modelo, tecnico=True)}\n  Respuesta de Gemini: {texto[:300]}")
         except Exception as e:  # noqa: BLE001
             print(f"✖ No se pudo conectar con Gemini: {e}")
 

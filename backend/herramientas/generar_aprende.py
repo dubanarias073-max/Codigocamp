@@ -16,7 +16,7 @@ from retos.generador import lecciones_aprende  # noqa: E402
 DESTINO = RAIZ.parent / "frontend" / "js" / "lecciones"
 TODOS = [
     "html", "css", "bd", "javascript", "python", "sql", "typescript", "c", "cpp", "java", "csharp",
-    "go", "kotlin", "php", "ruby", "rust", "swift", "terminal", "git", "github", "docker", "node", "nosql", "react",
+    "go", "kotlin", "php", "ruby", "rust", "swift", "terminal", "git", "github", "docker", "node", "nosql", "react", "reactnative",
 ]
 SALIDA_SRV = {"c", "cpp", "java", "csharp", "php", "go", "rust", "swift", "kotlin", "ruby", "terminal", "git", "github", "docker", "node", "nosql"}   # lenguajes que muestran la salida esperada
 
@@ -27,6 +27,8 @@ COMPILADOR = {"c": ("gcc", ".c", ["-std=c11", "-Wall", "-lm"]), "cpp": ("g++", "
 
 def _salida(slug, c):
     """Salida esperada de un ejemplo: C y C++ se compilan y ejecutan; el resto usa el campo out."""
+    if c.get("ref") and c["out"] is None and slug not in COMPILADOR:
+        return None   # tema de referencia: en Aprende se ejecuta de verdad al pulsar Ejecutar
     if slug not in COMPILADOR:
         if c["out"] is None:
             raise SystemExit(f"FALTA out=... (salida esperada) en el concepto «{c['t']}» de {slug}")
@@ -35,7 +37,11 @@ def _salida(slug, c):
     with tempfile.TemporaryDirectory() as d:
         src, exe = os.path.join(d, "p" + ext), os.path.join(d, "p")
         open(src, "w", encoding="utf-8").write(c["cod"])
+        if c.get("ref") and slug == "cpp":
+            flags = ["-std=c++23", "-Wall"]   # los temas de referencia usan C++ moderno (format, ranges, expected)
         r = subprocess.run([cc, src, "-o", exe] + flags, capture_output=True, text=True)
+        if r.returncode and c.get("ref"):
+            return None   # fragmento de referencia que no es un programa completo
         if r.returncode:
             raise SystemExit(f"NO COMPILA «{c['t']}»:\n{r.stderr}")
         r = subprocess.run([exe], capture_output=True, text=True, cwd=d, timeout=10)

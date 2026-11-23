@@ -2,7 +2,8 @@
 //   correcto («compilación exitosa») · incorrecto (zumbido de error del sistema) · clic (tecla mecánica) · teclear ·
 //   moneda (commit) · leccion (arranque del sistema) · racha (llamarada + acorde de inicio) · cofre (descomprimir datos) ·
 //   premio (notificación) · legendario (logro desbloqueado, consola retro) · ejecutar (Enter + ventilador) ·
-//   programa_ok (proceso terminó con código 0) · programa_error (excepción) · arranque (inicio de sesión)
+//   programa_ok (proceso terminó con código 0) · programa_error (excepción) · arranque (inicio de sesión) ·
+//   enviar / recibir (mensajes) · notificacion · guardar (Ctrl+S) · equipar · boop (tocar a Codi) · abrir · ia (respuesta) · nivel
 // Se apagan en Configuración («Sonidos»), igual que los de las preguntas (cc_sonido = "0").
 
 let ctx = null;
@@ -131,6 +132,37 @@ const SONIDOS = {
   programa_ok(t) { filtrado(nota(81), t, 0.07, { vol: 0.05, corte: 4000 }); filtrado(nota(88), t + 0.07, 0.14, { vol: 0.05, corte: 4500 }); },
   // El programa terminó con error (excepción / exit ≠ 0)
   programa_error(t) { filtrado(nota(47), t, 0.22, { tipo: "sawtooth", vol: 0.07, corte: 800, fin: nota(43) }); },
+  // Mensaje enviado: «whoosh» que sube (como un paquete de red que sale)
+  enviar(t) { ruido(t, 0.16, { vol: 0.045, desde: 600, hasta: 5000, q: 0.9 }); filtrado(nota(84), t + 0.08, 0.07, { tipo: "square", vol: 0.035, corte: 5000 }); },
+  // Mensaje recibido: dos gotas suaves (paquete que llega)
+  recibir(t) { tono(nota(79), t, 0.09, { tipo: "triangle", vol: 0.07 }); tono(nota(86), t + 0.08, 0.16, { tipo: "triangle", vol: 0.06 }); },
+  // Notificación (solicitud de amistad, aviso): campanita de sistema de 3 notas
+  notificacion(t) { [88, 84, 91].forEach((n, i) => tono(nota(n), t + i * 0.09, 0.2, { vol: 0.05 })); },
+  // Guardar (Ctrl+S): chasquido de disquete + bip corto
+  guardar(t) { tecla(t, { vol: 0.05, agudo: 3000 }); ruido(t + 0.02, 0.08, { vol: 0.03, desde: 900, hasta: 1500, q: 3 }); filtrado(nota(84), t + 0.09, 0.06, { vol: 0.035, corte: 4000 }); },
+  // Equipar un cosmético: destello mágico que sube
+  equipar(t) { [76, 81, 86, 93].forEach((n, i) => tono(nota(n), t + i * 0.04, 0.18, { vol: 0.04 })); ruido(t + 0.05, 0.3, { vol: 0.02, desde: 4000, hasta: 11000 }); },
+  // Tocar a Codi: «boop» de robot
+  boop(t) { filtrado(nota(72), t, 0.07, { tipo: "square", vol: 0.05, corte: 2500, fin: nota(79) }); filtrado(nota(84), t + 0.07, 0.09, { tipo: "square", vol: 0.04, corte: 3000, fin: nota(76) }); },
+  // Codi contento (caricias, bailar): trino de robot que sube
+  codi_feliz(t) { [79, 84, 88, 91].forEach((n, i) => filtrado(nota(n), t + i * 0.06, 0.08, { tipo: "square", vol: 0.035, corte: 3200 })); },
+  // Codi se ríe: «ji-ji-ji» de 8 bits
+  codi_risa(t) { for (let i = 0; i < 4; i++) filtrado(nota(86 - i), t + i * 0.09, 0.06, { tipo: "square", vol: 0.04, corte: 3500, fin: nota(90 - i) }); },
+  // Codi se duerme / despierta
+  codi_bostezo(t) { tono(nota(67), t, 0.5, { tipo: "triangle", vol: 0.05, fin: nota(55) }); },
+  codi_despierta(t) { tono(nota(60), t, 0.18, { tipo: "triangle", vol: 0.05, fin: nota(76) }); filtrado(nota(84), t + 0.16, 0.08, { tipo: "square", vol: 0.03, corte: 3000 }); },
+  // Abrir un panel o menú: soplo corto
+  abrir(t) { ruido(t, 0.09, { vol: 0.025, desde: 1500, hasta: 4500, q: 1 }); },
+  // La IA respondió: chispa digital que sube (procesamiento terminado)
+  ia(t) {
+    for (let i = 0; i < 5; i++) filtrado(nota(84 + i * 3), t + i * 0.03, 0.05, { tipo: "square", vol: 0.025, corte: 7000 });
+    tono(nota(96), t + 0.16, 0.35, { vol: 0.035 });
+  },
+  // Subir de nivel: fanfarria corta de 8 bits
+  nivel(t) {
+    [67, 71, 74, 79].forEach((n, i) => filtrado(nota(n), t + i * 0.08, 0.12, { tipo: "square", vol: 0.05, corte: 4500 }));
+    [79, 83, 86].forEach((n) => tono(nota(n), t + 0.34, 0.7, { tipo: "triangle", vol: 0.045, ataque: 0.04 }));
+  },
   // Inicio de sesión: acorde de arranque corto
   arranque(t) {
     [60, 64, 67, 72].forEach((n, i) => tono(nota(n), t + i * 0.06, 0.7 - i * 0.08, { tipo: "triangle", vol: 0.05, ataque: 0.05 }));

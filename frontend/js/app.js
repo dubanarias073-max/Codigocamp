@@ -3,7 +3,9 @@ import { protegerCuenta } from "./privacidad.js";
 import { api, getUser } from "/js/auth.js";
 import { iconoSVG } from "/js/iconos.js";
 import { aplicarCosmeticos, conMarco, cosmeticosGuardados } from "/js/cosmeticos.js";
-import "/js/pwa.js";
+import { estadoInstalacion, instalar } from "/js/pwa.js";
+import { saltarCodi } from "/js/codi.js";
+import { sonar } from "/js/sonidos.js";
 export { api };
 export { aplicarCosmeticos, conMarco };
 
@@ -56,7 +58,35 @@ const chips = (pr) => {
 // Actualiza los números de las estadísticas sin recargar (después de comprar o completar un reto).
 export function actualizarStats(pr) {
   document.querySelectorAll("[data-s]").forEach((el) => { if (pr.perfil[el.dataset.s] !== undefined) el.textContent = pr.perfil[el.dataset.s]; });
+  revisarNivel(pr.perfil);
 }
+
+/** ¿Subiste de nivel desde la última vez? Fanfarria + Codi celebrando (una sola vez por nivel). */
+export function revisarNivel(perfil) {
+  const n = Number(perfil?.nivel || 0);
+  if (!n) return;
+  let visto = 0;
+  try { visto = Number(localStorage.getItem("cc_nivel_visto") || 0); localStorage.setItem("cc_nivel_visto", String(n)); } catch { return; }
+  if (!visto || n <= visto) return;
+  sonar("nivel");
+  const capa = document.createElement("div");
+  capa.className = "cc-subio";
+  capa.setAttribute("role", "status");
+  import("/js/codi.js").then(({ codiSVG }) => {
+    capa.innerHTML = `<div class="cc-subio-caja">${codiSVG("celebra", { tam: 110 })}<b>¡Subiste al nivel ${n}!</b><small>Sigue así: cada nivel desbloquea más retos.</small></div>`;
+    document.body.appendChild(capa);
+    capa.onclick = () => capa.remove();
+    setTimeout(() => capa.classList.add("sale"), 2600);
+    setTimeout(() => capa.remove(), 3100);
+  });
+}
+
+// Tocar a Codi en cualquier parte: «boop» y salto
+document.addEventListener("click", (e) => {
+  const c = e.target.closest?.("svg.codi");
+  if (!c || e.target.closest("a,button")) return;
+  sonar("boop"); saltarCodi(c);
+});
 
 export async function iniciar(activa) {
   const user = await getUser();
@@ -64,14 +94,8 @@ export async function iniciar(activa) {
   await protegerCuenta(user);   // si antes estuvo otra cuenta en este navegador, se borran sus copias locales
   if (!user.onboarding) { location.replace(url("onboarding")); await parar(); }
   aplicarTema(user.tema);
-  // Idioma de la interfaz: el de la cuenta manda (así se ve igual en todos tus dispositivos)
-  let pendiente = false;
-  try { pendiente = localStorage.getItem("cc_idioma_pendiente") === "1"; localStorage.removeItem("cc_idioma_pendiente"); } catch { /* nada */ }
-  if (pendiente && user.idioma !== window.CC_IDIOMA) { user.idioma = window.CC_IDIOMA; api("/api/ajustes/", { idioma: window.CC_IDIOMA }).catch(() => {}); }
-  if (user.idioma && user.idioma !== (window.CC_IDIOMA || "es")) {
-    window.ccIdioma?.(user.idioma);
-    if (!sessionStorage.getItem("cc_idioma_recarga")) { sessionStorage.setItem("cc_idioma_recarga", "1"); location.reload(); await parar(); }
-  } else { try { sessionStorage.removeItem("cc_idioma_recarga"); } catch { /* nada */ } }
+  // Enlaces externos (chats, IA, perfiles…): se revisan antes de abrirlos; los de virus o estafas se bloquean
+  import("/js/enlaces.js").then((m) => m.protegerEnlaces()).catch(() => {});
   // Cuentas antiguas o términos actualizados: hay que aceptarlos antes de seguir.
   if (user.terminos === false) await (await import("/js/terminos.js")).pedirTerminos();
   // Dentro de la app de Android: el widget queda conectado a esta sesión.
@@ -81,9 +105,23 @@ export async function iniciar(activa) {
   const p = prog.perfil;
 
   const item = ([k, ic, t]) => `<a class="nav-i${k === activa ? " on" : ""}" href="${url(k)}"><span class="ic">${iconoSVG(ic, "nav-icon")}</span><span class="t">${t}</span></a>`;
-  $("lado").innerHTML = `<a class="logo-app" href="${url("inicio")}"><img src="/img/logo-icon.png" alt="" width="34" height="34" onerror="this.remove()"><span>codigocamp</span></a>`
+  $("lado").innerHTML = `<a class="logo-app" href="${url("inicio")}"><img src="/img/logo-icon.png" alt="" width="34" height="34"><span>codigocamp</span></a>`
     + NAV.map(item).join("") + '<p class="grupo">Más</p>' + MAS.map(item).join("")
+    + `<button class="nav-i nav-instalar" id="navInstalar" type="button" hidden><span class="ic" aria-hidden="true">${iconoSVG("instalar", "nav-icon")}</span><span class="t">Instalar app</span></button>`
     + `<a class="yo-chip" href="${url("perfil")}" title="Tu perfil">${fotoDe(user, { tam: 34 })}<span><b>${esc(user.nombre.split(" ")[0])}</b><small>@${esc(user.alias || "")}</small></span></a>`;
+
+  // «Instalar app» en el menú mientras CódigoCamp no esté instalado (y no estés dentro de la app de Android)
+  const pintarInstalar = () => {
+    const b = document.getElementById("navInstalar"); if (!b) return;
+    const e = estadoInstalacion();
+    b.hidden = e.instalada || !!window.CodigoCampApp;
+    b.onclick = async () => { if (e.puede && await instalar()) b.hidden = true; else location.href = "/pages/configuracion.html#app"; };
+  };
+  pintarInstalar(); addEventListener("cc-instalable", pintarInstalar);
+  revisarNivel(p);
+  // Las tarjetas entran en orden (una tras otra) solo al abrir la página
+  document.body.classList.add("cc-entrando");
+  setTimeout(() => document.body.classList.remove("cc-entrando"), 1400);
 
   const m = mis.hoy.find((x) => !x.completado);
   const der = $("der");
@@ -100,16 +138,20 @@ export async function iniciar(activa) {
     const fin = Date.now() + (w.segundos_restantes || 0) * 1000;
     // Codi, el compañero, en todas las páginas: en el menú (computador) y arriba (celular). Tocarlo abre el tutor de IA.
     const animo = w.animo || "saludo";
-    document.querySelector(".yo-chip")?.insertAdjacentHTML("beforebegin", `<a class="codi-lado" href="${url("ia")}" title="Codi · pregúntale al tutor de IA">
-      <span class="codi-lado-img">${codiSVG(animo, { tam: 64 })}</span><span class="codi-lado-globo">${esc(fraseDe(animo))}</span></a>`);
+    // Codi es una mascota: se toca, se acaricia, baila, se duerme y reacciona (js/mascota.js). Mantén pulsado → menú (hablar con la IA…).
+    document.querySelector(".yo-chip")?.insertAdjacentHTML("beforebegin", `<div class="codi-lado">
+      <span class="codi-lado-img"></span><span class="codi-lado-globo" aria-live="polite">${esc(fraseDe(animo))}</span></div>`);
+    const { activarMascota } = await import("/js/mascota.js");
+    activarMascota(document.querySelector(".codi-lado-img"), { animo, tam: 64, globo: document.querySelector(".codi-lado-globo"), urlIA: url("ia") });
     const lado = document.getElementById("lado");
     const compacto = () => document.querySelector(".codi-lado")?.classList.toggle("compacto", (lado?.offsetWidth || 0) < 170);
     compacto(); addEventListener("resize", compacto);
-    document.querySelector(".tope")?.insertAdjacentHTML("afterbegin", `<a class="codi-tope" href="${url("ia")}" title="Codi · pregúntale al tutor de IA" aria-label="Codi: pregúntale al tutor de IA">${codiSVG(animo, { tam: 36, animado: false })}</a>`);
+    document.querySelector(".tope")?.insertAdjacentHTML("afterbegin", `<span class="codi-tope" title="Codi · tócalo o mantén pulsado"></span>`);
+    activarMascota(document.querySelector(".codi-tope"), { animo, tam: 36, urlIA: url("ia") });
     if (der) der.insertAdjacentHTML("afterbegin", `<a class="tarjeta widget-racha${w.practicado_hoy ? " hecho" : w.racha ? " peligro" : ""}" href="${url("perfil")}#calendario" title="Calendario de racha">
       <div class="wr-cab"><span class="wr-codi">${codiSVG(w.animo || "feliz", { tam: 58 })}</span><div><b>${w.racha}</b><small>día${w.racha === 1 ? "" : "s"} de racha</small></div><span class="wr-hielo" title="Salvarrachas: protegen tu racha si un día no practicas">${iconoSVG("salvarrachas", "wr-mini")} ${w.salvarrachas ?? 0}</span></div>
       <div class="wr-reloj" data-reloj><span>${w.practicado_hoy ? "✅ Racha a salvo · el día termina en" : "⏳ Te quedan hoy"}</span><b data-reloj-num>--:--:--</b></div>
-      <div class="wr-semana">${w.semana.map((d, i) => `<span class="${d.icono === "🔥" ? "si" : ""}${d.hoy ? " hoy" : ""}"><small>${window.CC_IDIOMA === "en" ? "MTWTFSS"[i] : d.letra}</small><i>${d.icono === "🔥" ? iconoSVG("racha", "wr-dia") : ""}</i></span>`).join("")}</div>
+      <div class="wr-semana">${w.semana.map((d, i) => `<span class="${d.icono === "🔥" ? "si" : ""}${d.hoy ? " hoy" : ""}"><small>${d.letra}</small><i>${d.icono === "🔥" ? iconoSVG("racha", "wr-dia") : ""}</i></span>`).join("")}</div>
       <small class="wr-estado">${esc(w.estado)}</small>
       <div class="wr-metas"><span title="Cada 10 días seguidos de racha ganas un salvarrachas (puedes tener más de 2)">🎁 ${w.dias_para_salvarrachas ?? 10} día${w.dias_para_salvarrachas === 1 ? "" : "s"} para +1 salvarrachas</span>
         <span title="Practica de lunes a domingo sin usar salvarrachas: cofre de oro. Todo el mes sin fallar: cofre legendario">⭐ Semana perfecta ${w.semana_dias ?? 0}/7</span></div></a>`);

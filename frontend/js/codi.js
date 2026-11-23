@@ -106,9 +106,18 @@ export const ACCESORIOS_CODI = {
   // De temporada (no se venden: Codi se los pone solo en Halloween, etc., si no llevas otro accesorio)
   temp_bruja: { capa: "cabeza", sinAntena: true, svg: `<ellipse cx="100" cy="50" rx="68" ry="12" fill="#1e1b4b" stroke="#0f0a2e" stroke-width="3"/><path d="M62 48Q84 34 96-14Q112 6 108 20Q124 30 138 48Z" fill="#312e81" stroke="#0f0a2e" stroke-width="3" stroke-linejoin="round"/><path d="M66 44q34 8 68 0" stroke="#f97316" stroke-width="7" fill="none"/><rect x="92" y="38" width="14" height="12" rx="2" fill="#facc15" stroke="#a16207" stroke-width="2"/>` },
   temp_calabaza: { capa: "cabeza", svg: `<g transform="translate(150 40)"><ellipse rx="16" ry="13" fill="#f97316" stroke="#9a3412" stroke-width="2.5"/><path d="M-6-12q6 10 0 24M6-12q-6 10 0 24" stroke="#9a3412" stroke-width="2" fill="none"/><path d="M0-12q2-8 8-9" stroke="#15803d" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M-8-2l4 3-4 2zM8-2l-4 3 4 2zM-7 6q7 5 14 0" fill="#451a03" stroke="#451a03" stroke-width="1.5"/></g>` },
+  codi_alas: { capa: "atras", svg: `<g class="cdx-alas" shape-rendering="crispEdges"><path d="M64 140H46V130H32V120H20V106H10V90H2V66H14V80H24V94H36V108H50V120H64Z" fill="#e0f2fe" stroke="#0284c7" stroke-width="3" stroke-linejoin="miter"/><path d="M136 140 H154 V130 H168 V120 H180 V106 H190 V90 H198 V66 H186 V80 H176 V94 H164 V108 H150 V120 H136 Z" fill="#e0f2fe" stroke="#0284c7" stroke-width="3" stroke-linejoin="miter"/><path d="M14 80v18M24 94v16M36 108v14M50 120v12" stroke="#7dd3fc" stroke-width="3"/><path d="M186 80 v18 M176 94 v16 M164 108 v14 M150 120 v12" stroke="#7dd3fc" stroke-width="3"/><path d="M2 66h12v4H2zM186 66h12v4h-12z" fill="#fde047"/></g>` },
+  codi_kart: { capa: "frente", svg: `<g class="cdx-llama"><path d="M18 178q-14-4-16 6q10-2 16 2z" fill="#f97316"/><path d="M18 184q-12 2-12 10q8-6 14-6z" fill="#fde047"/></g><path d="M20 172q4-18 30-20h100q26 2 32 20l4 14H16z" fill="#ef4444" stroke="#7f1d1d" stroke-width="3" stroke-linejoin="round"/><path d="M40 160h120" stroke="#fff" stroke-opacity=".35" stroke-width="4" stroke-linecap="round"/><path d="M26 182h148v16H26z" fill="#991b1b" stroke="#7f1d1d" stroke-width="2"/><rect x="84" y="164" width="32" height="14" rx="4" fill="#fde047" stroke="#a16207" stroke-width="2"/><text x="100" y="175" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="900" fill="#7f1d1d">01</text><g fill="#111827" stroke="#475569" stroke-width="3"><circle cx="46" cy="188" r="12"/><circle cx="154" cy="188" r="12"/></g><g fill="#94a3b8"><circle cx="46" cy="188" r="4"/><circle cx="154" cy="188" r="4"/></g><path d="M172 150v18" stroke="#334155" stroke-width="4"/><rect x="164" y="144" width="22" height="8" rx="3" fill="#1f2937"/>` },
+  codi_explorador: { capa: "cabeza", sinAntena: true, svg: `<ellipse cx="100" cy="52" rx="72" ry="13" fill="#d6b77a" stroke="#78501f" stroke-width="3"/><path d="M52 50C52 6 148 6 148 50Z" fill="#e9cf96" stroke="#78501f" stroke-width="3"/><path d="M54 42q46 10 92 0" stroke="#3f6212" stroke-width="7" fill="none"/><path d="M84 16q16-8 32 0" stroke="#fff" stroke-opacity=".4" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M128 40q12-16 26-10q-12 2-18 14z" fill="#22c55e" stroke="#166534" stroke-width="2"/>` },
   codi_banda_ninja: { capa: "cabeza", svg: `<rect x="38" y="54" width="124" height="14" rx="5" fill="#dc2626" stroke="#7f1d1d" stroke-width="2.5"/><rect x="92" y="55" width="16" height="12" rx="2" fill="#cbd5e1" stroke="#475569" stroke-width="2"/><path d="M160 60q20 4 30 18q-14-4-26-6zM160 64q14 12 18 30q-10-12-20-20z" fill="#dc2626" stroke="#7f1d1d" stroke-width="2" stroke-linejoin="round"/>` },
   codi_carreras: { capa: "cabeza", sinAntena: true, svg: `<path d="M40 74C36 4 164 4 160 74L148 72C148 30 52 30 52 72Z" fill="#f8fafc" stroke="#1e293b" stroke-width="3"/><path d="M62 22q38-16 76 0l-6 10q-32-12-64 0z" fill="#ef4444"/><path d="M98 10h4v60h-4z" fill="#1e293b" opacity=".7"/><text x="100" y="52" text-anchor="middle" font-family="system-ui,sans-serif" font-size="16" font-weight="900" fill="#ef4444" stroke="#1e293b" stroke-width="1">01</text>` },
-  codi_escudo: { capa: "frente", svg: `<path d="M150 136h26v26q0 16-13 24q-13-8-13-24z" fill="#1d4ed8" stroke="#facc15" stroke-width="3"/><path d="M163 142v36M152 158h22" stroke="#facc15" stroke-width="3"/><path d="M34 112l8-8 30 30-4 4z" fill="#e2e8f0" stroke="#334155" stroke-width="2"/><path d="M40 128l12 12-4 4-12-12z" fill="#a16207" stroke="#451a03" stroke-width="2"/>` },
+  codi_escudo: { capa: "frente", svg: (a) => {
+    // escudo en la mano izquierda y espada en la derecha; siguen a los brazos cuando saluda, celebra o piensa
+    const izq = a === "celebra" ? [-19, -52] : a === "pensando" ? [34, -38] : [0, 0];
+    const der = a === "saludo" || a === "celebra" ? [19, -52] : [0, 0];
+    return `<g transform="translate(${der[0]} ${der[1]})"><path d="M154 158h8v-56l-4-9-4 9z" fill="#e2e8f0" stroke="#334155" stroke-width="2" stroke-linejoin="round"/><path d="M158 154v-50" stroke="#94a3b8" stroke-width="1.6"/><rect x="145" y="157" width="26" height="7" rx="3" fill="#facc15" stroke="#a16207" stroke-width="2"/><rect x="155" y="164" width="6" height="16" rx="2" fill="#7c2d12" stroke="#451a03" stroke-width="1.5"/><circle cx="158" cy="183" r="4.5" fill="#facc15" stroke="#a16207" stroke-width="1.5"/></g>`
+      + `<g transform="translate(${izq[0]} ${izq[1]})"><path d="M18 150h40v18q0 20-20 28q-20-8-20-28z" fill="#1d4ed8" stroke="#facc15" stroke-width="3.5" stroke-linejoin="round"/><path d="M24 156h28v12q0 14-14 20q-14-6-14-20z" fill="#2563eb"/><text x="38" y="176" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" font-weight="900" fill="#fde047">{ }</text></g>`;
+  } },
   codi_jefe_final: { capa: "cabeza", sinAntena: true, svg: `<path d="M54 50L46 6L72 30L86 0L100 24L114 0L128 30L154 6L146 50Z" fill="#1e1b4b" stroke="#a855f7" stroke-width="3" stroke-linejoin="round"/><rect x="54" y="42" width="92" height="12" rx="4" fill="#312e81" stroke="#a855f7" stroke-width="3"/><g fill="#f43f5e"><circle cx="100" cy="48" r="5"/><circle cx="76" cy="48" r="3.5"/><circle cx="124" cy="48" r="3.5"/></g><path d="M86 0L100 24 114 0" fill="none" stroke="#f0abfc" stroke-width="1.5" opacity=".6"/>` },
   codi_minero: { capa: "cabeza", sinAntena: true, svg: `<path d="M148 34L200 8V62Z" fill="#fde047" fill-opacity=".45"/><path d="M46 60C46 12 154 12 154 60Z" fill="#f59e0b" stroke="#92400e" stroke-width="3"/><path d="M100 14v44M70 22l6 34M130 22l-6 34" stroke="#b45309" stroke-width="4"/><rect x="40" y="50" width="120" height="14" rx="7" fill="#d97706" stroke="#92400e" stroke-width="2.5"/><circle cx="138" cy="34" r="11" fill="#fef9c3" stroke="#92400e" stroke-width="3"/><circle cx="138" cy="34" r="5" fill="#fff"/>` },
   codi_caballero: { capa: "cabeza", sinAntena: true, svg: `<path d="M100 18q14-24 34-14q-14 4-22 18z" fill="#ef4444" stroke="#7f1d1d" stroke-width="2.5"/><g shape-rendering="crispEdges"><path d="M48 62V34h8v-8h8v-8h72v8h8v8h8v28z" fill="#cbd5e1" stroke="#334155" stroke-width="3"/><path d="M60 34h80v6H60z" fill="#94a3b8"/><path d="M96 18h8v44h-8z" fill="#e2e8f0"/></g><g fill="#475569"><circle cx="58" cy="54" r="3"/><circle cx="142" cy="54" r="3"/></g>` },
@@ -127,7 +136,6 @@ export const ACCESORIOS_CODI = {
   codi_audifonos: { capa: "cabeza", svg: `<path d="M30 84C30 8 170 8 170 84" stroke="#111827" stroke-width="10" fill="none" stroke-linecap="round"/><path d="M32 70C40 20 160 20 168 70" stroke="#f472b6" stroke-width="3" fill="none" stroke-linecap="round"/><rect x="14" y="66" width="28" height="48" rx="13" fill="#1f2937" stroke="#f472b6" stroke-width="3"/><rect x="158" y="66" width="28" height="48" rx="13" fill="#1f2937" stroke="#f472b6" stroke-width="3"/><circle cx="28" cy="90" r="5" fill="#f472b6"/><circle cx="172" cy="90" r="5" fill="#f472b6"/>` },
   codi_flor: { capa: "cabeza", svg: `<g transform="translate(144 42)"><g fill="#f9a8d4" stroke="#db2777" stroke-width="1.5"><circle cx="0" cy="-10" r="8"/><circle cx="9.5" cy="-3" r="8"/><circle cx="6" cy="8" r="8"/><circle cx="-6" cy="8" r="8"/><circle cx="-9.5" cy="-3" r="8"/></g><circle r="6" fill="#facc15" stroke="#ca8a04" stroke-width="1.5"/></g>` },
   codi_gafas: { capa: "cara", svg: `<g shape-rendering="crispEdges"><path d="M50 82h100v6H50zM62 82h32v20h-6v4H68v-4h-6zM106 82h32v20h-6v4h-20v-4h-6z" fill="none" stroke="#e2e8f0" stroke-width="5" stroke-linejoin="miter"/><path d="M50 82h100v6H50z" fill="#030712"/><path d="M62 82h32v20h-6v4H68v-4h-6z" fill="#030712"/><path d="M106 82h32v20h-6v4h-20v-4h-6z" fill="#030712"/><path d="M68 86h6v4h-6zM74 90h6v4h-6zM112 86h6v4h-6zM118 90h6v4h-6z" fill="#fff" opacity=".85"/></g>` },
-  codi_gafas_nerd: { capa: "cara", svg: `<g fill="#fff" fill-opacity=".12" stroke="#f59e0b" stroke-width="5"><circle cx="80" cy="92" r="16"/><circle cx="120" cy="92" r="16"/></g><path d="M96 90q4-4 8 0M64 90H50M136 90h14" stroke="#f59e0b" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M70 84q4-4 9-4M110 84q4-4 9-4" stroke="#fff" stroke-opacity=".6" stroke-width="2.5" fill="none" stroke-linecap="round"/>` },
   codi_bigote: { capa: "cara", svg: `<path d="M100 104c-6-7-19-10-28 0-4 4-10 3-12-1 1 9 13 12 22 9 8-2 12-6 18-6s10 4 18 6c9 3 21 0 22-9-2 4-8 5-12 1-9-10-22-7-28 0z" fill="#78350f" stroke="#451a03" stroke-width="1.5"/>` },
   codi_bufanda: { capa: "cuello", svg: `<rect x="56" y="130" width="88" height="16" rx="8" fill="#ef4444" stroke="#7f1d1d" stroke-width="2.5"/><path d="M76 131v14M96 131v14M116 131v14M136 131v14" stroke="#fde68a" stroke-width="4"/><path d="M118 142l6 34 14-3-4-32z" fill="#ef4444" stroke="#7f1d1d" stroke-width="2.5" stroke-linejoin="round"/><path d="M121 156l13-2M123 166l13-2" stroke="#fde68a" stroke-width="4"/>` },
   codi_corbatin: { capa: "cuello", svg: `<path d="M100 144L76 132v24zM100 144l24-12v24z" fill="#a855f7" stroke="#581c87" stroke-width="2.5" stroke-linejoin="round"/><rect x="93" y="137" width="14" height="14" rx="4" fill="#c084fc" stroke="#581c87" stroke-width="2.5"/>` },
@@ -156,7 +164,7 @@ function redibujarCodis() {
     svg.outerHTML = codiSVG(animo, { tam, animado: svg.classList.contains("codi-animado"), titulo: svg.getAttribute("aria-label") || undefined });
   }
 }
-const capaAcc = (acc, capa) => (acc && acc.capa === capa ? `<g class="cdx-acc cdx-acc-${capa}">${acc.svg}</g>` : "");
+const capaAcc = (acc, capa, a) => (acc && acc.capa === capa ? `<g class="cdx-acc cdx-acc-${capa}">${typeof acc.svg === "function" ? acc.svg(a) : acc.svg}</g>` : "");
 
 /** El SVG de Codi. tam en px (o null para que llene su contenedor). accesorio: clave de ACCESORIOS_CODI (por defecto el que tiene puesto). */
 export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "Codi, la mascota de CódigoCamp", accesorio } = {}) {
@@ -202,6 +210,8 @@ export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "C
     .codi-animado .cdx-parpadeo{transform-box:fill-box;transform-origin:center;animation:cdxParpadea 4.6s infinite}
     .codi-preocupado.codi-animado .cdx-parpadeo{animation:cdxParpadea 4.6s infinite,cdxMira 3.6s ease-in-out infinite}
     .codi-animado .cdx-llama{transform-box:fill-box;transform-origin:50% 100%;animation:cdxLlama .5s ease-in-out infinite alternate}
+    .codi-animado .cdx-alas{transform-box:fill-box;transform-origin:50% 90%;animation:cdxAlas .55s ease-in-out infinite alternate}
+    @keyframes cdxAlas{to{transform:scaleY(.78) translateY(4px)}}
     .codi-animado .cdx-pulso{animation:cdxPulso 2.4s ease-in-out infinite}
     .codi-animado .cdx-saluda{transform-box:view-box;transform-origin:140px 156px;animation:cdxSaluda .7s ease-in-out infinite}
     .codi-animado .cdx-z text{animation:cdxZ 2.6s ease-in-out infinite}
@@ -245,7 +255,7 @@ export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "C
   <circle cx="100" cy="100" r="96" fill="url(#${id}aura)"/>
   ${extras(a, id)}
   <g class="cdx-todo">
-    ${capaAcc(acc, "atras")}
+    ${capaAcc(acc, "atras", a)}
     <!-- cuerpo con sudadera -->
     <rect x="76" y="180" width="18" height="11" rx="5.5" fill="#0d1530" stroke="#5ef2ff" stroke-opacity=".5" stroke-width="2"/>
     <rect x="106" y="180" width="18" height="11" rx="5.5" fill="#0d1530" stroke="#5ef2ff" stroke-opacity=".5" stroke-width="2"/>
@@ -259,7 +269,7 @@ export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "C
       <circle cx="72" cy="174" r="2.4" fill="#5ef2ff"/><circle cx="128" cy="174" r="2.4" fill="#b8ff3c"/></g>
     <text x="100" y="179" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="11" font-weight="900" fill="#b8ff3c">&lt;/&gt;</text>
 
-    ${capaAcc(acc, "cuello")}
+    ${capaAcc(acc, "cuello", a)}
     <!-- antena -->
     ${acc?.sinAntena ? "" : antena(a, id)}
     <!-- orejas { } -->
@@ -273,15 +283,15 @@ export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "C
     <!-- visor -->
     <rect x="52" y="62" width="96" height="62" rx="28" fill="url(#${id}visor)" stroke="#000" stroke-opacity=".4" stroke-width="2"/>
     <rect x="52" y="62" width="96" height="62" rx="28" fill="none" stroke="${c}" stroke-opacity=".28" stroke-width="1.5"/>
-    ${ojos(a, id, c)}
+    <g class="cdx-mirada">${ojos(a, id, c)}</g>
     ${boca(a, c)}
     <ellipse cx="66" cy="112" rx="7" ry="3.5" fill="#ff7aa8" opacity="${a === "alarma" || a === "dormido" ? 0 : .35}"/>
     <ellipse cx="134" cy="112" rx="7" ry="3.5" fill="#ff7aa8" opacity="${a === "alarma" || a === "dormido" ? 0 : .35}"/>
     <path d="M64 70q12-6 26-6" stroke="#fff" stroke-opacity=".22" stroke-width="4" stroke-linecap="round" fill="none"/>
-    ${capaAcc(acc, "cara")}
-    ${capaAcc(acc, "cabeza")}
+    ${capaAcc(acc, "cara", a)}
+    ${capaAcc(acc, "cabeza", a)}
     ${arriba ? brazoIzq + brazoDer : ""}
-    ${capaAcc(acc, "frente")}
+    ${capaAcc(acc, "frente", a)}
   </g>
 </svg>`;
 }

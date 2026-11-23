@@ -6,6 +6,7 @@ import * as FS from "./fs.js";
 import { archivosDe, esMarcador, formatoBytes, leerMarcador } from "./archivos.js";
 import { importarEn, paraExportar, prepararArchivos, resumenPlan } from "./importar.js";
 import { DiscoNavegador, Sincronizador, recuerdo, soporteCarpeta } from "./carpeta.js";
+import { DiscoConector } from "./equipo.js";
 import { crearZip, leerZip, zipDisponible } from "./zip.js";
 
 const AVISO_IMAGENES = "cc_trabajo_aviso_archivos";
@@ -29,9 +30,15 @@ export class Entradas {
    * @param {number|string} o.usuarioId
    * @param {HTMLElement} o.botonCarpeta            elemento de la barra de estado para la carpeta vinculada
    * @param {()=>void} [o.antesDeLeer]               pasa al proyecto el texto sin guardar de los editores
+   * @param {()=>Promise<object|string|null>} [o.elegirOrigen]  ¿dónde está la carpeta? → { equipo, carpeta } | "navegador" | null
+   * @param {(equipo:object|null)=>void} [o.alEquipo]  la carpeta abierta es (o deja de ser) la de un equipo con el Conector
+   * @param {()=>void} [o.abrirConector]            muestra cómo conectar un equipo
+   * @param {object} [o.conector]                   { fsEquipo, listarEquipos } de conector.js
+   * @param {(o:{silencioso?:boolean})=>Promise<boolean>} [o.alAntesEquipo]  pasa Trabajo a «trabajar en tu equipo» (sin nube)
    */
-  constructor({ proyecto, cambio, archivos, usuarioId, botonCarpeta, antesDeLeer = () => {} }) {
-    Object.assign(this, { proyecto, cambio, archivos, botonCarpeta, antesDeLeer });
+  constructor({ proyecto, cambio, archivos, usuarioId, botonCarpeta, antesDeLeer = () => {}, elegirOrigen = null, alEquipo = () => {}, abrirConector = () => {}, conector = null, alAntesEquipo = async () => true }) {
+    Object.assign(this, { proyecto, cambio, archivos, botonCarpeta, antesDeLeer, elegirOrigen, alEquipo, abrirConector, conector, alAntesEquipo });
+    this.vigilaEquipo = null;
     this.clave = `u${usuarioId}`;
     this.sinc = null;
     this.disco = null;
@@ -49,6 +56,7 @@ export class Entradas {
     const soporte = soporteCarpeta();
     const items = [
       { texto: "Subir archivos…", fn: () => this.subirArchivos("") },
+      { texto: "📎 Documentos (Word, Excel, PowerPoint, PDF)…", fn: () => this.alDocumentos?.() },
       { texto: "Subir una carpeta…", fn: () => this.subirCarpeta("") },
       { texto: "Importar .zip…", fn: () => this.importarZip() },
       { texto: "Descargar proyecto (.zip)", fn: () => this.descargarZip() },
@@ -58,8 +66,9 @@ export class Entradas {
       const nombre = this.disco?.nombre ?? "carpeta";
       if (this.estadoCarpeta === "permiso") items.push({ texto: `Reconectar carpeta «${nombre}»`, fn: () => this.reconectar() });
       else items.push({ texto: `Sincronizar ahora con «${nombre}»`, fn: () => this.sincronizarAhora(true) });
-      items.push({ texto: "Dejar de sincronizar la carpeta", fn: () => this.desvincular() });
-    } else items.push({ texto: soporte.disponible ? "Abrir carpeta del computador…" : "Abrir carpeta del computador (no disponible aquí)…", fn: () => this.vincularCarpeta() });
+      if (this.disco?.esEquipo && this.itemsEquipo) items.push(...this.itemsEquipo());
+      items.push({ texto: this.disco?.esEquipo ? "Cerrar la carpeta del equipo (volver a la nube)" : "Dejar de sincronizar la carpeta", fn: () => this.desvincular() });
+    } else items.push({ texto: this.elegirOrigen ? "Abrir carpeta del computador o celular…" : soporte.disponible ? "Abrir carpeta del computador…" : "Abrir carpeta del computador (no disponible aquí)…", fn: () => this.vincularCarpeta() });
     items.push("-", { texto: "Espacio usado…", fn: () => this.mostrarEspacio() });
     menuContextual(x, y, items);
   }
@@ -155,6 +164,15 @@ export class Entradas {
     const files = await this.#elegir({ multiple: true });
     if (!files.length) return;
     await this.#importar({ archivos: await this.#leerFiles(files) }, { destino });
+  }
+
+  /** Documentos de Office y PDF: van a la carpeta «documentos» y se pueden ver en Trabajo sin descargarlos. */
+  async subirDocumentos(destino = "documentos") {
+    const files = await this.#elegir({ multiple: true, accept: ".docx,.xlsx,.xlsm,.pptx,.pdf,.doc,.xls,.ppt,.odt,.ods,.odp,.rtf,.csv,.txt,.md" });
+    if (!files.length) return [];
+    const leidos = await this.#leerFiles(files);
+    await this.#importar({ archivos: leidos }, { destino });
+    return leidos.map((a) => `${destino}/${a.ruta}`);
   }
 
   async subirCarpeta(destino = "") {
@@ -324,12 +342,20 @@ export class Entradas {
     else if (r === "carpeta") this.subirCarpeta("");
   }
 
+  /** La carpeta abierta es la de un equipo conectado (terminal y Git reales): { id, equipo, sistema, carpeta } o null. */
+  get equipo() { return this.disco?.esEquipo && this.sinc?.vinculada ? { ...this.disco.equipo, carpeta: this.disco.carpeta } : null; }
+
   async vincularCarpeta() {
+    if (this.elegirOrigen) {
+      const r = await this.elegirOrigen();
+      if (!r) return;
+      if (r.equipo) { await this.vincularEquipo(r.equipo, r.carpeta); return; }
+    }
     const soporte = soporteCarpeta();
     if (!soporte.disponible) { await this.#explicarNoDisponible(soporte); return; }
     const seguir = await dialogo({
       titulo: "Abrir una carpeta de tu computador", ancho: true,
-      mensaje: `Tu proyecto y la carpeta se mantendrán iguales: lo que cambies en CódigoCamp se guarda en la carpeta, y lo que cambies con otro programa (por ejemplo VS Code) aparece aquí.`,
+      mensaje: `Tu proyecto y la carpeta se mantendrán iguales: lo que cambies en CódigoCamp se guarda en la carpeta, y lo que cambies con otro programa (por ejemplo otro editor) aparece aquí.`,
       avisos: [
         `Solo funciona en Chrome, Edge y Opera de computador (estás usando ${soporte.navegador}). En Firefox, Safari y celulares usa ZIP.`,
         "El navegador pedirá permiso cada vez que abras la página. En Chrome puedes elegir «Permitir en cada visita» para no repetirlo.",
@@ -338,7 +364,7 @@ export class Entradas {
       ],
       lista: [
         "Crea una carpeta para el proyecto: el navegador no deja abrir Escritorio, Documentos ni carpetas del sistema.",
-        "Se sincroniza cualquier archivo de hasta 1 GB cuyo nombre no tenga espacios ni tildes. Lo demás (node_modules, .git, nombres con espacios, archivos enormes) se queda en tu carpeta sin tocarse.",
+        "Se sincroniza cualquier archivo de hasta 1 GB (los nombres pueden tener espacios y tildes). node_modules, .git, venv y similares se quedan en tu carpeta sin tocarse.",
         `Límites: ${FS.LIMITES.archivos} archivos por proyecto y 10 GB por cuenta. Los archivos grandes tardan en subir la primera vez.`,
         "Si el mismo archivo cambia en los dos lados, se queda la versión del computador y la de CódigoCamp se guarda como «nombre.conflicto.ext».",
       ],
@@ -353,9 +379,31 @@ export class Entradas {
     }
     const disco = new DiscoNavegador(handle);
     if ((await disco.permiso(true)) !== "granted") { aviso("Sin permiso para escribir en esa carpeta: no se puede sincronizar.", { tipo: "error" }); return; }
+    await this.#empezar(disco);
+  }
+
+  /** Abre como proyecto una carpeta del computador o celular conectado con el Conector (ya elegida en ese equipo). */
+  async vincularEquipo(equipo, carpeta) {
+    if (this.sinc?.vinculada) { this.#detener(); this.sinc.desvincular(); this.sinc = null; }
+    // Desde aquí se trabaja directo en el equipo: el proyecto de la nube queda guardado y vuelve al cerrar la carpeta
+    if (!(await this.alAntesEquipo({ equipo, carpeta }))) return;
+    const disco = this.#discoEquipo(equipo, carpeta);
+    if (await this.#empezar(disco)) this.alEquipo({ ...equipo, carpeta });
+    else { this.#detener(); this.sinc = null; this.disco = null; this.alEquipo(null, "cerrar"); }
+  }
+
+  #discoEquipo(equipo, carpeta) {
+    const d = new DiscoConector({ id: equipo.id, equipo: equipo.equipo, sistema: equipo.sistema }, carpeta, this.conector.fsEquipo);
+    d.alVirus = (ruta, mensaje) => aviso(mensaje, { tipo: "error", ms: 15000 });
+    return d;
+  }
+
+  /** Primera sincronización con una carpeta (del navegador o del equipo). true si quedó vinculada. */
+  async #empezar(disco) {
+    const handle = { name: disco.nombre };
     let enCarpeta;
     try { enCarpeta = (await disco.listar()).archivos.length; }
-    catch (e) { aviso(`No se pudo leer la carpeta: ${e.message}`, { tipo: "error" }); return; }
+    catch (e) { aviso(`No se pudo leer la carpeta: ${e.message}`, { tipo: "error" }); return false; }
     this.antesDeLeer();
     const nProyecto = Object.keys(this.proyecto().files).length;
     let modo = "combinar";
@@ -369,29 +417,32 @@ export class Entradas {
         ],
         botones: [{ texto: "Usar la carpeta", valor: "carpeta" }, { texto: "Combinar", valor: "combinar" }, { texto: "Cancelar", valor: null, cancelar: true }],
       });
-      if (!modo) return;
-      if (modo === "carpeta" && !(await this.#confirmarReemplazo(nProyecto))) return;
+      if (!modo) return false;
+      if (modo === "carpeta" && !(await this.#confirmarReemplazo(nProyecto))) return false;
     } else if (enCarpeta) modo = "carpeta";
     await this.#conectar(disco, null);
-    const quitar = aviso("Sincronizando la carpeta por primera vez (los archivos grandes tardan en subir)…", { ms: 6 * 3600 * 1000 });
+    const quitar = aviso(disco.esEquipo ? `Abriendo «${disco.nombre}» de ${disco.equipo.equipo}…` : "Sincronizando la carpeta por primera vez (los archivos grandes tardan en subir)…", { ms: 6 * 3600 * 1000 });
     try {
       const r = await this.sinc.vincular(modo);
       quitar();
       const omit = [...r.omitidos].map(([ruta, motivo]) => ({ ruta, motivo }));
-      aviso(`Carpeta «${handle.name}» vinculada${r.traidos ? ` · ${r.traidos} archivos traídos` : ""}${omit.length ? ` · ${omit.length} se quedan solo en la carpeta` : ""}.`, {
+      aviso(disco.esEquipo ? `«${handle.name}» abierta desde tu equipo${omit.length ? ` · ${omit.length} archivos muy grandes se ven solo en la terminal` : ""}.` : `Carpeta «${handle.name}» vinculada${r.traidos ? ` · ${r.traidos} archivos traídos` : ""}${omit.length ? ` · ${omit.length} se quedan solo en la carpeta` : ""}.`, {
         ms: 9000, accion: omit.length ? { texto: "Ver cuáles", fn: () => this.#detalles({ omitidos: omit, renombrados: [] }) } : undefined,
       });
       this.#pintarCarpeta("ok");
+      return true;
     } catch (e) {
       quitar();
       this.#fallo(e);
+      return false;
     }
   }
 
   /** Al cargar la página: si había una carpeta vinculada, se retoma (o se pide reconectarla). */
   async iniciar() {
-    if (!soporteCarpeta().disponible) return;
     const guardado = await recuerdo.leer(this.clave);
+    if (guardado?.equipo && this.conector) { await this.#retomarEquipo(guardado); return; }
+    if (!soporteCarpeta().disponible) return;
     if (!guardado?.handle) return;
     const disco = new DiscoNavegador(guardado.handle);
     let permiso = "prompt";
@@ -402,6 +453,43 @@ export class Entradas {
       this.#pintarCarpeta("permiso");
       aviso(`Para seguir sincronizando la carpeta «${disco.nombre}», el navegador necesita tu permiso otra vez.`, { ms: 15000, accion: { texto: "Reconectar", fn: () => this.reconectar() } });
     }
+  }
+
+  /** Al volver a Trabajo: la carpeta del equipo sigue abierta si su Conector está encendido (si no, se espera a que vuelva). */
+  async #retomarEquipo(g) {
+    // Al volver a Trabajo se empieza de cero con la carpeta del equipo (manda la carpeta: nunca se toca la nube)
+    this.disco = this.#discoEquipo(g.equipo, g.carpeta);
+    const lista = await this.conector.listarEquipos();
+    const eq = lista.find((e) => e.id === g.equipo.id);
+    if (!eq) { this.disco = null; await recuerdo.borrar(this.clave); return; } // lo desconectaste
+    if (eq.en_linea && await this.#raizEquipo(eq, g.carpeta) && await this.alAntesEquipo({ equipo: eq, carpeta: g.carpeta, silencioso: true })) {
+      if (await this.#empezar(this.disco)) { this.alEquipo({ ...eq, carpeta: g.carpeta }); return; }
+      this.alEquipo(null, "cerrar");
+    }
+    void this.#soltarEquipo();
+  }
+
+  /** Pide al Conector que use esta carpeta (si se cerró, al abrirlo vuelve a la última). */
+  async #raizEquipo(eq, carpeta) {
+    if ((eq.carpeta || "") === carpeta) return true;
+    try { await this.conector.fsEquipo(eq, "raiz", { ruta: carpeta }); return true; }
+    catch (e) { aviso(`No se pudo abrir «${this.disco?.nombre}» en ${eq.equipo}: ${e.message}`, { tipo: "error", ms: 12000 }); return false; }
+  }
+
+  /** El equipo está apagado o sin el Conector: se avisa y, en cuanto vuelve, se sigue solo. */
+  /** El equipo se desconectó (o no está conectado): se suelta todo lo del equipo y Trabajo vuelve al proyecto guardado
+   *  en CódigoCamp. Para seguir en el equipo, se abre su carpeta otra vez cuando el Conector esté abierto. */
+  async #soltarEquipo() {
+    this.#detener();
+    clearInterval(this.vigilaEquipo);
+    this.vigilaEquipo = null;
+    const nombre = this.disco?.equipo?.equipo;
+    this.sinc?.desvincular?.();
+    this.sinc = null;
+    this.disco = null;
+    await recuerdo.borrar(this.clave).catch?.(() => {});
+    this.#pintarCarpeta("ninguna");
+    this.alEquipo(null, "desconectado", nombre);
   }
 
   async #conectar(disco, base, cache = null) {
@@ -423,7 +511,11 @@ export class Entradas {
 
   #guardarBase(base, cache) {
     clearTimeout(this.guardadoBase);
-    this.guardadoBase = setTimeout(() => { if (this.disco) recuerdo.guardar(this.clave, { handle: this.disco.raiz, base, cache, nombre: this.disco.nombre }); }, 300);
+    this.guardadoBase = setTimeout(() => {
+      if (!this.disco) return;
+      const donde = this.disco.esEquipo ? { equipo: this.disco.equipo, carpeta: this.disco.carpeta } : { handle: this.disco.raiz };
+      recuerdo.guardar(this.clave, { ...donde, base, cache, nombre: this.disco.nombre });
+    }, 300);
   }
 
   #avisoSinc(a) {
@@ -435,6 +527,22 @@ export class Entradas {
 
   async reconectar() {
     if (!this.disco) return;
+    if (this.disco.esEquipo) {
+      const eq = (await this.conector.listarEquipos()).find((e) => e.id === this.disco.equipo.id);
+      if (!eq?.en_linea) {
+        void this.#soltarEquipo();
+        return;
+      }
+      if (!(await this.#raizEquipo(eq, this.disco.carpeta))) return;
+      if (!this.sinc) {   // la página empezó sin el equipo: se entra a trabajar en el equipo desde cero
+        if (!(await this.alAntesEquipo({ equipo: eq, carpeta: this.disco.carpeta, silencioso: true }))) return;
+        if (!(await this.#empezar(this.disco))) { this.alEquipo(null, "cerrar"); return; }
+      } else if (!this.temporizador) await this.#conectar(this.disco, this.sinc.base || {}, Object.fromEntries(this.sinc.cacheDisco));
+      this.#pintarCarpeta("ok");
+      this.alEquipo({ ...eq, carpeta: this.disco.carpeta });
+      await this.sincronizarAhora(false);
+      return;
+    }
     try {
       if ((await this.disco.permiso(true)) !== "granted") { aviso("Sin permiso no se puede sincronizar la carpeta.", { tipo: "error" }); return; }
     } catch (e) { this.#fallo(e); return; }
@@ -458,7 +566,12 @@ export class Entradas {
 
   #fallo(e) {
     this.#detener();
-    const nombre = this.disco?.nombre ?? "la carpeta";
+    if (!this.disco) return;   // ya se soltó la carpeta (llegó tarde el error de otra sincronización)
+    const nombre = this.disco.nombre ?? "la carpeta";
+    if (this.disco.esEquipo && (e?.desconectado || /desconect|no está conectado/i.test(e?.message || ""))) {
+      void this.#soltarEquipo();
+      return;
+    }
     if (e?.name === "NotAllowedError" || e?.name === "SecurityError") {
       this.#pintarCarpeta("permiso");
       aviso(`El navegador retiró el permiso para «${nombre}».`, { tipo: "error", ms: 15000, accion: { texto: "Reconectar", fn: () => this.reconectar() } });
@@ -478,24 +591,32 @@ export class Entradas {
   }
 
   async desvincular() {
-    const ok = await dialogo({
+    const equipo = this.disco?.esEquipo;
+    const ok = await dialogo(equipo ? {
+      titulo: "¿Cerrar la carpeta de tu equipo?",
+      mensaje: "No se borra nada: tus archivos se quedan en tu equipo. Trabajo vuelve a tu proyecto de la nube, tal como lo dejaste.",
+      botones: [{ texto: "Cerrar y volver a la nube", valor: true }, { texto: "Cancelar", valor: false, cancelar: true }],
+    } : {
       titulo: "¿Dejar de sincronizar la carpeta?",
       mensaje: "No se borra nada: tus archivos se quedan en la carpeta y en tu proyecto. Solo dejarán de copiarse los cambios.",
       botones: [{ texto: "Dejar de sincronizar", valor: true }, { texto: "Cancelar", valor: false, cancelar: true }],
     });
     if (!ok) return;
     this.#detener();
+    clearInterval(this.vigilaEquipo);
+    const eraEquipo = this.disco?.esEquipo;
     this.sinc?.desvincular();
     this.sinc = null;
     this.disco = null;
     await recuerdo.borrar(this.clave);
     this.#pintarCarpeta("ninguna");
+    if (eraEquipo) this.alEquipo(null, "cerrar");
   }
 
   /** La página avisa de cada cambio del proyecto: se sincroniza poco después. */
   alCambiarProyecto(info = {}) {
     if (info.origen === "carpeta" || info.origen === "ui") return;
-    this.#programar(700);
+    this.#programar(this.disco?.esEquipo ? 250 : 700);   // con tu equipo (Conector) el viaje es corto: se copia casi al instante
   }
 
   #programar(ms) {
@@ -510,10 +631,14 @@ export class Entradas {
     const b = this.botonCarpeta;
     b.hidden = estado === "ninguna";
     const nombre = this.disco?.nombre ?? "";
-    b.textContent = estado === "permiso" ? `Carpeta · ${nombre} · reconectar` : `Carpeta · ${nombre}`;
+    const eq = this.disco?.esEquipo ? this.disco.equipo.equipo : null;
+    b.textContent = eq ? (estado === "permiso" ? `🖥 ${eq} · ${nombre} · desconectado` : `🖥 ${eq} · ${nombre}`)
+      : estado === "permiso" ? `Carpeta · ${nombre} · reconectar` : `Carpeta · ${nombre}`;
     b.className = `estado-item ${estado === "ok" || estado === "sincronizando" ? "carpeta-ok" : estado === "permiso" ? "carpeta-aviso" : "carpeta-error"}`;
     const hora = this.sinc?.ultima ? ` Última sincronización: ${this.sinc.ultima.toLocaleTimeString("es")}.` : "";
-    b.title = estado === "permiso" ? "Clic para dar permiso otra vez y seguir sincronizando."
+    b.title = eq && estado === "permiso" ? `«${eq}» no está conectado. Abre el Conector en ese equipo y sigue solo.`
+      : eq && estado !== "error" ? `Carpeta «${this.disco.carpeta}» de ${eq}: lo que guardas aquí se guarda allá y lo que cambias allá (terminal, git, otro editor) aparece aquí.${this.sinc?.ultima ? ` Última vez: ${this.sinc.ultima.toLocaleTimeString("es")}.` : ""}`
+      : estado === "permiso" ? "Clic para dar permiso otra vez y seguir sincronizando."
       : estado === "error" ? "La sincronización se detuvo. Clic para ver opciones."
         : `Sincronizado con la carpeta «${nombre}» de tu computador.${hora} Clic para opciones.`;
   }

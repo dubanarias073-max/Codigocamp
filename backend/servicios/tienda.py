@@ -17,14 +17,17 @@ def asegurar_articulos():
         i.moneda, i.categoria, i.precio = "diamante", "diamante", BASICOS_DIAMANTE[i.clave]
     # Los precios siguen siempre a constantes.py / cosmeticos.py (si cambian, se actualizan en la base).
     precios = {a["clave"]: a["precio"] for a in ARTICULOS_DIAMANTE} | {c["clave"]: c["precio"] for c in COSMETICOS_TIENDA}
-    datos = {a["clave"]: a for a in ARTICULOS_DIAMANTE}
+    datos = {a["clave"]: a for a in ARTICULOS_DIAMANTE} | {c["clave"]: {**c, "icono": c["tipo"]} for c in COSMETICOS_TIENDA}
     for i in StoreItem.query.filter(StoreItem.clave.in_(list(precios))).all():
         if i.precio != precios[i.clave]:
             i.precio = precios[i.clave]
-        if i.clave in datos:   # nombre, descripción e ícono también siguen a constantes.py
+        if i.clave in datos:   # nombre, descripción e ícono también siguen a constantes.py / cosmeticos.py
             for campo in ("nombre", "descripcion", "icono"):
                 if getattr(i, campo) != datos[i.clave][campo]:
                     setattr(i, campo, datos[i.clave][campo])
+    from cosmeticos import RETIRADOS
+    for i in StoreItem.query.filter(StoreItem.clave.in_(list(RETIRADOS)), StoreItem.activo.is_(True)).all():
+        i.activo = False   # se quitó de la tienda
     orden = 10
     for a in ARTICULOS_DIAMANTE:
         orden += 1

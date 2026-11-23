@@ -92,7 +92,7 @@ export function resolverDestino(py, raiz, url, proxy = []) {
   const candidatos = [];
   for (const b of bases) {
     const r = FS.unir(b, rel);
-    if (!rel || rel.endsWith("/")) candidatos.push(FS.unir(r, "index.html"));
+    if (!rel || rel.endsWith("/")) candidatos.push(FS.unir(r.replace(/\/+$/, ""), "index.html"));   // carpeta/ → carpeta/index.html
     else { candidatos.push(r); if (!/\.[a-z0-9]+$/i.test(rel)) candidatos.push(`${r}.html`, FS.unir(r, "index.html")); }
   }
   const archivo = candidatos.find((c) => c && FS.tieneArchivo(py, c));

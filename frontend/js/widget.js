@@ -69,7 +69,7 @@ function pintar() {
   $("hora").textContent = d.actualizado ? `Actualizado ${d.actualizado}` : "";
   const clase = d.practicado_hoy ? "ok" : d.racha ? "peligro" : "";
   const animo = d.animo || (d.practicado_hoy ? "feliz" : d.racha ? "preocupado" : "dormido");
-  const semana = `<div class="wg-semana">${(d.semana || []).map((s, i) => `<span class="${s.hoy ? "hoy" : ""} ${s.estado || ""}">${esc(window.CC_IDIOMA === "en" ? "MTWTFSS"[i] : s.letra)}<i>${s.estado === "hecho" ? "🔥" : esc(s.icono)}</i></span>`).join("")}</div>`;
+  const semana = `<div class="wg-semana">${(d.semana || []).map((s, i) => `<span class="${s.hoy ? "hoy" : ""} ${s.estado || ""}">${esc(s.letra)}<i>${s.estado === "hecho" ? "🔥" : esc(s.icono)}</i></span>`).join("")}</div>`;
   base = Date.now(); segBase = d.segundos_restantes || 0;
   let html;
   if (vista === "hoy") {

@@ -402,3 +402,6 @@ ETAPAS_CONCEPTOS = [
     ("Modelado y rendimiento", "Relaciones, patrones, índices, explain, transacciones y búsqueda vectorial", E7),
     ("Redis y otras bases en producción", "Streams, sesiones, caché, bloqueos, Firestore, Cassandra, Neo4j y respaldos", E8),
 ]
+
+from .nosql_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

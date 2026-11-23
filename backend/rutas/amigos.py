@@ -25,9 +25,11 @@ def amigos():
         item = {"id": friendship.id, "nombre": other.nombre, "alias": other.profile.alias if other.profile else "",
                 "avatar": "", "foto": foto_url(other.id), "marco": equipados_de(other.id)["marco"]}
         if friendship.estado == "aceptada":
-            last = Message.query.filter_by(amistad_id=friendship.id).order_by(Message.id.desc()).first()
+            from rutas.chat import borrado_hasta
+            desde = borrado_hasta(current_user.id, friendship.id)   # lo que borré de mi vista no cuenta
+            last = Message.query.filter(Message.amistad_id == friendship.id, Message.id > desde).order_by(Message.id.desc()).first()
             unread = Message.query.filter(
-                Message.amistad_id == friendship.id, Message.leido.is_(False),
+                Message.amistad_id == friendship.id, Message.id > desde, Message.leido.is_(False),
                 Message.autor_id != current_user.id,
             ).count()
             item.update(no_leidos=unread, ultimo=("🚫 Mensaje eliminado" if last.borrado_en else last.texto[:60]) if last else "", orden=last.id if last else 0)

@@ -1,5 +1,6 @@
 // Lógica de chats.html
 import { avatarSVG } from "/js/avatares.js";
+import { sonar } from "/js/sonidos.js";
 import { iniciar, api, esc, aviso, fotoDe } from "/js/app.js";
 import { CSS_ADJUNTOS, crearAdjuntador, htmlAdjuntos } from "/js/adjuntar.js";
 await iniciar("chats");
@@ -16,7 +17,9 @@ const avatar = (x) => (x.foto || avatarSVG(x.avatar) ? `<span class="c-av c-av-f
 
 /* ===== Lista de amigos y solicitudes ===== */
 async function cargarLista() {
+  const antes = datos?.recibidas?.length ?? null;
   datos = await api("/api/amigos/");
+  if (antes !== null && datos.recibidas.length > antes) sonar("notificacion");   // llegó una solicitud de amistad
   if (activo && !datos.amigos.some((a) => a.id === activo)) cerrar();
   $("miCodigo").textContent = datos.yo.codigo;
   $("miAlias").textContent = "@" + datos.yo.alias;
@@ -146,6 +149,7 @@ async function abrir(id) {
   $("cAlias").textContent = amigo ? `@${amigo.alias}` : "";
   $("cAv").outerHTML = amigo ? avatar(amigo).replace('class="c-av', 'id="cAv" class="c-av') : '<span class="c-av" id="cAv"></span>';
   $("cg").classList.add("en-chat");
+  listaChats(false);
   document.body.classList.add("en-chat");
   if (!new URLSearchParams(location.search).has("con")) history.pushState({ chat: id }, "", `?con=${id}`);
   try {
@@ -186,7 +190,7 @@ async function abrirPerfil() {
   try { p = await api(`/api/amigos/${activo}/perfil/`); }
   catch (x) { c.innerHTML = `<p class="nota">${esc(x.message)}</p>`; return; }
   const max = Math.max(1, ...p.semana.map((d) => d.xp));
-  const dias = ["D", "L", "M", "X", "J", "V", "S"];
+  const dias = ["D", "L", "M", "M", "J", "V", "S"];
   const foto = fotoDe({ foto: p.foto, avatar: p.avatar, nombre: p.nombre, cosmeticos: { marco: p.equipados.marco?.clave } }, { tam: 84 });
   const barra = (v, t, color) => `<span class="pf-barra"><i style="width:${t ? Math.min(100, Math.round(v * 100 / t)) : 0}%;${color ? `background:${esc(color)}` : ""}"></i></span>`;
   c.innerHTML = `
@@ -301,7 +305,7 @@ $("contactos").onclick = async () => {
         : `<button class="c-btn pri" type="button" data-agregar-ct="${esc(x.alias)}">${x.relacion === "recibida" ? "Aceptar solicitud" : "Agregar amigo"}</button>`}</li>`;
     const invitar = (c, i) => { const e = m.enlacesInvitacion(c, enlace);
       return `<li class="ct-fila"><span class="c-av">${esc((c.nombre || "?").charAt(0).toUpperCase())}</span><span class="ct-txt"><b>${esc(c.nombre || (c.tel || c.email || [])[0] || "")}</b><small>${esc((c.tel || [])[0] || (c.email || [])[0] || "")}</small></span>
-        <span class="ct-inv">${e.whatsapp ? `<a class="c-btn" href="${e.whatsapp}" target="_blank" rel="noopener" title="Invitar por WhatsApp">WhatsApp</a>` : ""}${e.sms ? `<a class="c-btn" href="${e.sms}" title="Invitar por mensaje">SMS</a>` : ""}${e.correo ? `<a class="c-btn" href="${e.correo}" title="Invitar por correo">Correo</a>` : ""}</span></li>`; };
+        <span class="ct-inv">${e.whatsapp ? `<a class="c-btn" href="${e.whatsapp}" ${window.CodigoCampApp ? "" : 'target="_blank" rel="noopener"'} title="Invitar por WhatsApp">WhatsApp</a>` : ""}${e.sms ? `<a class="c-btn" href="${e.sms}" title="Invitar por mensaje">SMS</a>` : ""}${e.correo ? `<a class="c-btn" href="${e.correo}" title="Invitar por correo">Correo</a>` : ""}</span></li>`; };
     cuerpo.innerHTML = (encontrados.length ? `<h3>Ya está en CódigoCamp (${encontrados.length})</h3><ul class="ct-lista">${encontrados.map(fila).join("")}</ul>`
       : `<p class="nota">Ninguno de esos contactos está en CódigoCamp todavía. ¡Invítalos!</p>`)
       + (otros.length ? `<h3>Invitar (${otros.length})</h3><ul class="ct-lista">${otros.slice(0, 300).map(invitar).join("")}</ul>` : "");
@@ -318,6 +322,20 @@ $("dlgContactos").onclick = async (e) => {
   if (b) { b.disabled = true; await agregar(b.dataset.agregarCt); b.replaceWith(Object.assign(document.createElement("span"), { className: "ct-ok", textContent: "✓ Listo" })); }
 };
 $("volver").onclick = () => { if (history.state?.chat) history.back(); else cerrar(); };
+// Eliminar chat: desaparece solo de tu vista; tu amigo conserva toda la conversación.
+$("borrarChat").onclick = async () => {
+  menu(false);
+  if (!activo) return;
+  const amigo = datos.amigos.find((a) => a.id === activo);
+  if (!confirm(`¿Eliminar el chat con ${amigo?.nombre ?? "este amigo"}?\n\nSe borra solo para ti: ${amigo?.nombre ?? "tu amigo"} seguirá viendo la conversación. Si te vuelve a escribir, verás los mensajes nuevos.`)) return;
+  try {
+    await api(`/api/chat/${activo}/`, undefined, "DELETE");
+    $("log").innerHTML = '<p class="nota c-saludo">Eliminaste este chat de tu vista. Los mensajes nuevos aparecerán aquí.</p>';
+    ultimo = 0; ultimoDia = ""; ultimoAutor = null;
+    aviso("Chat eliminado solo para ti");
+    cargarLista().catch(() => {});
+  } catch (x) { aviso(x.message, true); }
+};
 $("quitar").onclick = async () => {
   menu(false);
   if (!activo || !confirm("¿Quitar a este amigo? Se borrará la conversación.")) return;
@@ -346,6 +364,7 @@ $("fMsg").onsubmit = async (e) => {
     $("log").querySelector(".c-saludo")?.remove();
     mostrarEmojis(false);
     pintar(r.mensajes, { forzar: true });
+    sonar("enviar");
   } catch (x) { aviso(x.message, true); }
   actualizarEnviar();
   if (!TACTIL) $("texto").focus();
@@ -358,5 +377,21 @@ await cargarLista();
 const invitado = new URLSearchParams(location.search).get("agregar");
 if (invitado) { history.replaceState(null, "", location.pathname); if (invitado.toUpperCase() !== datos.yo.codigo) await agregar(invitado); }
 { const con = Number(new URLSearchParams(location.search).get("con")); if (con && datos.amigos.some((a) => a.id === con)) abrir(con); else if (con) history.replaceState(null, "", location.pathname); }
-setInterval(async () => { if (!document.hidden && activo) { try { const r = await api(`/api/chat/${activo}/?despues=${ultimo}`); if (r.mensajes.length) $("log").querySelector(".c-saludo")?.remove(); pintar(r.mensajes); aplicarBorrados(r.borrados); } catch {} } }, 4000);
+setInterval(async () => { if (!document.hidden && activo) { try { const r = await api(`/api/chat/${activo}/?despues=${ultimo}`); if (r.mensajes.length) $("log").querySelector(".c-saludo")?.remove(); if (r.mensajes.some((m) => !m.yo)) sonar("recibir"); pintar(r.mensajes); aplicarBorrados(r.borrados); } catch {} } }, 4000);
 setInterval(() => { if (!document.hidden) cargarLista().catch(() => {}); }, 15000);
+
+// PC: la lista de chats es un menú hamburguesa (en el celular la lista es la pantalla principal)
+function listaChats(abrir) {
+  const pc = matchMedia("(min-width: 761px)").matches;
+  const si = pc && abrir;
+  $("cg").classList.toggle("lista-abierta", si);
+  $("cVelo").hidden = !si;
+  $("verAmigos").setAttribute("aria-expanded", String(si));
+  if (si) setTimeout(() => $("quien")?.focus({ preventScroll: true }), 230);
+}
+$("verAmigos").onclick = () => listaChats(!$("cg").classList.contains("lista-abierta"));
+$("verAmigos2").onclick = () => listaChats(true);
+$("cerrarAmigos").onclick = () => listaChats(false);
+$("cVelo").onclick = () => listaChats(false);
+addEventListener("keydown", (e) => { if (e.key === "Escape") listaChats(false); });
+if (!new URLSearchParams(location.search).has("con")) listaChats(true);

@@ -233,3 +233,6 @@ ETAPAS_CONCEPTOS = [
     ("Git por dentro", "Objetos, HEAD, merges, conflictos, parches y repositorios grandes", E7),
     ("Git profesional", "Firmas, hooks del equipo, changelog, hotfix, secretos y buenas prácticas", E8),
 ]
+
+from .git_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

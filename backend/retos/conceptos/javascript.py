@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Arrays y objetos", "Maneja listas y datos estructurados", js_e4.LISTA),
     ("DOM, eventos y asincronía", "Haz páginas interactivas que hablan con servidores", js_e5.LISTA),
 ]
+
+from .javascript_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

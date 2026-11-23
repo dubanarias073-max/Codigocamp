@@ -1,7 +1,9 @@
 // Lógica de tienda.html: cosméticos (fondos, punteros, temas, marcos, efectos) con vista previa en vivo, potenciadores y tu colección.
 import { iniciar, api, esc, aviso, actualizarStats, aplicarCosmeticos } from "/js/app.js";
+import { sonar } from "/js/sonidos.js";
 import { iconoSVG } from "/js/iconos.js";
 import { vistaPrevia } from "/js/cosmeticos.js";
+import { escenaArticulo } from "/js/escenas-tienda.js";
 const { user } = await iniciar("tienda");
 const $ = (id) => document.getElementById(id);
 const RAREZA = { comun: "Común", raro: "Raro", epico: "Épico", legendario: "Legendario" };
@@ -38,7 +40,7 @@ function tarjeta(i) {
   const cos = COSMETICO.has(i.tipo);
   return `<div class="tarjeta producto rareza-${esc(i.rareza)}${i.tuyo ? " tuyo" : ""}${cos ? " cosmetico" : ""}" data-clave="${esc(i.clave)}" data-tipo="${esc(i.tipo)}">
     <span class="producto-rango">${esc(RAREZA[i.rareza] || "Común")}</span>
-    ${cos ? `<div class="vista vista-${i.tipo}" data-prev="${esc(i.clave)}"></div>` : `<span class="ic ic-${esc(i.rareza)}">${iconoSVG(i.clave, "producto-icon")}</span>`}
+    ${cos ? `<div class="vista vista-${i.tipo}" data-prev="${esc(i.clave)}"></div>` : (escenaArticulo(i.clave, "potenciador") ? `<div class="vista vista-potenciador cc-prev-escena">${escenaArticulo(i.clave, "potenciador")}</div>` : `<span class="ic ic-${esc(i.rareza)}">${iconoSVG(i.clave, "producto-icon")}</span>`)}
     <h3>${esc(i.nombre)}</h3><small>${esc(i.descripcion)}</small>
     ${cos && !["cursor", "efecto", "dedo"].includes(i.tipo) ? `<button type="button" class="probar" data-probar="${esc(i.clave)}" data-tipo="${i.tipo}">${probando?.clave === i.clave ? "Dejar de probar" : "Probar"}</button>` : ""}
     ${boton(i)}</div>`;
@@ -105,6 +107,7 @@ async function equipar(clave, tipo, poner) {
     equipados = r.equipados;
     probando = null;
     aplicarCosmeticos(equipados);
+    sonar(poner ? "equipar" : "clic");
     aviso(poner ? "¡Listo! Ya lo tienes puesto en todo CódigoCamp." : "Quitado.");
     pintar();
   } catch (x) { aviso(x.message, true); }

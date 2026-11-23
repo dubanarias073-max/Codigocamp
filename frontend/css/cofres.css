@@ -1,7 +1,16 @@
 /* Cofres: dibujo, ventana de apertura (temblor, rayos, premios) y confeti. Se usa en Recompensas, retos y Aprende. */
 .cofre-svg{width:100%;height:100%;overflow:visible}
-.cofre-tapa{transform-origin:16px 52px;transition:transform .5s cubic-bezier(.3,1.6,.5,1)}
-.cofre-svg.abierto .cofre-tapa{transform:rotate(-28deg) translate(-6px,-10px)}
+.cofre-tapa{transform-box:view-box;transform-origin:14px 57px;transition:transform .55s cubic-bezier(.3,1.6,.5,1)}
+.cofre-svg.abierto .cofre-tapa{transform:rotate(-32deg) translate(-4px,-8px)}
+.cofre-luz{opacity:0;transition:opacity .4s ease .15s}
+.cofre-svg.abierto .cofre-luz{opacity:1}
+.cofre-monedas{transform-box:view-box;transform-origin:60px 56px;transform:translateY(10px) scale(.6);transition:transform .6s cubic-bezier(.3,1.7,.5,1) .2s}
+.cofre-svg.abierto .cofre-monedas{transform:translateY(-6px) scale(1)}
+.cofre-chispas{animation:cofre-chispa 1.6s ease-in-out infinite}
+@keyframes cofre-chispa{50%{opacity:.25}}
+.cofre-legendario{filter:drop-shadow(0 0 10px rgba(192,132,252,.55))}
+.cofre-diamante{filter:drop-shadow(0 0 8px rgba(103,232,249,.5))}
+@media (prefers-reduced-motion:reduce){.cofre-chispas{animation:none}}
 @keyframes cofre-salto{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px) rotate(-2deg)}}
 .abrir-fondo{position:fixed;inset:0;z-index:80;display:grid;place-items:center;background:rgba(2,6,23,.78);backdrop-filter:blur(4px)}
 .abrir-caja{width:min(520px,94vw);padding:26px 22px;border-radius:24px;background:var(--panel);border:1px solid var(--borde);text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.5)}
@@ -41,3 +50,4 @@
 .premio-xp{display:grid;place-items:center;border-radius:50%;background:#fbbf24;color:#3b2500;font-weight:900;font-size:12px}
 .cofre-mini{width:58px;height:52px;flex:none}
 .vista-dedo{background:var(--panel2);touch-action:none;user-select:none}
+

@@ -36,7 +36,7 @@ MARGEN_LIMPIEZA = timedelta(hours=1)
 VIGENCIA_ENLACE = 6 * 3600
 RESERVA_DISCO = 1024 ** 3  # se deja siempre 1 GB libre en el disco del servidor
 _HASH = re.compile(r"^[a-f0-9]{64}$")
-MARCADOR = re.compile(r"^cc(?:img|bin):v1:([a-f0-9]{64}):[a-z]+/[a-z0-9.+-]{1,60}:\d{1,13}$")
+MARCADOR = re.compile(r"^cc(?:img|bin):v1:([a-f0-9]{64}):[a-z]+/[a-z0-9.+-]{1,90}:\d{1,13}$")
 
 _POR_EXTENSION = {
     "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "webp": "image/webp", "avif": "image/avif",
@@ -44,6 +44,17 @@ _POR_EXTENSION = {
     "ogv": "video/ogg", "mp3": "audio/mpeg", "m4a": "audio/mp4", "wav": "audio/wav", "ogg": "audio/ogg", "oga": "audio/ogg",
     "pdf": "application/pdf", "ttf": "font/ttf", "otf": "font/otf", "woff": "font/woff", "woff2": "font/woff2",
     "zip": "application/zip", "txt": "text/plain", "csv": "text/csv", "json": "application/json",
+    # Documentos de Office y OpenDocument: Trabajo los muestra sin descargarlos (visor de documentos)
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "doc": "application/msword",
+    "xls": "application/vnd.ms-excel",
+    "ppt": "application/vnd.ms-powerpoint",
+    "odt": "application/vnd.oasis.opendocument.text",
+    "ods": "application/vnd.oasis.opendocument.spreadsheet",
+    "odp": "application/vnd.oasis.opendocument.presentation",
+    "rtf": "application/rtf",
 }
 EN_NAVEGADOR = {
     "image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp", "image/x-icon",
@@ -214,6 +225,16 @@ def subir():
     if total == 0:
         temporal.unlink(missing_ok=True)
         return api_error("El archivo está vacío.")
+
+    # Antivirus: programas ejecutables, virus conocidos, macros, bombas zip… se borran al instante (servicios/antivirus.py)
+    from servicios.antivirus import revisar_archivo
+    try:
+        peligro = revisar_archivo(str(temporal), request.args.get("nombre", "")[:200])
+    except OSError:
+        peligro = None
+    if peligro:
+        temporal.unlink(missing_ok=True)
+        return api_error(f"🛡️ Bloqueamos este archivo: {peligro}. CódigoCamp no guarda archivos que puedan dañar tu equipo o el de otros.", 422)
 
     hexa = huella.hexdigest()
     tipo = tipo_de(cabeza, request.args.get("nombre", "")[:200])

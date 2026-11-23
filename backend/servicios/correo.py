@@ -57,18 +57,63 @@ def _config(app):
     }
 
 
-def plantilla(titulo, parrafos, boton=None, pie="", mascota=None):
-    """HTML sencillo y compatible con los clientes de correo (tablas y estilos en línea)."""
-    cuerpo = "".join(f'<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#2b3338">{p}</p>' for p in parrafos)
+def _url_sitio():
+    try:
+        return _config(current_app._get_current_object())["url"].rstrip("/")
+    except Exception:   # sin aplicación (pruebas sueltas)
+        return ""
+
+
+FRASES_CODI = {
+    "saludo": "¡Hola! Soy Codi, tu compañero de código 👋", "feliz": "¡Todo en orden por aquí!", "celebra": "¡Lo lograste! 🎉",
+    "fuego": "¡Estás en llamas! 🔥", "pensando": "Mmm… déjame revisar esto", "preocupado": "Tu racha te está esperando…",
+    "alarma": "¡Corre, tu racha está en peligro!", "triste": "Te extrañé… ¿volvemos?", "dormido": "Zzz… despiértame con una lección",
+}
+
+
+def plantilla(titulo, parrafos, boton=None, pie="", mascota=None, animo="feliz", etiqueta=None, frase=None):
+    """Correo con el diseño de CódigoCamp: cabecera oscura con el logo, Codi ANIMADO (GIF: se mueve en Gmail, Outlook y
+    el celular) con su globo de diálogo, una «ventana de código» con el mensaje y botón en degradado.
+    HTML con tablas y estilos en línea para que se vea bien en todos los clientes de correo."""
+    url = _url_sitio()
+    if mascota is None and url:
+        mascota = f"{url}/img/codi/anim/{animo}.gif"   # GIF animado (frontend/img/codi/anim/); el PNG queda de respaldo
+    frase = frase if frase is not None else FRASES_CODI.get(animo, "")
+    cuerpo = "".join(f'<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#d6def5">{p}</p>' for p in parrafos)
     if boton:
-        cuerpo += (f'<p style="margin:22px 0"><a href="{html.escape(boton[1])}" style="background:{COLOR};color:#fff;text-decoration:none;'
-                   f'padding:12px 22px;border-radius:10px;font-weight:700;display:inline-block">{html.escape(boton[0])}</a></p>')
-    return f"""<!doctype html><html lang="es"><body style="margin:0;background:#f4f2eb;font-family:Segoe UI,Arial,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f2eb;padding:28px 12px"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fffefa;border:1px solid #d9d5c9;border-radius:16px">
-<tr><td style="padding:22px 28px;border-bottom:1px solid #ece9df;font-weight:800;font-size:18px;color:{COLOR}">&lt;/&gt; codigocamp</td></tr>
-<tr><td style="padding:26px 28px">{f'<img src="{html.escape(mascota)}" width="96" height="96" alt="Codi" style="display:block;margin:0 0 10px;width:96px;height:96px">' if mascota else ""}<h1 style="margin:0 0 16px;font-size:21px;color:#1f262c">{html.escape(titulo)}</h1>{cuerpo}</td></tr>
-<tr><td style="padding:16px 28px;border-top:1px solid #ece9df;font-size:12px;color:#737a7e">{pie or "Recibes este correo por tu cuenta de CódigoCamp. Puedes elegir qué correos recibir en Configuración → Correos."}</td></tr>
+        cuerpo += (f'<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 6px"><tr><td style="border-radius:12px;'
+                   f'background:#a3e635;background-image:linear-gradient(135deg,#22d3ee,#a3e635)">'
+                   f'<a href="{html.escape(boton[1])}" style="display:inline-block;padding:14px 26px;font-weight:800;font-size:15px;'
+                   f'color:#06100f;text-decoration:none;border-radius:12px">{html.escape(boton[0])} &rarr;</a></td></tr></table>')
+    logo = (f'<img src="{html.escape(url)}/img/logo-icon.png" width="30" height="30" alt="" style="vertical-align:middle;border:0;margin-right:8px">'
+            if url else "")
+    img = (f'<img src="{html.escape(mascota)}" width="150" height="150" alt="Codi, la mascota de CódigoCamp" '
+           f'style="display:block;width:150px;height:150px;margin:0 auto;border:0">' if mascota else "")
+    globo = (f'<td valign="middle" style="padding:0 0 0 4px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#1b2440;'
+             f'border:1px solid #2f3f6b;border-radius:16px 16px 16px 4px;padding:12px 16px;font-size:14px;font-weight:700;line-height:1.4;color:#e2e8f0;'
+             f'max-width:240px">{html.escape(frase)}</td></tr></table></td>') if frase and img else ""
+    codi = (f'<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto"><tr><td valign="bottom">{img}</td>{globo}</tr></table>'
+            if img else "")
+    archivo = html.escape(etiqueta or "mensaje.js")
+    return f"""<!doctype html><html lang="es"><head><meta name="color-scheme" content="dark light"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;background:#070b16;font-family:'Segoe UI',Roboto,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#070b16;background-image:radial-gradient(circle at 50% 0,#1e1b4b,#070b16 60%);padding:26px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px">
+<tr><td style="padding:4px 6px 18px;font-family:Consolas,'Courier New',monospace;font-weight:800;font-size:20px;color:#5ef2ff">{logo}codigocamp</td></tr>
+<tr><td align="center" style="padding:0 0 4px">{codi}</td></tr>
+<tr><td style="background:#0e1426;border:1px solid #243154;border-radius:18px;overflow:hidden">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  <tr><td style="padding:11px 16px;background:#0a0f1e;border-bottom:1px solid #243154;font-family:Consolas,monospace;font-size:12px;color:#8ea0c9">
+    <span style="color:#ff5f57">&#9679;</span> <span style="color:#febc2e">&#9679;</span> <span style="color:#28c840">&#9679;</span>
+    &nbsp;&nbsp;<span style="background:#1b2440;color:#a3e635;padding:3px 9px;border-radius:6px">{archivo}</span></td></tr>
+  <tr><td style="padding:26px 28px 24px">
+    <p style="margin:0 0 6px;font-family:Consolas,monospace;font-size:13px;color:#64748b">// CódigoCamp</p>
+    <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#ffffff">{html.escape(titulo)}</h1>
+    {cuerpo}
+  </td></tr>
+  </table></td></tr>
+<tr><td style="padding:18px 8px;font-size:12px;line-height:1.5;color:#7c89ad;text-align:center">{pie or "Recibes este correo por tu cuenta de CódigoCamp. Puedes elegir qué correos recibir en Configuración → Correos."}<br>
+  <span style="font-family:Consolas,monospace;color:#3b4a74">&lt;/&gt; Aprende a programar en español</span></td></tr>
 </table></td></tr></table></body></html>"""
 
 
@@ -203,7 +248,7 @@ def bienvenida(usuario, agente, ip, metodo="contraseña"):
          "Practica unos minutos cada día para mantener tu 🔥 racha: te avisaremos por correo si estás a punto de perderla.",
          f"{nombre}, <b>si no fuiste tú</b> quien creó esta cuenta, escríbenos o cambia la contraseña desde Configuración → Seguridad."],
         ("Empezar a aprender", f"{cfg['url']}/pages/inicio.html"),
-        mascota=f"{cfg['url']}/img/codi/saludo.png",
+        animo="saludo", etiqueta="bienvenida.js", frase=f"¡Hola {usuario.nombre.split(' ')[0]}! Soy Codi y voy a aprender contigo 👋",
     ))
     return True
 
@@ -239,6 +284,7 @@ def registrar_inicio(usuario, agente, ip, *, metodo="contraseña", nuevo_usuario
          "Si fuiste tú, no tienes que hacer nada.",
          "<b>Si no fuiste tú</b>, cambia tu contraseña ahora: así se cierra el acceso de quien la tenga."],
         ("Cambiar mi contraseña", f"{cfg['url']}/pages/configuracion.html#seguridad"),
+        animo="pensando", etiqueta="seguridad.log", frase="Vi un inicio de sesión nuevo… ¿fuiste tú? 🔍"
     ))
     return True
 
@@ -255,6 +301,7 @@ def enlace_restablecer(usuario, enlace, agente, ip, minutos):
          "Si no fuiste tú, ignora este correo: tu contraseña no cambia y nadie puede entrar sin este enlace."],
         ("Crear nueva contraseña", enlace),
         pie="Por seguridad, nunca te pediremos tu contraseña por correo.",
+        animo="pensando", etiqueta="contraseña.py", frase="¿Olvidaste tu contraseña? Tranqui, te ayudo 🔑"
     ))
     return True
 
@@ -270,6 +317,7 @@ def avisar_cambio_clave(usuario, agente, ip):
          "Si fuiste tú, todo está bien.",
          "<b>Si no fuiste tú</b>, entra con Google o escríbenos de inmediato: alguien más podría tener acceso a tu correo."],
         ("Revisar mi cuenta", f"{cfg['url']}/pages/configuracion.html#seguridad"),
+        animo="celebra", etiqueta="seguridad.log", frase="¡Contraseña nueva lista! Tu cuenta está protegida 🛡️"
     ))
     return True
 
@@ -318,7 +366,8 @@ def recordar_rachas(hoy=None, nivel=None):
                         f"Te bastan {perfil.meta_minutos} minutos: una lección o un reto y tu racha sigue viva.", salvar]
         enviar(usuario.email, asunto, plantilla(titulo, parrafos, ("Salvar mi racha", f"{cfg['url']}/pages/inicio.html"),
                                                 pie="Puedes desactivar estos avisos en Configuración → Correos.",
-                                                mascota=f"{cfg['url']}/img/codi/{'alarma' if nivel_u >= 2 else 'preocupado'}.png"))
+                                                animo="alarma" if nivel_u >= 2 else "preocupado", etiqueta="racha.js",
+                                                frase=(f"¡Auxilio! Tu llama de {dias} se apaga hoy 🔥" if nivel_u >= 2 else f"¿Practicamos? Llevamos {dias} juntos 🔥")))
         enviados += 1
     db.session.commit()
     return enviados

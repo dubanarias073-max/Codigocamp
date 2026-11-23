@@ -36,14 +36,60 @@ export function leerContactos() {
   return Promise.reject(new Error("Tu navegador no permite elegir contactos. Copia tu enlace de invitación y compártelo."));
 }
 
+const sinTildes = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const digitos = (t) => String(t || "").replace(/\D/g, "");
+
+/** El teléfono guarda a la misma persona varias veces (cuenta de Google, SIM, WhatsApp…): se juntan en una sola,
+ *  por mismo número (últimos 10 dígitos), mismo correo o mismo nombre. */
+export function unirContactos(lista) {
+  const grupos = [];
+  const indice = new Map();   // clave → grupo
+  for (const c of lista || []) {
+    const tels = [...new Set((c.tel || []).map(digitos).filter((t) => t.length >= 7))];
+    const correos = [...new Set((c.email || []).map((e) => String(e).trim().toLowerCase()).filter((e) => e.includes("@")))];
+    const nombre = String(c.nombre || "").trim();
+    const claves = [...tels.map((t) => "t:" + t.slice(-10)), ...correos.map((e) => "e:" + e), ...(nombre ? ["n:" + sinTildes(nombre)] : [])];
+    let g = claves.map((k) => indice.get(k)).find(Boolean);
+    if (!g) { g = { nombre, tel: [], email: [], _t: new Set(), _e: new Set() }; grupos.push(g); }
+    if (!g.nombre && nombre) g.nombre = nombre;
+    for (const t of c.tel || []) { const k = digitos(t).slice(-10); if (k.length >= 7 && !g._t.has(k)) { g._t.add(k); g.tel.push(String(t).trim()); } }
+    for (const e of correos) if (!g._e.has(e)) { g._e.add(e); g.email.push(e); }
+    for (const k of claves) indice.set(k, g);
+  }
+  return grupos.filter((g) => g.nombre || g.tel.length || g.email.length).map(({ _t, _e, ...g }) => g)
+    .sort((a, b) => sinTildes(a.nombre).localeCompare(sinTildes(b.nombre)));
+}
+
+/** Código de país según el idioma/región del teléfono (para números guardados sin +). */
+const PAISES = { CO: "57", MX: "52", AR: "54", CL: "56", PE: "51", EC: "593", VE: "58", ES: "34", US: "1", BO: "591", PY: "595", UY: "598",
+  GT: "502", CR: "506", PA: "507", DO: "1", HN: "504", SV: "503", NI: "505", CU: "53", PR: "1", BR: "55" };
+function codigoPais() {
+  for (const l of [...(navigator.languages || []), navigator.language]) {
+    const r = /-([A-Z]{2})$/i.exec(l || ""); if (r && PAISES[r[1].toUpperCase()]) return PAISES[r[1].toUpperCase()];
+  }
+  return "57";
+}
+/** Número en formato internacional sin + (lo que pide WhatsApp): "300 123 4567" → "573001234567". */
+export function telInternacional(tel, pais = codigoPais()) {
+  const crudo = String(tel || "").trim();
+  let d = digitos(crudo);
+  if (!d) return "";
+  if (crudo.startsWith("+")) return d;
+  if (d.startsWith("00")) return d.slice(2);
+  d = d.replace(/^0+/, "");
+  return d.startsWith(pais) && d.length > 10 ? d : pais + d;
+}
+
 /** Busca en el servidor cuáles contactos tienen cuenta. Devuelve { encontrados: [...], otros: [...] }. */
 export async function cruzarContactos(contactos, api) {
+  contactos = unirContactos(contactos);
   const porHuella = new Map();
   for (const c of contactos) for (const e of c.email || []) if (/@/.test(e)) porHuella.set(huellaCorreo(e), c);
   let resultados = [];
   if (porHuella.size) resultados = (await api("/api/amigos/contactos/", { hashes: [...porHuella.keys()].slice(0, 1000) })).resultados || [];
   const conCuenta = new Set(resultados.map((r) => porHuella.get(r.hash)));
-  const encontrados = resultados.map((r) => ({ ...r, contacto: porHuella.get(r.hash)?.nombre || "" }));
+  const vistos = new Set();   // la misma cuenta puede salir por varios correos del contacto
+  const encontrados = resultados.filter((r) => !vistos.has(r.alias) && vistos.add(r.alias)).map((r) => ({ ...r, contacto: porHuella.get(r.hash)?.nombre || "" }));
   const otros = contactos.filter((c) => !conCuenta.has(c) && ((c.tel || []).length || (c.email || []).length));
   return { encontrados, otros };
 }
@@ -51,11 +97,14 @@ export async function cruzarContactos(contactos, api) {
 /** Enlaces para invitar a un contacto: SMS, WhatsApp y correo. */
 export function enlacesInvitacion(contacto, enlace) {
   const texto = `¡Aprende a programar conmigo en CódigoCamp! Agrégame aquí: ${enlace}`;
-  const tel = (contacto.tel || [])[0]?.replace(/[^\d+]/g, "");
+  const tel = (contacto.tel || [])[0];
+  const intl = tel ? telInternacional(tel) : "";
   const correo = (contacto.email || [])[0];
+  // iOS usa «&body=» y Android «?body=»
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent || "");
   return {
-    sms: tel ? `sms:${tel}?body=${encodeURIComponent(texto)}` : null,
-    whatsapp: tel ? `https://wa.me/${tel.replace(/^\+/, "")}?text=${encodeURIComponent(texto)}` : null,
+    sms: intl ? `sms:+${intl}${ios ? "&" : "?"}body=${encodeURIComponent(texto)}` : null,
+    whatsapp: intl ? `https://wa.me/${intl}?text=${encodeURIComponent(texto)}` : null,
     correo: correo ? `mailto:${correo}?subject=${encodeURIComponent("Te invito a CódigoCamp")}&body=${encodeURIComponent(texto)}` : null,
     texto,
   };

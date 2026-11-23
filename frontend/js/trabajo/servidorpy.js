@@ -12,13 +12,11 @@ import { importsDelProyecto, pipDeImport } from "./extensiones.js";
 import { prepararBdPython, usaMongo } from "./bdpython.js";
 import { cerrarMysqlEnPython } from "./pymysql.js";
 
-/** Servidores encendidos: puerto → { url, tipo, pedir(req) } */
-export const servidores = new Map();
-const oyentes = new Set();
-export const alCambiarServidores = (fn) => { oyentes.add(fn); return () => oyentes.delete(fn); };
-const avisar = () => oyentes.forEach((fn) => { try { fn(servidores); } catch { /* nada */ } });
+// Los servidores viven en el registro común de puertos (panel PUERTOS, vista previa, Node, PHP…)
+import { alCambiarServidores, avisar, cambioProyecto, esperarDetencion, servidores } from "./puertos.js";
+export { alCambiarServidores, servidores };
 /** Trabajo lo llama en cada cambio del proyecto: los servidores con recarga se actualizan en la siguiente petición. */
-export function marcarCambio() { for (const s of servidores.values()) s.sucio = true; }
+export function marcarCambio(origen) { cambioProyecto(origen); }
 
 const ESTADOS = { 200: "OK", 201: "Created", 202: "Accepted", 204: "No Content", 301: "Moved Permanently", 302: "Found", 303: "See Other", 304: "Not Modified", 307: "Temporary Redirect", 308: "Permanent Redirect", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 409: "Conflict", 422: "Unprocessable Entity", 429: "Too Many Requests", 500: "Internal Server Error", 502: "Bad Gateway", 503: "Service Unavailable" };
 const aB64 = (bytes) => { let s = ""; const u = new Uint8Array(bytes); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
@@ -260,11 +258,12 @@ export async function ejecutarServidorPy(o) {
       return tarea;
     },
   };
+  registro.comando = o.comando || registro.framework;
   servidores.set(puerto, registro);
   avisar();
   o.abrir?.(url + (fastapi ? "/docs" : "/"));
 
-  await new Promise((listo) => { if (!o.senal) return; if (o.senal.aborted) listo(); else o.senal.addEventListener("abort", listo, { once: true }); });
+  await esperarDetencion(o.senal, puerto);
 
   servidores.delete(puerto);
   avisar();

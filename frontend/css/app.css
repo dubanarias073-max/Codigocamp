@@ -417,3 +417,77 @@ a:hover>.icono-codi,.on>.icono-codi{transform:translateY(-2px) scale(1.08)}
 /* Vista previa de los accesorios de Codi en la tienda */
 .vista.cc-prev-codi{display:grid;place-items:center;background:radial-gradient(circle at 50% 60%,color-mix(in srgb,var(--cy,#22d3ee) 22%,transparent),transparent 70%)}
 .vista.cc-prev-codi svg{overflow:visible}
+
+/* Botón «Instalar app» del menú lateral */
+.nav-instalar{width:100%;background:none;font-family:inherit;text-align:left;cursor:pointer}
+.nav-instalar:not(:hover){color:var(--sub)}
+
+/* ===== Animaciones ordenadas (entrada escalonada, toques y subida de nivel) ===== */
+@keyframes cc-sube{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+body.cc-entrando .der>.tarjeta,body.cc-entrando .centro>.tarjeta,body.cc-entrando .centro>section,body.cc-entrando .nav-i{animation:cc-sube .45s cubic-bezier(.2,.9,.3,1) both}
+body.cc-entrando .der>.tarjeta:nth-child(1),body.cc-entrando .centro>:nth-child(1),body.cc-entrando .nav-i:nth-child(2){animation-delay:.02s}
+body.cc-entrando .der>.tarjeta:nth-child(2),body.cc-entrando .centro>:nth-child(2),body.cc-entrando .nav-i:nth-child(3){animation-delay:.07s}
+body.cc-entrando .der>.tarjeta:nth-child(3),body.cc-entrando .centro>:nth-child(3),body.cc-entrando .nav-i:nth-child(4){animation-delay:.12s}
+body.cc-entrando .der>.tarjeta:nth-child(4),body.cc-entrando .centro>:nth-child(4),body.cc-entrando .nav-i:nth-child(5){animation-delay:.17s}
+body.cc-entrando .der>.tarjeta:nth-child(5),body.cc-entrando .centro>:nth-child(5),body.cc-entrando .nav-i:nth-child(6){animation-delay:.22s}
+body.cc-entrando .der>.tarjeta:nth-child(n+6),body.cc-entrando .centro>:nth-child(n+6),body.cc-entrando .nav-i:nth-child(n+7){animation-delay:.27s}
+.der>.tarjeta{transition:transform .18s ease,box-shadow .18s ease}
+@media (hover:hover){.der>.tarjeta:hover{transform:translateY(-2px);box-shadow:0 10px 26px -14px rgba(0,0,0,.45)}}
+.nav-i{transition:background .18s ease,color .18s ease,transform .12s ease}
+.nav-i:active{transform:scale(.96)}
+.nav-i .ic{transition:transform .2s cubic-bezier(.2,1.6,.4,1)}
+@media (hover:hover){.nav-i:hover .ic{transform:translateY(-2px) rotate(-6deg)}}
+svg.codi{cursor:pointer}
+.cc-subio{position:fixed;inset:0;z-index:9995;display:grid;place-items:center;background:rgba(0,0,0,.45);animation:cc-sube .3s ease both}
+.cc-subio.sale{opacity:0;transition:opacity .45s}
+.cc-subio-caja{display:grid;justify-items:center;gap:6px;padding:22px 30px;border-radius:22px;background:var(--panel,#111827);border:2px solid var(--acc);
+  box-shadow:0 0 0 6px color-mix(in srgb,var(--acc) 25%,transparent),0 30px 60px rgba(0,0,0,.5);animation:cc-pop .5s cubic-bezier(.2,1.6,.4,1) both;text-align:center}
+.cc-subio-caja b{font-size:24px}.cc-subio-caja small{color:var(--sub)}
+@keyframes cc-pop{from{transform:scale(.6)}to{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){body.cc-entrando *{animation:none!important}}
+
+/* ---- Codi, la mascota interactiva (js/mascota.js) ---- */
+.mascota{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;border-radius:50%;outline-offset:4px;display:inline-grid;place-items:center}
+.mascota .cdx-mirada{transition:transform .18s ease-out;transform-box:view-box}
+.mascota.m-salta{animation:mSalta .8s cubic-bezier(.3,1.6,.5,1)}
+.mascota.m-gira{animation:mGira .85s cubic-bezier(.5,0,.3,1)}
+.mascota.m-saluda{animation:mSaluda .8s ease-in-out}
+.mascota.m-inclina{animation:mInclina .9s ease-in-out}
+.mascota.m-temblor{animation:mTemblor .5s ease-in-out 2}
+.mascota.m-baila{animation:mBaila .65s ease-in-out 4}
+.mascota.m-dormido{filter:saturate(.7) brightness(.92)}
+@keyframes mSalta{0%{transform:none}25%{transform:translateY(2px) scale(1.12,.86)}55%{transform:translateY(-18px) scale(.92,1.08)}80%{transform:translateY(0) scale(1.06,.94)}100%{transform:none}}
+@keyframes mGira{0%{transform:none}50%{transform:translateY(-10px) rotate(180deg) scale(.95)}100%{transform:rotate(360deg)}}
+@keyframes mSaluda{0%,100%{transform:none}25%{transform:rotate(-10deg)}50%{transform:rotate(8deg) scale(1.05)}75%{transform:rotate(-5deg)}}
+@keyframes mInclina{0%,100%{transform:none}40%,70%{transform:rotate(-12deg) translateX(-2px)}}
+@keyframes mTemblor{0%,100%{transform:none}20%{transform:translateX(-4px) rotate(-4deg)}40%{transform:translateX(4px) rotate(4deg)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes mBaila{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-10px) rotate(-14deg)}50%{transform:translateY(0) rotate(0) scale(1.08,.92)}75%{transform:translateY(-10px) rotate(14deg)}}
+.m-corazon{position:fixed;z-index:9999;pointer-events:none;font-size:18px;animation:mCorazon 1.9s ease-out both}
+@keyframes mCorazon{0%{opacity:0;transform:translate(0,0) scale(.4)}15%{opacity:1;transform:translate(0,-10px) scale(1.1)}100%{opacity:0;transform:translate(var(--dx),-90px) scale(.8)}}
+.codi-lado-globo.m-globo-nuevo{animation:mGlobo .35s cubic-bezier(.3,1.6,.5,1)}
+@keyframes mGlobo{from{transform:scale(.6) translateY(6px);opacity:0}to{transform:none;opacity:1}}
+.m-menu{position:fixed;z-index:10000;min-width:210px;padding:6px;border-radius:14px;background:var(--panel,#111827);border:1px solid var(--borde,#334155);box-shadow:0 18px 40px rgba(0,0,0,.35);animation:mGlobo .2s ease-out}
+.m-menu button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;border-radius:9px;background:none;color:var(--txt,#e5e7eb);font:600 14px/1.2 inherit;text-align:left;cursor:pointer}
+.m-menu button span{width:22px;text-align:center;font-size:17px}
+.m-menu button:hover,.m-menu button:focus-visible{background:color-mix(in srgb,var(--cy,#22d3ee) 16%,transparent);outline:none}
+.codi-lado{cursor:default}
+@media (prefers-reduced-motion:reduce){.mascota,.m-corazon{animation:none!important}}
+
+/* ===== Iconos propios del menú (duotono): relleno suave + acento con el color de cada sección ===== */
+.icono-menu .duo{fill:currentColor;stroke:none;opacity:.13;transition:opacity .2s}
+.icono-menu .acento{stroke:var(--ic-acento,currentColor)}
+.icono-menu circle.acento,.icono-menu g.acento circle{fill:var(--ic-acento,currentColor);stroke:none}
+.icono-menu-configuracion circle.acento{fill:none;stroke:var(--ic-acento,currentColor);stroke-width:1.8}
+.icono-menu-inicio{--ic-acento:#f97316}.icono-menu-recompensas{--ic-acento:#eab308}.icono-menu-chats{--ic-acento:#06b6d4}
+.icono-menu-aprende{--ic-acento:#ef4444}.icono-menu-trabajo{--ic-acento:#22c55e}.icono-menu-ia{--ic-acento:#a855f7}
+.icono-menu-tienda{--ic-acento:#ec4899}.icono-menu-perfil{--ic-acento:#3b82f6}.icono-menu-configuracion{--ic-acento:#14b8a6}
+.on .icono-menu .duo,a:hover .icono-menu .duo,button:hover .icono-menu .duo{opacity:.26}
+.on .icono-menu,a:hover .icono-menu{transform:translateY(-1px)}
+.icono-menu{transition:transform .2s}
+
+/* Ilustraciones propias de efectos, rastros, temas y potenciadores (js/escenas-tienda.js) */
+.vista.cc-prev-escena{background:#0f172a}
+.vista .escena-articulo{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+.vista.cc-prev-escena .cc-prev-efecto,.vista.cc-prev-escena .cc-prev-efecto:only-child{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);padding:2px 9px;border-radius:99px;background:rgba(15,23,42,.62);color:#fff;font-size:11px;font-weight:700;white-space:nowrap;backdrop-filter:blur(4px)}
+.cc-prev-paleta{position:absolute;right:8px;bottom:6px;display:flex;gap:3px;padding:3px;border-radius:99px;background:rgba(255,255,255,.85)}
+.cc-prev-paleta i{width:12px;height:12px;border-radius:50%}

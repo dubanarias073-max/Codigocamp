@@ -208,3 +208,6 @@ ETAPAS_CONCEPTOS = [
     ("Imágenes y seguridad", "ARG, etiquetas, registros, escaneo, BuildKit, límites y contenedores seguros", E7),
     ("Kubernetes y producción", "ConfigMaps, Ingress, probes, escalado, Helm, Swarm y monitoreo", E8),
 ]
+
+from .docker_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

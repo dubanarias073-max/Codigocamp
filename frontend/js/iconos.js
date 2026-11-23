@@ -1,4 +1,20 @@
 import { codiSVG } from "/js/codi.js";
+import { ILUSTRADOS } from "/js/iconos-ilustrados.js";
+let nIlus = 0;
+// Iconos propios del menú principal (estilo duotono de CódigoCamp): un relleno suave (.duo) + trazo redondeado y un
+// detalle de acento (.acento) que toma el color de cada sección. Todos en 24×24, trazo 1.8, para que se vean como familia.
+const MENU = {
+  inicio: '<path class="duo" d="M4.5 10.2 12 4.4l7.5 5.8V20H4.5z"/><path d="M3 11.2 12 4.2l9 7"/><path d="M5 9.8V20h14V9.8"/><path d="M10 20v-4.6a2 2 0 0 1 4 0V20"/><path class="acento" d="M16.2 6.4V4.2h1.9v3.7"/>',
+  recompensas: '<path class="duo" d="M4.5 10.5h15V20h-15z"/><rect x="3.2" y="7.2" width="17.6" height="3.6" rx="1"/><path d="M4.6 10.8V20h14.8v-9.2M12 7.2V20"/><path d="M12 7.2c-1.6-3.2-5.6-3.6-5.6-1.3 0 1.2 1.5 1.3 5.6 1.3zM12 7.2c1.6-3.2 5.6-3.6 5.6-1.3 0 1.2-1.5 1.3-5.6 1.3z"/><path class="acento" d="m20.2 1.6.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5z"/>',
+  chats: '<path class="duo" d="M9.5 8.5h10a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H18v2.6l-3.2-2.6H9.5A1.5 1.5 0 0 1 8 17v-7a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M15.5 6V4.5A1.5 1.5 0 0 0 14 3H4.5A1.5 1.5 0 0 0 3 4.5v7A1.5 1.5 0 0 0 4.5 13H6v2.6"/><path d="M9.5 8.5h10a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H18v2.6l-3.2-2.6H9.5A1.5 1.5 0 0 1 8 17v-7a1.5 1.5 0 0 1 1.5-1.5z"/><g class="acento"><circle cx="11.8" cy="13.5" r=".9"/><circle cx="14.5" cy="13.5" r=".9"/><circle cx="17.2" cy="13.5" r=".9"/></g>',
+  aprende: '<path class="duo" d="M12 6.4c-2.6-1.7-5.6-2-8.6-1.2v13.4c3-.8 6-.5 8.6 1.2 2.6-1.7 5.6-2 8.6-1.2V5.2c-3-.8-6-.5-8.6 1.2z"/><path d="M12 6.4c-2.6-1.7-5.6-2-8.6-1.2v13.4c3-.8 6-.5 8.6 1.2 2.6-1.7 5.6-2 8.6-1.2V5.2c-3-.8-6-.5-8.6 1.2zM12 6.4v13.4"/><path d="M6 9.2c1.3-.2 2.6 0 3.6.5M6 12.2c1.3-.2 2.6 0 3.6.5"/><path class="acento" d="M15 4.9v6l1.4-1.1 1.4 1.1V4.6"/>',
+  trabajo: '<rect class="duo" x="3" y="4" width="18" height="12.5" rx="2"/><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/><path class="acento" d="m9.2 8.4-2.4 2 2.4 2m5.6-4 2.4 2-2.4 2M13 7.6l-2 5.6"/>',
+  ia: '<path class="duo" d="M5 5.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-5.5L9 21v-3.5H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/><path d="M5 5.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-5.5L9 21v-3.5H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/><path d="M9 10.2v1.6M15 10.2v1.6M9.8 14.2c1.3.8 3.1.8 4.4 0"/><path class="acento" d="m19.6 1.4.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/>',
+  tienda: '<path class="duo" d="M4.5 10.5h15V20h-15z"/><path d="M3.2 6.8 4.6 3.5h14.8l1.4 3.3"/><path d="M3.2 6.8h17.6v1.4a2.9 2.9 0 0 1-4.4 2.5 2.9 2.9 0 0 1-4.4 0 2.9 2.9 0 0 1-4.4 0 2.9 2.9 0 0 1-4.4-2.5z"/><path d="M4.6 10.6V20h14.8v-9.4M3 20h18"/><path class="acento" d="M9.5 20v-4.2a1.2 1.2 0 0 1 1.2-1.2h2.6a1.2 1.2 0 0 1 1.2 1.2V20"/>',
+  perfil: '<circle class="duo" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3.2"/><path d="M6.3 18.6c1.2-2.4 3.3-3.6 5.7-3.6s4.5 1.2 5.7 3.6"/><path class="acento" d="m18.6 2.6.5 1.2 1.2.5-1.2.5-.5 1.2-.5-1.2-1.2-.5 1.2-.5z"/>',
+  configuracion: '<path class="duo" d="M18.75 10.13 L21.10 10.61 L21.10 13.39 L18.75 13.87 L18.09 15.45 L19.41 17.45 L17.45 19.41 L15.45 18.09 L13.87 18.75 L13.39 21.10 L10.61 21.10 L10.13 18.75 L8.55 18.09 L6.55 19.41 L4.59 17.45 L5.91 15.45 L5.25 13.87 L2.90 13.39 L2.90 10.61 L5.25 10.13 L5.91 8.55 L4.59 6.55 L6.55 4.59 L8.55 5.91 L10.13 5.25 L10.61 2.90 L13.39 2.90 L13.87 5.25 L15.45 5.91 L17.45 4.59 L19.41 6.55 L18.09 8.55Z"/><path d="M18.75 10.13 L21.10 10.61 L21.10 13.39 L18.75 13.87 L18.09 15.45 L19.41 17.45 L17.45 19.41 L15.45 18.09 L13.87 18.75 L13.39 21.10 L10.61 21.10 L10.13 18.75 L8.55 18.09 L6.55 19.41 L4.59 17.45 L5.91 15.45 L5.25 13.87 L2.90 13.39 L2.90 10.61 L5.25 10.13 L5.91 8.55 L4.59 6.55 L6.55 4.59 L8.55 5.91 L10.13 5.25 L10.61 2.90 L13.39 2.90 L13.87 5.25 L15.45 5.91 L17.45 4.59 L19.41 6.55 L18.09 8.55Z"/><circle class="acento" cx="12" cy="12" r="3.1"/>',
+};
+
 const DIBUJOS = {
   inicio: '<path d="m3 11 9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/><path d="m2 12 10-8 10 8"/>',
   recompensas: '<path d="M5 8h14l-1 13H6L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2m-3 4v5m-2-2 2 2 2-2"/>',
@@ -10,6 +26,7 @@ const DIBUJOS = {
   configuracion: '<path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1"/><circle cx="12" cy="12" r="4"/>',
   trabajo: '<path d="M3 7h7l2 2h9v10H3V7Z"/><path d="M3 10h18m-12 3h6m-6 3h4"/>',
   archivo: '<path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v5h5m-9 4h4m-4 4h4"/>',
+  instalar: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7m-3-3 3 3 3-3M10 18.5h4"/>',
   carpeta: '<path d="M3 6h7l2 2h9v11H3V6Z"/><path d="M3 10h18"/>',
   calendario: '<rect x="4" y="6" width="16" height="15" rx="2"/><path d="M8 3v6m8-6v6M4 11h16m-11 4h2m3 0h2m-7 3h2"/>',
   diamante: '<path d="m12 2 8 8-8 12L4 10l8-8Z"/><path d="M4 10h16M8 3l4 7 4-7"/>',
@@ -56,7 +73,11 @@ const DIBUJOS = {
 export function iconoSVG(clave, clase = "") {
   // El ícono de la IA es Codi, la mascota
   if (clave === "codi") return `<span class="${clase} icono-codi" aria-hidden="true">${codiSVG("feliz", { tam: 22, animado: false })}</span>`;
+  // Menú principal: el set propio duotono (la IA también; Codi sigue siendo la mascota en el resto de la app)
+  if (MENU[clave] && /nav-icon|tab-svg|menu-ic/.test(clase)) return `<svg class="${clase} icono-menu icono-menu-${clave}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${MENU[clave]}</svg>`;
   if (clave === "ia") return `<span class="${clase} icono-codi" aria-hidden="true">${codiSVG("feliz", { tam: 26, animado: false })}</span>`;
+  // Premios, monedas, racha, cofres y artículos: dibujos a todo color (js/iconos-ilustrados.js)
+  if (ILUSTRADOS[clave]) return `<svg class="${clase} icono-ilustrado" viewBox="0 0 64 64" aria-hidden="true">${ILUSTRADOS[clave](`il${++nIlus}`)}</svg>`;
   const dibujo = DIBUJOS[clave] || '<path d="M4 4h16v16H4z"/><path d="M8 9h8m-8 4h8m-8 4h5"/>';
   return `<svg class="${clase}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${dibujo}</svg>`;
 }

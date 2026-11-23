@@ -91,7 +91,7 @@ Cómo respondes:
 - Si el error es porque falta instalar algo (ModuleNotFoundError, Cannot find module, «command not found» de un framework), di exactamente qué
   escribir en la terminal (pip install …, pip install -r requirements.txt, npm install …) o que lo instale desde Extensiones (Ctrl+Shift+X).
   Si usa un entorno virtual, recuérdale activarlo antes (source .venv/bin/activate o .venv\\Scripts\\activate).
-- En Trabajo funcionan como en VS Code: python -m venv .venv, fastapi dev main.py, uvicorn main:app --reload, flask --app app run --debug
+- En Trabajo funcionan: python -m venv .venv, fastapi dev main.py, uvicorn main:app --reload, flask --app app run --debug
   (la vista previa abre http://127.0.0.1:8000/docs). uvicorn, gunicorn y uvloop no hace falta instalarlos: CódigoCamp hace de servidor.
 - Si es un reto o ejercicio de clase, da primero una pista y ofrece la solución si la pide.
 - Si te pasan archivos (imágenes, capturas, PDF, video, audio, código), analízalos y refiérete a ellos por su nombre.
@@ -111,11 +111,13 @@ GUÍA DE CÓDIGOCAMP (todo lo que la plataforma puede hacer; úsala para ayudar 
   perder la racha ni usar salvarrachas): cofre legendario con 2000 diamantes, 600 XP, 10 vidas y 3 salvarrachas. Vidas: se pierde una al fallar un reto y se recuperan con el tiempo.
   El curso se cambia arriba en «Mi curso».
 - Recompensas: encargos de hoy (misiones diarias con diamantes), cofres de logro (se abren al cumplir metas) y el desafío del mes.
-- Aprende: 24 cursos con lecciones (HTML, CSS, JavaScript, Python, SQL, Bases de datos, TypeScript, Java, C#, Kotlin, Swift, PHP, Ruby,
-  Go, Rust, C, C++, Terminales, Git, Docker, Node.js, GitHub, NoSQL, React). Cada lección trae teoría, código editable con el editor de
-  VS Code (colores, autocompletado, Ctrl+Enter ejecuta) y un reto «Ahora tú». Java, C, C++, C#, PHP, Go, Rust, Swift, Kotlin y Ruby se
+- Aprende: 25 cursos con lecciones (HTML, CSS, JavaScript, Python, SQL, Bases de datos, TypeScript, Java, C#, Kotlin, Swift, PHP, Ruby,
+  Go, Rust, C, C++, Terminales, Git, Docker, Node.js, GitHub, NoSQL, React, React Native). React Native se ve en un celular simulado (react-native-web con Expo y
+  React Navigation simulados); para el celular real se usa Expo Go con «expo start» en Trabajo. HTML tiene 220 temas (cada etiqueta,
+  input, atributo, ARIA, metadatos y SEO). Cada lección trae teoría, código editable con el editor
+  profesional (colores, autocompletado, Ctrl+Enter ejecuta) y un reto «Ahora tú». Java, C, C++, C#, PHP, Go, Rust, Swift, Kotlin y Ruby se
   ejecutan de verdad; si el programa lee del teclado aparece la caja «⌨️ Entrada del teclado» (un dato por línea).
-- Trabajo (como VS Code): explorador de archivos, pestañas, editor Monaco, búsqueda (Ctrl+Shift+F), paleta (Ctrl+Shift+P), panel de Git
+- Trabajo (el editor profesional de CódigoCamp; nunca lo compares con otros editores ni nombres VS Code): explorador de archivos, pestañas, editor Monaco, búsqueda (Ctrl+Shift+F), paleta (Ctrl+Shift+P), panel de Git
   (commit, ramas, push/pull a GitHub con «Iniciar sesión con GitHub»), Extensiones (Ctrl+Shift+X, paquetes de pip y npm), vista previa
   en vivo como Live Server (al lado o en pestaña, tamaños de celular/tableta), copiloto de IA que propone cambios que el alumno acepta,
   y proyectos Vite con npm create vite@latest mi-app -- --template vanilla | vanilla-ts | react | react-ts | preact | vue | svelte.
@@ -126,13 +128,28 @@ GUÍA DE CÓDIGOCAMP (todo lo que la plataforma puede hacer; úsala para ayudar 
     runghc, elixir, julia, groovy, crystal run, nim r, ocaml, rdmd, fpc, zig run, sbcl); Dockerfile → docker build +
     docker run; compose.yaml → docker compose up -d.
   · Archivos nuevos de cualquiera de esos lenguajes, .sh, Dockerfile y compose.yaml vienen con un ejemplo que funciona.
-  · Como VS Code: Ctrl+P ir a archivo, Ctrl+Shift+P comandos, Ctrl+, ajustes del editor (letra, tabulación, ajuste de línea, minimapa,
+  · Atajos: Ctrl+P ir a archivo, Ctrl+Shift+P comandos, Ctrl+, ajustes del editor (letra, tabulación, ajuste de línea, minimapa,
     números de línea, formatear al guardar…), Ctrl+K Ctrl+S lista de atajos, Ctrl+\\ dividir el editor, Ctrl+K Z modo zen (Esc sale),
     Ctrl+ / Ctrl− / Ctrl 0 tamaño de letra, Alt+Z ajuste de línea, Ctrl+Shift+O ir a símbolo, F12 definición, F2 renombrar, Ctrl+D
     multicursor, Alt+↑/↓ mover línea, Shift+Alt+F formatear, reabrir pestaña cerrada (paleta), Ctrl+K Ctrl+T temas de color
     (Dark+, Light+, Monokai, Dracula, One Dark Pro, GitHub, Night Owl, Solarized, alto contraste), Ctrl+Shift+V vista previa de
     Markdown, clic derecho en las pestañas (cerrar otras / a la derecha / todas, copiar ruta, dividir, mostrar en el explorador).
-  · IA en Trabajo (como Copilot): Ctrl+I pide un cambio en el código seleccionado (o escribe en el cursor) y se acepta con Enter o
+  · Servidores de desarrollo en Trabajo (panel PUERTOS junto a TERMINAL y CONSOLA; se abren en la vista previa):
+    node server.js con Express o http (express, cors, body-parser, dotenv, morgan, express.static, Router, res.render con EJS),
+    nodemon / node --watch (se reinicia al guardar), npm start / npm run dev / yarn / pnpm, php -S localhost:8000 (PHP real con
+    sesiones), python -m http.server, npx serve, http-server, live-server, FastAPI/Flask/Django, y npx expo start (Expo con Expo
+    Snack: vista web y QR para Expo Go en el celular). Next.js, Angular (ng serve), Nuxt, Astro, Laravel (php artisan serve),
+    Rails, Spring Boot, Go y .NET web corren en Docker si el servidor lo tiene activo (DOCKER_TRABAJO=1).
+  · Problemas: ⊗ errores y ⚠ advertencias de todo el proyecto y de lo que falla al ejecutar; los archivos dañados se ven en rojo;
+    clic en ⊗/⚠ o Ctrl+Shift+M abre el panel PROBLEMAS.
+  · Tu computador o celular (Conector): menú ⋯ → «Abrir carpeta del computador o celular…» o botón 🖥 de la terminal → descargas
+    codigocamp-conector.py, lo abres con el código y confirmas con tu PIN/huella/contraseña. Eliges una carpeta de tu equipo y
+    Trabajo la usa como editor de escritorio: lo guardado se escribe allá, lo que cambia allá aparece aquí; la terminal
+    «🖥 equipo», ▶ Ejecutar y el panel de Git usan lo instalado en tu equipo. Nunca abre carpetas del sistema; el antivirus
+    del equipo (Defender o ClamAV) revisa lo que entra, sale o se ejecuta.
+  · Seguridad: los enlaces de virus o estafas nunca se abren (ni aceptando); los dudosos piden confirmación. Los archivos
+    subidos pasan por un antivirus. Si un estudiante pregunta por qué se bloqueó algo, explícale el motivo con calma.
+  · IA en Trabajo: Ctrl+I pide un cambio en el código seleccionado (o escribe en el cursor) y se acepta con Enter o
     se descarta con Esc; clic derecho en el editor → ✨ explicar, arreglar errores, mejorar, comentar/documentar, escribir pruebas;
     💡 bombilla (Ctrl+.) en cada error subrayado → «Arreglar con IA» o «Explicar este error»; en la terminal, si un comando falla,
     aparece «✨ Arreglar con IA»; en Git, «✨ Mensaje con IA» escribe el mensaje del commit; sugerencias en gris mientras escribes
@@ -175,7 +192,7 @@ GUÍA DE CÓDIGOCAMP (todo lo que la plataforma puede hacer; úsala para ayudar 
   clic, rastros del mouse o del dedo y potenciadores. «Probar» muestra la vista previa antes de comprar. Los fondos se ven detrás de todas
   las páginas con los paneles semitransparentes.
 - Perfil: foto de perfil, lo que lleva puesto, cofres, cursos y su colección. Configuración: cuenta, aprendizaje (curso, meta diaria),
-  apariencia (tema claro/oscuro/automático, idioma, cosméticos), seguridad (sesiones y dispositivos), correos y app/widgets."""
+  apariencia (tema claro/oscuro/automático, cosméticos), seguridad (sesiones y dispositivos), correos y app/widgets."""
 
 COPILOTO = """
 MODO COPILOTO ACTIVADO: el alumno te dio permiso para proponer cambios en los archivos de su proyecto de Trabajo.
@@ -339,8 +356,17 @@ def _partes_adjuntos(adjuntos, clave):
     return partes
 
 
-def explicar_error_gemini(codigo, cuerpo, modelo):
-    """Mensaje claro según lo que respondió Gemini (para saber qué corregir en backend/.env)."""
+def explicar_error_gemini(codigo, cuerpo, modelo, *, tecnico=False):
+    """Mensaje según lo que respondió Gemini. Al estudiante se le muestra un mensaje amable;
+    el detalle técnico (qué corregir en backend/.env) queda en el registro del servidor y en `flask probar-ia`."""
+    if not tecnico:
+        try:
+            current_app.logger.warning("IA: %s", explicar_error_gemini(codigo, cuerpo, modelo, tecnico=True))
+        except Exception:
+            pass
+        if codigo == 429:
+            return "Codi está atendiendo a mucha gente ahora mismo. Inténtalo de nuevo en un minuto."
+        return "Codi no pudo responder en este momento. Inténtalo de nuevo en un rato."
     texto = cuerpo.lower()
     if codigo == 429:
         return "La IA está muy ocupada o se acabó la cuota gratis de tu clave de Gemini por ahora. Inténtalo en un minuto."
@@ -365,7 +391,7 @@ def tutor():
         return api_error("Escribe una pregunta de hasta 12 000 caracteres (o adjunta un archivo).")
     api_key = current_app.config["GEMINI_API_KEY"]
     if not api_key:
-        return api_error("El tutor todavía no está configurado (falta GEMINI_API_KEY en backend/.env).", 503)
+        return api_error("Codi todavía no está disponible. Vuelve a intentarlo más tarde.", 503)
     usuario = current_user if current_user.is_authenticated else None
     if ids and not usuario:
         return api_error("Inicia sesión para enviar archivos a la IA.", 401)
@@ -404,7 +430,7 @@ def tutor():
 
     ctx = data.get("contexto") if isinstance(data.get("contexto"), dict) else {}
     copiloto = bool(ctx.get("copiloto")) and usuario is not None
-    sistema = SISTEMA + (_contexto_alumno() if usuario else "") + _contexto_trabajo(ctx) + (COPILOTO if copiloto else "")
+    sistema = _con_idioma(SISTEMA + (_contexto_alumno() if usuario else "") + _contexto_trabajo(ctx) + (COPILOTO if copiloto else ""))
     modelo = current_app.config["GEMINI_MODEL"]
     payload = json.dumps({
         "systemInstruction": {"parts": [{"text": sistema}]}, "contents": contents,
@@ -451,7 +477,7 @@ def completar():
         return jsonify(texto="")
     api_key = current_app.config["GEMINI_API_KEY"]
     if not api_key:
-        return api_error("Falta GEMINI_API_KEY en backend/.env.", 503)
+        return api_error("La ayuda de Codi no está disponible ahora.", 503)
     if too_many(f"completar:{current_user.id}", 40, 60):   # ~1 cada 1,5 s escribiendo seguido
         return jsonify(texto="", espera=True)
     ruta, lenguaje = str(data.get("ruta", ""))[:200], str(data.get("lenguaje", ""))[:30]
@@ -500,6 +526,27 @@ def limpiar_sugerencia(texto, antes, despues):
     return "\n".join(lineas).rstrip() if len(lineas) > 1 else lineas[0]
 
 
+def _en_ingles():
+    """¿La cuenta usa CódigoCamp en inglés? Entonces la IA responde en inglés."""
+    try:
+        from flask_login import current_user
+        from models import Profile
+        if not current_user.is_authenticated:
+            return False
+        p = Profile.query.filter_by(usuario_id=current_user.id).first()
+        return bool(p and p.idioma == "en")
+    except Exception:
+        return False
+
+
+IDIOMA_EN = ("\n\nIMPORTANT: the student uses CódigoCamp in ENGLISH. Answer ONLY in clear, friendly English "
+             "(code comments and commit messages in English too). Keep the names CódigoCamp and Codi.")
+
+
+def _con_idioma(sistema):
+    return sistema + (IDIOMA_EN if _en_ingles() else "")
+
+
 PORQUE = """Eres Codi, el tutor de CódigoCamp. Explica en español, SIMPLE y CORTO (1 o 2 frases, máximo 40 palabras), POR QUÉ
 la respuesta correcta es la correcta: la idea de fondo, con palabras fáciles. NO repitas la pregunta ni la respuesta (el alumno ya
 las ve) ni la «explicación guardada». Si el alumno respondió otra cosa, di en pocas palabras por qué eso no era. Sin títulos, sin
@@ -534,7 +581,7 @@ def porque_reto(reto_id):
               + f"Respuesta correcta: {correcta}\nExplicación guardada: {reto.explicacion}\n"
               + (f"El alumno respondió: {respuesta_alumno}\n" if respuesta_alumno else ""))
     payload = json.dumps({
-        "systemInstruction": {"parts": [{"text": PORQUE}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "systemInstruction": {"parts": [{"text": _con_idioma(PORQUE)}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.3, "maxOutputTokens": 350},
     }).encode()
     try:
@@ -545,7 +592,7 @@ def porque_reto(reto_id):
     return jsonify(texto=texto or reto.explicacion, ia=bool(texto))
 
 
-EDITAR = """Eres el copiloto de código de CódigoCamp (como Copilot en VS Code, «Ctrl+I»). Te dan un archivo con una SELECCIÓN
+EDITAR = """Eres el copiloto de código de CódigoCamp («Ctrl+I» en Trabajo). Te dan un archivo con una SELECCIÓN
 (o un cursor) y una instrucción del alumno. Devuelve SOLO el código que debe ir en lugar de la selección (o insertarse en el
 cursor): sin explicaciones, sin ``` y sin repetir lo que está antes o después. Respeta la sangría, el estilo y el lenguaje del
 archivo. Cambia solo lo pedido. Si la instrucción pide comentarios o documentación, escríbelos en español."""
@@ -587,7 +634,7 @@ def editar_en_linea():
     prompt = (f"Archivo: {ruta} ({lenguaje})\nInstrucción: {instruccion}\n\n--- antes ---\n{antes}\n--- SELECCIÓN"
               f"{' (vacía: escribe en el cursor)' if not sel else ''} ---\n{sel}\n--- después ---\n{despues}")
     try:
-        texto = _texto_gemini(prompt, EDITAR, tokens=4000)
+        texto = _texto_gemini(prompt, _con_idioma(EDITAR), tokens=4000)
     except ValueError as e:
         return api_error(str(e), 503)
     except Exception:
@@ -609,7 +656,7 @@ def mensaje_commit():
     if too_many(f"commit:{current_user.id}", 10, 60):
         return api_error("Vas muy rápido. Espera unos segundos.", 429)
     try:
-        texto = _texto_gemini(diff, COMMIT, tokens=300, temperatura=0.3, timeout=25)
+        texto = _texto_gemini(diff, _con_idioma(COMMIT), tokens=300, temperatura=0.3, timeout=25)
     except ValueError as e:
         return api_error(str(e), 503)
     except Exception:

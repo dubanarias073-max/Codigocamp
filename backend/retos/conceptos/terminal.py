@@ -249,3 +249,6 @@ ETAPAS_CONCEPTOS = [
     ("Sistema y redes", "Procesos, servicios, logs, red, SSH, rsync, usuarios y firewall", E7),
     ("Scripts profesionales", "Modo estricto, arreglos, case, trap, getopts, jq, regex y make", E8),
 ]
+
+from .terminal_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

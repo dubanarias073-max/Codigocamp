@@ -486,7 +486,7 @@ export class MotorGit {
     // Proyectos con el Git anterior de CódigoCamp (sin historial real): se crea un repositorio de verdad con su último commit.
     const g = py.git;
     const d = this.dirFs("");
-    io.out(color.gris("Actualizando Git de este proyecto a Git real (como VS Code)…\n"));
+    io.out(color.gris("Actualizando Git de este proyecto a Git real…\n"));
     this.repos(py)[""] = { remote: g.remote || "", respaldo: "", rama: g.branch || "main" };
     await this.git.init({ fs: this.fs, dir: d, defaultBranch: g.branch || "main" });
     if (g.remote) await this.git.addRemote({ fs: this.fs, dir: d, remote: "origin", url: g.remote, force: true });

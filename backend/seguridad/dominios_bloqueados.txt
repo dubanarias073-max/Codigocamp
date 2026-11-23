@@ -1,0 +1,5 @@
+# Dominios bloqueados siempre en CódigoCamp (uno por línea). Agrega aquí los que reporten tus estudiantes.
+# Las listas públicas actualizadas se descargan con:  flask --app app actualizar-listas
+# Dominios de prueba oficiales para comprobar que el bloqueo funciona:
+malware.testing.google.test
+testsafebrowsing.appspot.com

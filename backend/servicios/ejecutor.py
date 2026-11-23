@@ -325,7 +325,7 @@ def _csharp(codigo, d, entrada):
 LENGUAJES = {
     "java":   {"f": _java, "piston": ("java", "Main.java")},
     "c":      {"f": _nativo(("gcc", "cc", "clang"), ".c", ("-lm",)), "piston": ("c", "main.c")},
-    "cpp":    {"f": _nativo(("g++", "clang++"), ".cpp", ("-std=c++17",)), "piston": ("c++", "main.cpp")},
+    "cpp":    {"f": _nativo(("g++", "clang++"), ".cpp", ("-std=c++20",)), "piston": ("c++", "main.cpp")},
     "csharp": {"f": _csharp, "piston": ("csharp", "Program.cs")},
     "php":    {"f": _interprete(("php",), ".php"), "piston": ("php", "main.php")},
     "go":     {"f": _interprete(("go",), ".go", ("run",)), "piston": ("go", "main.go")},

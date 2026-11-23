@@ -165,6 +165,11 @@ export class Sincronizador {
     const salida = new Map();
     const omitidos = new Map();
     const vistos = new Set();
+    // Discos lentos (la carpeta de otro equipo por el Conector) traen de una vez todo lo que hay que leer en esta vuelta.
+    if (this.disco.precargar) {
+      const faltan = archivos.filter((a) => { const c = this.cacheDisco.get(a.ruta); return FS.rutaValida(a.ruta) && a.tamano <= this.maxArchivo && (!c || c.tamano !== a.tamano || c.modificado !== a.modificado); });
+      if (faltan.length) await this.disco.precargar(faltan);
+    }
     for (const a of archivos) {
       vistos.add(a.ruta);
       if (!FS.rutaValida(a.ruta)) { omitidos.set(a.ruta, "su nombre tiene caracteres que no se admiten (\\ / : * ? \" < > |) o la ruta es demasiado larga"); continue; }

@@ -8,3 +8,6 @@ ETAPAS_CONCEPTOS = [
     ("Estructuras, bits y archivos", "Tipos propios, operaciones de bajo nivel y ficheros", c_e4.LISTA),
     ("C profesional", "Proyectos en varios archivos, herramientas y algoritmos", c_e5.LISTA),
 ]
+
+from .c_ref import ETAPAS_REF as _REF
+ETAPAS_CONCEPTOS = ETAPAS_CONCEPTOS + _REF   # etapas de referencia: más temas del curso

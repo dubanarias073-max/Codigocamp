@@ -562,3 +562,36 @@ CREATE TABLE IF NOT EXISTS mensajes_ia (
   CONSTRAINT fk_mensajes_ia_conversacion FOREIGN KEY (conversacion_id) REFERENCES conversaciones_ia (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Mensajes de cada conversación con la IA';
+
+-- Conector de CódigoCamp: equipos (computador o celular) que su dueño conectó a Trabajo.
+-- La terminal de Trabajo ejecuta comandos de verdad en ese equipo solo mientras el programa del Conector está abierto.
+CREATE TABLE IF NOT EXISTS conectores (
+  id INT NOT NULL AUTO_INCREMENT,
+  usuario_id INT NOT NULL,
+  token_hash VARCHAR(64) NOT NULL,
+  equipo VARCHAR(80) NOT NULL DEFAULT 'Mi equipo',
+  sistema VARCHAR(40) NOT NULL DEFAULT '',
+  carpeta VARCHAR(400) NOT NULL DEFAULT '',
+  creado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ultimo DATETIME NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_conectores_token (token_hash),
+  KEY ix_conectores_usuario (usuario_id),
+  CONSTRAINT fk_conectores_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- «Eliminar chat» solo para quien lo borra (borrado lógico por usuario, equivalente a un arreglo deletedBy):
+-- esa persona no ve los mensajes con id <= hasta_mensaje_id; la otra conserva todo su historial.
+CREATE TABLE IF NOT EXISTS chats_borrados (
+  id INT NOT NULL AUTO_INCREMENT,
+  usuario_id INT NOT NULL,
+  amistad_id INT NOT NULL,
+  hasta_mensaje_id INT NOT NULL DEFAULT 0,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_chat_borrado (usuario_id, amistad_id),
+  KEY ix_chats_borrados_usuario (usuario_id),
+  KEY ix_chats_borrados_amistad (amistad_id),
+  CONSTRAINT fk_chats_borrados_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE,
+  CONSTRAINT fk_chats_borrados_amistad FOREIGN KEY (amistad_id) REFERENCES amistades (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

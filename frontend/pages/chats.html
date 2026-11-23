@@ -25,8 +25,8 @@
     <main class="centro" id="contenido">
       <h1 class="titulo-pag">Chats</h1>
       <div class="chats-grid" id="cg">
-        <aside class="c-lista" aria-label="Amigos">
-          <div class="c-lista-cab"><h2>Chats</h2></div>
+        <aside class="c-lista" id="cLista" aria-label="Amigos">
+          <div class="c-lista-cab"><h2>Chats</h2><button class="c-ico c-hamb" id="cerrarAmigos" type="button" aria-label="Cerrar la lista"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
           <div class="c-yo">
             <span class="c-av" id="miAv">?</span>
             <div class="c-yo-txt"><small>Tu ID</small><b id="miCodigo">······</b><small id="miAlias"></small></div>
@@ -45,13 +45,15 @@
           </div>
         </aside>
         <section class="c-conv" aria-label="Conversación">
-          <div class="c-vacio" id="vacio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18l-1.5 3 4-1.5A9 9 0 1 0 5 18z"/></svg><b>Tus conversaciones</b><span>Elige un amigo para chatear o agrega a alguien con su @usuario o ID.</span></div>
+          <div class="c-vacio" id="vacio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18l-1.5 3 4-1.5A9 9 0 1 0 5 18z"/></svg><b>Tus conversaciones</b><span>Elige un amigo para chatear o agrega a alguien con su @usuario o ID.</span><button class="c-btn pri c-hamb" id="verAmigos2" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Ver mis chats</button></div>
+          <div class="c-velo" id="cVelo" hidden></div>
           <header class="c-cab" id="cab" hidden>
+            <button class="c-ico c-hamb" id="verAmigos" type="button" aria-controls="cLista" aria-label="Tus chats" title="Tus chats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
             <button class="c-ico c-volver" id="volver" type="button" aria-label="Volver a la lista"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
             <span class="c-av" id="cAv"></span>
             <div class="c-cab-txt"><b id="cNombre"></b><small id="cAlias"></small></div>
             <button class="c-ico" id="cMas" type="button" aria-label="Opciones" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
-            <div class="c-menu" id="cMenu" hidden><button id="verPerfil" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Ver perfil</button><button id="quitar" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg>Quitar amigo</button></div>
+            <div class="c-menu" id="cMenu" hidden><button id="verPerfil" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Ver perfil</button><button id="borrarChat" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/><path d="M9 9l6 4M15 9l-6 4"/></svg>Eliminar chat (solo para mí)</button><button id="quitar" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg>Quitar amigo</button></div>
           </header>
           <div class="c-log" id="log" aria-live="polite" hidden></div>
           <div class="c-abajo">

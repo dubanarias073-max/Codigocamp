@@ -32,9 +32,13 @@ const esIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" 
 const esSafariMac = /Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|Chromium|Edg|Firefox/.test(ua);
 const esFirefox = /Firefox/.test(ua);
 
+/** Sin HTTPS ningún sistema deja instalar la app (solo funciona en https:// o en localhost). */
+export const sinHttps = () => typeof isSecureContext !== "undefined" && !isSecureContext;
+
 export function estadoInstalacion() {
   if (instalada) return { instalada: true, puede: false };
   if (aviso) return { puede: true };
+  if (sinHttps()) return { puede: false, https: true, ayuda: `⚠️ Estás entrando por <b>${location.protocol}//${location.host}</b> (sin candado 🔒). Windows, Android, iPhone y Mac <b>solo instalan apps desde una dirección https://</b>. Quien administra CódigoCamp debe publicarlo con HTTPS (un dominio con certificado, o un túnel como <i>Cloudflare Tunnel</i> o <i>ngrok</i>); después de eso aparece el botón Instalar en todos los dispositivos.` };
   let ayuda;
   if (esIOS) ayuda = "En iPhone/iPad (Safari): toca <b>Compartir</b> <span aria-hidden=\"true\">⬆️</span> y luego <b>Agregar a pantalla de inicio</b>.";
   else if (esSafariMac) ayuda = "En Safari para Mac: menú <b>Archivo → Agregar al Dock</b>.";

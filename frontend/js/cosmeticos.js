@@ -1,3 +1,4 @@
+import { escenaArticulo } from "/js/escenas-tienda.js";
 import { ACCESORIOS_CODI, codiSVG, ponerAccesorioCodi } from "/js/codi.js";
 // Cosméticos de la tienda y los cofres: cómo se ve cada fondo, puntero, tema, marco, efecto y rastro, y cómo se aplican
 // en todas las páginas. Todo es original (CSS, SVG y canvas), sin imágenes externas.
@@ -13,7 +14,8 @@ export const CURSORES = {
   cursor_nave: { x: 16, y: 2, c: ["#e2e8f0", "#0f172a", '<path d="M26 26h4v4h-4z" fill="#f97316"/>'], svg: '<g shape-rendering="crispEdges"><path d="M14 2h4v4h2v8h4v4h4v6h-4v-2h-4v4h-2v2h-8v-2h-2v-4H4v2H0v-6h4v-4h4V6h2V4h4z" fill="#e2e8f0" stroke="#0f172a" stroke-width="1"/><path d="M14 8h4v4h-4z" fill="#22d3ee"/><path d="M12 26h2v4h-2zM18 26h2v4h-2z" fill="#f97316"/></g>' },
   cursor_mando: { x: 4, y: 4, c: ["#6366f1", "#1e1b4b", ""], svg: '<rect x="2" y="9" width="28" height="15" rx="7" fill="#6366f1" stroke="#1e1b4b" stroke-width="1.6"/><path d="M9 13v7M5.5 16.5h7" stroke="#e0e7ff" stroke-width="2.2" stroke-linecap="round"/><circle cx="22" cy="14.5" r="2" fill="#f43f5e"/><circle cx="25.5" cy="18" r="2" fill="#22c55e"/><path d="M2 2l6 2-3 1 2 3-1 1-2-3-1 3z" fill="#fff" stroke="#1e1b4b"/>' },
   cursor_baculo: { x: 4, y: 4, c: ["#a16207", "#1c1917", ""], svg: '<path d="M8 8l20 20" stroke="#1c1917" stroke-width="5" stroke-linecap="round"/><path d="M8 8l20 20" stroke="#a16207" stroke-width="3" stroke-linecap="round"/><circle cx="7" cy="7" r="6" fill="#a855f7" stroke="#1c1917" stroke-width="1.5"/><circle cx="5" cy="5" r="2" fill="#f5d0fe"/>' },
-  cursor_pico: { x: 2, y: 2, c: ["#c084fc", "#2e1065", '<path d="M25 25h4v4h-4z" fill="#a16207" stroke="#2e1065"/>'], svg: '<g shape-rendering="crispEdges"><path d="M2 6h4V4h4V2h8v2h4v2h2v4h-2V8h-2V6h-4V4h-6v2H8v2H6v2H4V8H2z" fill="#c084fc" stroke="#2e1065" stroke-width="1"/><path d="M14 10h2v2h2v2h2v2h2v2h2v2h2v2h2v4h-4v-2h-2v-2h-2v-2h-2v-2h-2v-2h-2v-2h-2z" fill="#a16207" stroke="#2e1065" stroke-width="1"/><path d="M8 4h2v2H8zM18 4h2v2h-2z" fill="#f5d0fe"/></g>' },
+  cursor_sable_cian: { x: 3, y: 3, c: ["#67e8f9", "#0c4a6e", '<circle cx="28" cy="28" r="3" fill="#a5f3fc"/>'], svg: '<path d="M4 4l17 17" stroke="#22d3ee" stroke-width="7" stroke-linecap="round" opacity=".35"/><path d="M4 4l17 17" stroke="#ecfeff" stroke-width="3" stroke-linecap="round"/><path d="M20 20l6 6" stroke="#334155" stroke-width="5" stroke-linecap="round"/><path d="M19 23l4-4" stroke="#facc15" stroke-width="2.5" stroke-linecap="round"/>' },
+  cursor_pico: { x: 2, y: 14, c: ["#c084fc", "#2e1065", '<path d="M27 21l3 3.5-3 5.5-3-5.5z" fill="#c084fc" stroke="#2e1065" stroke-width=".9" stroke-linejoin="round"/><path d="M27 21l1.2 3.5h-2.4z" fill="#f5d0fe"/>'], svg: '<path d="M15 11l13 18" stroke="#2e1065" stroke-width="6" stroke-linecap="round"/><path d="M15 11l13 18" stroke="#b45309" stroke-width="3.4" stroke-linecap="round"/><path d="M16.5 13l11 15.5" stroke="#f59e0b" stroke-width="1" stroke-linecap="round" opacity=".8"/><path d="M14.5 13.5l3.6-2.4M16.3 16l3.6-2.4" stroke="#2e1065" stroke-width="1.2"/><path d="M2 14C7 5 22 2 30 9c-7-2-12-1-15 2-4-1-9 0-13 3z" fill="#a855f7" stroke="#2e1065" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 11.5C10 6 19 4.5 26 7.2" stroke="#f5d0fe" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M15 6l2.4 2.6L15 11l-2.4-2.4z" fill="#e9d5ff" stroke="#2e1065" stroke-width=".9" stroke-linejoin="round"/><path d="M2 14l3-1-1 3z" fill="#f5d0fe"/>' },
   cursor_espada: { x: 2, y: 2, c: ["#cbd5e1", "#0f172a", '<path d="M25 25h4v4h-4z" fill="#facc15" stroke="#0f172a"/>'], svg: '<path d="M2 2h4v2h2v2h2v2h2v2h2v2h2v2h-2v2h-2v-2h-2v-2H10v-2H8v-2H6V8H4V6H2z" fill="#cbd5e1" stroke="#0f172a" stroke-width="1"/><path d="M16 18h2v-2h2v2h2v2h-2v2h-2v-2h-2z" fill="#a16207" stroke="#0f172a"/><path d="M22 22h4v4h-4z" fill="#facc15" stroke="#0f172a"/>' },
   cursor_varita: { x: 4, y: 4, c: ["#ddd6fe", "#5b21b6", '<path d="M27 22l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="#fde047" stroke="#a16207" stroke-width=".6"/>'], svg: '<path d="M10 10l17 17" stroke="#1f2937" stroke-width="5" stroke-linecap="round"/><path d="M10 10l17 17" stroke="#7c3aed" stroke-width="3" stroke-linecap="round"/><path d="M6 1l1.6 3.4L11 6 7.6 7.6 6 11 4.4 7.6 1 6l3.4-1.6z" fill="#fde047" stroke="#a16207"/>' },
   cursor_lapiz: { x: 2, y: 29, c: ["#fde68a", "#78350f", '<path d="M25 30l1-4 4-4 1 1-4 4z" fill="#f472b6"/>'], svg: '<path d="M3 29l2-7L22 5l5 5L10 27z" fill="#fbbf24" stroke="#1f2937" stroke-width="1.5" stroke-linejoin="round"/><path d="M3 29l2-7 5 5z" fill="#fde68a" stroke="#1f2937" stroke-linejoin="round"/><path d="M19 8l5 5" stroke="#1f2937"/><path d="M22 5l5 5 2-2-5-5z" fill="#f472b6" stroke="#1f2937"/>' },
@@ -86,6 +88,7 @@ export const TEMAS = {
   tema_aurora: { acc: "#4ade80", acc2: "#7c3aed", cy: "#22d3ee" },
   tema_aprendiz: { acc: "#a3e635", acc2: "#3f6212", cy: "#fde047" },
   tema_mito: { acc: "#f0abfc", acc2: "#a16207", cy: "#fde68a" },
+  tema_synthwave: { acc: "#f472b6", acc2: "#7c3aed", cy: "#22d3ee" },
   tema_mazmorra: { acc: "#f97316", acc2: "#44403c", cy: "#fbbf24" },
   tema_portatil: { acc: "#9bbc0f", acc2: "#306230", cy: "#8bac0f" },
   tema_arcade: { acc: "#facc15", acc2: "#7c3aed", cy: "#f43f5e" },
@@ -99,6 +102,37 @@ export const TEMAS = {
 // -------------------------------------------------------------------------------------- fondos ----
 const CIRCUITO = svg('<g fill="none" stroke="#22d3ee" stroke-opacity=".35" stroke-width="1"><path d="M0 8h10l4 4h18M8 0v6M22 12v10l4 4h6M0 24h8l3-3"/><circle cx="8" cy="7" r="1.5"/><circle cx="22" cy="22" r="1.5"/><circle cx="11" cy="21" r="1.5"/></g>', 32, 32);
 const OLAS = (c, o) => svg(`<path d="M0 20 Q8 14 16 20 T32 20 V32 H0z" fill="${c}" fill-opacity="${o}"/>`, 32, 32);
+/** «Guarida del jefe»: rocas que flotan sin parar (de lado y de arriba abajo) sobre un río de lava que fluye. */
+function guaridaJefe() {
+  const url = (w, h, cuerpo) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges">${cuerpo}</svg>`)}")`;
+  // roca pixel: cuerpo oscuro, borde de luz y grietas de lava (x, y = esquina; e = tamaño del pixel)
+  const roca = (x, y, e, ancho = 12) => {
+    const P = (cx, cy, w, h, c) => `<rect x="${x + cx * e}" y="${y + cy * e}" width="${w * e}" height="${h * e}" fill="${c}"/>`;
+    const m = Math.round(ancho / 2);
+    return P(2, 0, ancho - 4, 1, "#57534e") + P(1, 1, ancho - 2, 1, "#44403c") + P(0, 2, ancho, 3, "#292524") + P(1, 5, ancho - 2, 1, "#1c1917") + P(3, 6, ancho - 6, 1, "#1c1917")
+      + P(2, 1, 3, 1, "#78716c") + P(m, 2, 1, 2, "#f97316") + P(m + 1, 3, 2, 1, "#fb923c") + P(2, 4, 2, 1, "#ea580c") + P(m - 1, 4, 1, 1, "#fde047")
+      + P(4, 7, 1, 1, "#f97316") + P(ancho - 5, 7, 1, 2, "#fb923c");   // gotas de lava que caen
+  };
+  const capaA = url(320, 200, roca(24, 40, 4, 14) + roca(190, 120, 3, 12) + roca(250, 20, 2, 10));
+  const capaB = url(420, 240, roca(80, 150, 2, 12) + roca(300, 70, 3, 9) + roca(170, 20, 2, 8));
+  const brasas = url(160, 160, '<rect x="20" y="30" width="2" height="2" fill="#fdba74"/><rect x="90" y="110" width="2" height="2" fill="#fde047"/><rect x="130" y="60" width="2" height="2" fill="#f97316"/><rect x="50" y="140" width="2" height="2" fill="#fb923c"/>');
+  const lava = url(64, 44, '<path d="M0 12h8v-4h8v4h8v-6h8v6h8v-4h8v4h8v-2h8v34H0z" fill="#ea580c"/><path d="M0 20h12v-4h8v4h16v-4h12v4h16v24H0z" fill="#f97316"/><path d="M0 30h6v-2h10v2h14v-4h10v4h24v14H0z" fill="#facc15"/><rect x="18" y="34" width="4" height="2" fill="#fef9c3"/><rect x="44" y="38" width="6" height="2" fill="#fef9c3"/>');
+  return `background:${capaA} 0 0/320px 200px repeat,${capaB} 0 0/420px 240px repeat,${brasas} 0 0/160px 160px repeat,${lava} 0 100%/64px 44px repeat-x,`
+    + "radial-gradient(ellipse 120% 60% at 50% 110%,rgba(249,115,22,.55),transparent 70%),linear-gradient(#0c0403,#1c0a05 60%,#2a0d04);"
+    + "animation:cc-guarida 24s linear infinite,cc-late-fondo 3s ease-in-out infinite";
+}
+/** Movimiento continuo de la guarida: la capa A va a la izquierda, la B a la derecha (con vaivén vertical) y las brasas suben. */
+function cuadrosGuarida() {
+  const pasos = 12;
+  let k = "";
+  for (let i = 0; i <= pasos; i++) {
+    const t = i / pasos, onda = Math.sin(t * Math.PI * 4);
+    const ax = (-320 * t).toFixed(1), ay = (onda * 12).toFixed(1);
+    const bx = (420 * t).toFixed(1), by = (-onda * 9 + Math.sin(t * Math.PI * 2) * 6).toFixed(1);
+    k += `${(t * 100).toFixed(2)}%{background-position:${ax}px ${ay}px,${bx}px ${by}px,${(40 * Math.sin(t * Math.PI * 2)).toFixed(1)}px ${(-320 * t).toFixed(1)}px,${(-256 * t).toFixed(1)}px 100%,0 0,0 0}`;
+  }
+  return `@keyframes cc-guarida{${k}}`;
+}
 export const FONDOS = {
   fondo_aurora: { css: "background:radial-gradient(60% 50% at 20% 20%,rgba(74,222,128,.35),transparent 70%),radial-gradient(50% 45% at 80% 30%,rgba(56,189,248,.32),transparent 70%),radial-gradient(60% 50% at 50% 85%,rgba(192,132,252,.3),transparent 70%),#020617;background-size:200% 200%;animation:cc-aurora 18s ease-in-out infinite alternate", oscuro: true },
   fondo_galaxia: { css: "background:radial-gradient(1px 1px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#fff,transparent),radial-gradient(1.5px 1.5px at 55% 35%,#fff,transparent),radial-gradient(1px 1px at 75% 80%,#fff,transparent),radial-gradient(1.5px 1.5px at 90% 15%,#fff,transparent),radial-gradient(1px 1px at 45% 90%,#fff,transparent),radial-gradient(ellipse at 70% 40%,rgba(147,51,234,.45),transparent 60%),radial-gradient(ellipse at 20% 80%,rgba(37,99,235,.4),transparent 55%),#05010f;background-size:220px 220px,300px 300px,260px 260px,340px 340px,280px 280px,200px 200px,100% 100%,100% 100%,100% 100%;animation:cc-titilar 6s ease-in-out infinite alternate", oscuro: true },
@@ -134,6 +168,11 @@ export const FONDOS = {
   fondo_mazmorra: { css: `background:url("${svg('<g shape-rendering="crispEdges"><rect width="32" height="32" fill="#292524"/><g fill="#44403c"><rect x="1" y="1" width="14" height="6"/><rect x="17" y="1" width="14" height="6"/><rect x="9" y="9" width="14" height="6"/><rect x="-7" y="9" width="14" height="6"/><rect x="25" y="9" width="14" height="6"/><rect x="1" y="17" width="14" height="6"/><rect x="17" y="17" width="14" height="6"/><rect x="9" y="25" width="14" height="6"/><rect x="-7" y="25" width="14" height="6"/><rect x="25" y="25" width="14" height="6"/></g></g>', 32, 32)}") 0 0/96px 96px,#1c1917;background-blend-mode:normal`, oscuro: true },
   fondo_espacial: { css: `background:url("${svg('<g shape-rendering="crispEdges"><path d="M6 10h2v2h2v4H4v-4h2z" fill="#22d3ee"/><path d="M6 16h2v2H6z" fill="#f97316"/><path d="M24 22h2v2h2v2h-6v-2h2z" fill="#f472b6"/><rect x="14" y="4" width="1" height="1" fill="#fff"/><rect x="28" y="12" width="1" height="1" fill="#fff"/><rect x="18" y="28" width="1" height="1" fill="#fff"/><rect x="2" y="26" width="1" height="1" fill="#fde047"/></g>', 32, 32)}") 0 0/120px 120px,radial-gradient(ellipse at 50% 0,#1e1b4b,#020617 70%);animation:cc-olas 30s linear infinite`, oscuro: true },
   fondo_pista: { css: "background:repeating-conic-gradient(#0f172a 0 25%,#f8fafc 0 50%) 0 0/24px 24px,#111;background:linear-gradient(90deg,transparent 46%,#facc15 46% 47%,transparent 47% 53%,#facc15 53% 54%,transparent 54%),repeating-linear-gradient(#475569 0 40px,#334155 40px 80px),repeating-conic-gradient(#0f172a 0 25%,#f8fafc 0 50%) 0 0/24px 24px", oscuro: true },
+  fondo_lava_jefe: { css: guaridaJefe(), oscuro: true },
+  fondo_salto_luz: { css: "background:repeating-conic-gradient(from 0deg at 50% 50%,transparent 0 4deg,rgba(147,197,253,.28) 4deg 4.4deg,transparent 4.4deg 9deg,rgba(244,114,182,.22) 9deg 9.3deg),radial-gradient(circle at 50% 50%,#fff 0 1%,#93c5fd 2%,#1e3a8a 14%,#020617 60%);animation:cc-late-fondo 2.4s ease-in-out infinite", oscuro: true },
+  fondo_jungla: { css: `background:url("${svg('<g shape-rendering="crispEdges"><path d="M4 0h2v12H4zM22 0h2v8h-2z" fill="#166534"/><path d="M2 12h6v3H2zM20 8h6v3h-6zM12 22h8v3h-8z" fill="#22c55e"/><path d="M3 15h4v2H3zM21 11h4v2h-4z" fill="#15803d"/><rect x="14" y="4" width="2" height="2" fill="#fde047" fill-opacity=".6"/><rect x="28" y="20" width="2" height="2" fill="#fde047" fill-opacity=".5"/></g>', 32, 32)}") 0 0/112px 112px,radial-gradient(ellipse at 50% 0,rgba(253,224,71,.25),transparent 55%),linear-gradient(#14532d,#052e16 70%,#022c22)`, oscuro: true },
+  fondo_pista_arcoiris: { css: "background:radial-gradient(120% 60% at 50% 120%,transparent 54%,#f43f5e 54.5% 55.5%,#f59e0b 56% 57%,#facc15 57.5% 58.5%,#22c55e 59% 60%,#22d3ee 60.5% 61.5%,#a855f7 62% 63%,transparent 63.5%),radial-gradient(2px 2px at 15% 20%,#fff,transparent),radial-gradient(2px 2px at 80% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 55% 35%,#fff,transparent),radial-gradient(1.5px 1.5px at 35% 10%,#fde047,transparent),linear-gradient(#0b0221,#1e0b4b 60%,#3b0764);animation:cc-olas 18s ease-in-out infinite alternate", oscuro: true },
+  fondo_castillo: { css: `background:url("${svg('<g shape-rendering="crispEdges" fill="#0f172a"><path d="M4 32V18h2v-2h2v2h2v-6h2v-2h2v2h2v6h2v-2h2v2h2v14z"/><rect x="11" y="6" width="2" height="4"/></g><g fill="#fde047"><rect x="12" y="14" width="1" height="2"/><rect x="7" y="22" width="1" height="2"/><rect x="18" y="22" width="1" height="2"/></g>', 32, 32)}") 50% 100%/360px 360px no-repeat,radial-gradient(circle at 78% 22%,#fef9c3 0 4%,rgba(254,249,195,.25) 5%,transparent 14%),radial-gradient(1.5px 1.5px at 20% 30%,#fff,transparent),radial-gradient(1.5px 1.5px at 40% 12%,#fff,transparent),radial-gradient(1.5px 1.5px at 62% 40%,#fff,transparent),linear-gradient(#1e1b4b,#4c1d95 65%,#7e22ce)`, oscuro: true },
   fondo_portatil: { css: "background:radial-gradient(circle,rgba(15,56,15,.35) 1px,transparent 1.5px) 0 0/5px 5px,linear-gradient(#9bbc0f,#8bac0f)" },
   fondo_arcade: { css: "background:repeating-linear-gradient(0deg,rgba(0,0,0,.25) 0 2px,transparent 2px 4px),repeating-linear-gradient(90deg,rgba(244,63,94,.5) 0 2px,transparent 2px 56px) 0 100%/100% 40% no-repeat,repeating-linear-gradient(0deg,rgba(250,204,21,.45) 0 2px,transparent 2px 28px) 0 100%/100% 40% no-repeat,radial-gradient(2px 2px at 20% 18%,#fff,transparent),radial-gradient(2px 2px at 70% 12%,#fff,transparent),radial-gradient(2px 2px at 45% 30%,#facc15,transparent),linear-gradient(#0f0524,#3b0764 58%,#1e0336)", oscuro: true },
   fondo_islas: { css: `background:url("${svg('<g shape-rendering="crispEdges"><rect x="4" y="18" width="14" height="3" fill="#a855f7"/><rect x="6" y="21" width="10" height="3" fill="#6d28d9"/><rect x="9" y="24" width="4" height="3" fill="#4c1d95"/><rect x="11" y="13" width="2" height="5" fill="#f472b6"/><rect x="9" y="11" width="6" height="3" fill="#f9a8d4"/><rect x="22" y="6" width="6" height="2" fill="#fff" fill-opacity=".7"/><rect x="20" y="8" width="10" height="2" fill="#fff" fill-opacity=".7"/></g>', 32, 32)}") 0 0/160px 160px,linear-gradient(#38bdf8,#a5b4fc 55%,#f0abfc)` },
@@ -172,6 +211,8 @@ export const MARCOS = {
   marco_lava: "background:conic-gradient(#1c1917,#dc2626,#1c1917,#f97316,#1c1917,#facc15,#1c1917);box-shadow:0 0 16px rgba(220,38,38,.75);animation:cc-rot 5s linear infinite",
   marco_aurora: "background:conic-gradient(#4ade80,#22d3ee,#a78bfa,#f0abfc,#22d3ee,#4ade80);box-shadow:0 0 18px rgba(74,222,128,.55),0 0 30px rgba(167,139,250,.35);animation:cc-rot 6s linear infinite",
   marco_estelar: "background:radial-gradient(circle at 20% 20%,#fff 0 6%,transparent 7%),radial-gradient(circle at 80% 30%,#fff 0 5%,transparent 6%),radial-gradient(circle at 40% 85%,#fff 0 5%,transparent 6%),conic-gradient(#1e1b4b,#6366f1,#1e1b4b,#a855f7,#1e1b4b);box-shadow:0 0 14px rgba(129,140,248,.7);animation:cc-rot 9s linear infinite",
+  marco_estrella: "background:conic-gradient(#f43f5e,#f59e0b,#facc15,#22c55e,#22d3ee,#6366f1,#a855f7,#f43f5e);box-shadow:0 0 22px 6px rgba(168,85,247,.55),0 0 0 2px #fff;animation:cc-rot 1.6s linear infinite",
+  marco_fuego_azul: "background:conic-gradient(#0ea5e9,#e0f2fe,#2563eb,#67e8f9,#1d4ed8,#0ea5e9);box-shadow:0 0 18px 6px rgba(14,165,233,.7),0 0 34px 10px rgba(37,99,235,.35);animation:cc-rot 1.2s linear infinite",
   marco_jefe: "background:conic-gradient(#450a0a,#dc2626,#000,#7f1d1d,#f43f5e,#000,#450a0a);box-shadow:0 0 18px rgba(220,38,38,.8);animation:cc-rot 1.4s linear infinite",
   marco_vida: "background:repeating-conic-gradient(#ef4444 0 26deg,#1f2937 26deg 30deg);box-shadow:0 0 10px rgba(239,68,68,.6)",
   marco_nivel_up: "background:conic-gradient(#fde047,#22d3ee,#fff,#a3e635,#fde047);box-shadow:0 0 20px 5px rgba(253,224,71,.7);animation:cc-rot 2.4s linear infinite",
@@ -191,12 +232,16 @@ const CSS_BASE = `
 @keyframes cc-olas{to{background-position:160px 100%,-180px 100%,0 0}}
 @keyframes cc-cuadricula{to{background-position:0 40px,40px 0,0 0}}
 @keyframes cc-rot{to{transform:rotate(360deg)}}
+@keyframes cc-late-fondo{50%{filter:brightness(1.3) saturate(1.25)}}
+${cuadrosGuarida()}
+@keyframes cc-tono{to{filter:hue-rotate(360deg)}}
 #cc-fondo{position:fixed;inset:0;z-index:-1;pointer-events:none}
 #cc-fondo canvas{width:100%;height:100%;display:block}
 html.cc-con-fondo body{background:transparent!important}
 #cc-fondo::after{content:"";position:absolute;inset:0;background:var(--cc-velo,transparent)}
 html.cc-con-fondo :is(.area-editor,.editores,.editor-dividido,.ed-monaco,.monaco-editor,.aula .ed-monaco,.aula #ed){background:var(--cc-panel-solido)!important}
 html.cc-con-fondo .pantalla-reto{background-color:transparent}
+html.cc-con-fondo .trabajo-pagina :is(.panel-inf,#terminalPanel,.explorador,.asistente,.editor-tarjeta,.ide-estado,.term,.problemas,.puertos){background-color:color-mix(in srgb,var(--cc-panel-solido) 95%,transparent)!important}
 html.cc-con-fondo .r-pie{background:color-mix(in srgb,var(--cc-bg-solido) 62%,transparent)!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 html.cc-con-fondo .r-pie.bien{background:color-mix(in srgb,var(--acc) 28%,color-mix(in srgb,var(--cc-bg-solido) 55%,transparent))!important}
 html.cc-con-fondo .r-pie.mal{background:color-mix(in srgb,var(--rojo,#ef4444) 26%,color-mix(in srgb,var(--cc-bg-solido) 55%,transparent))!important}
@@ -376,6 +421,8 @@ export const EFECTOS = {
   efecto_codigo: (x, y) => { const t = ["{ }", "</>", "01", ";", "=>", "()", "[ ]", "#"]; for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; texto(x, y, t[i % t.length], { color: ["#4ade80", "#22d3ee", "#facc15"][i % 3], tam: 13, dx: Math.cos(a) * 70, dy: Math.sin(a) * 70, dur: 800 }); } },
   efecto_ondas: (x, y) => { [0, 140, 280].forEach((d, k) => setTimeout(() => onda(x, y, ["#38bdf8", "#7dd3fc", "#bae6fd"][k], 3.6 + k), d)); },
   efecto_emojis: (x, y) => { const e = ["🎉", "✨", "🔥", "🚀", "💯", "⭐"]; for (let i = 0; i < 7; i++) texto(x, y, e[(Math.random() * e.length) | 0], { color: "transparent", tam: 18 + Math.random() * 8, dx: (Math.random() - .5) * 140, dy: -50 - Math.random() * 90, dur: 1100, emoji: true }); },
+  efecto_rayo: (x, y) => { texto(x, y, "⚡", { color: "#fde047", tam: 34, dx: 0, dy: -20, dur: 500 }); particula(x, y, { color: "#fde047", tam: 46, dx: 0, dy: 0, dur: 450, forma: "burbuja" }); particula(x, y, { color: "#38bdf8", tam: 28, dx: 0, dy: 0, dur: 600, forma: "burbuja" }); for (let i = 0; i < 14; i++) { const a = Math.random() * Math.PI * 2, r = 50 + Math.random() * 50; particula(x, y, { color: i % 2 ? "#fde047" : "#e0f2fe", tam: 5, dx: Math.cos(a) * r, dy: Math.sin(a) * r, dur: 420, forma: "pixel" }); } },
+  efecto_powerup: (x, y) => { texto(x, y, "¡POWER UP!", { color: `hsl(${Math.random() * 360} 95% 60%)`, tam: 19, dx: 0, dy: -60, dur: 900 }); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; particula(x, y, { color: `hsl(${i * 22} 95% 60%)`, tam: 9, dx: Math.cos(a) * 80, dy: Math.sin(a) * 80, dur: 700, forma: "estrella" }); } },
   efecto_critico: (x, y) => { texto(x, y, "¡CRÍTICO!", { color: "#ef4444", tam: 20, dx: 0, dy: -55, dur: 850 }); for (let i = 0; i < 10; i++) { const a = Math.random() * Math.PI * 2; particula(x, y, { color: ["#ef4444", "#fde047"][i % 2], tam: 6, dx: Math.cos(a) * 60, dy: Math.sin(a) * 60, dur: 500, forma: "pixel" }); } },
   efecto_xp: (x, y) => { for (let i = 0; i < 8; i++) particula(x, y, { color: ["#a3e635", "#4ade80", "#fde047"][i % 3], tam: 7 + Math.random() * 6, dx: (Math.random() - .5) * 60, dy: -50 - Math.random() * 60, dur: 900 + Math.random() * 400, forma: "punto" }); texto(x, y, "+XP", { color: "#a3e635", tam: 15, dx: 0, dy: -45, dur: 800 }); },
   efecto_teletransporte: (x, y) => { particula(x, y, { color: "#22d3ee", tam: 30, dx: 0, dy: 0, dur: 600, forma: "burbuja" }); particula(x, y, { color: "#a855f7", tam: 16, dx: 0, dy: 0, dur: 700, forma: "burbuja" }); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; particula(x + Math.cos(a) * 40, y + Math.sin(a) * 40, { color: "#67e8f9", tam: 5, dx: -Math.cos(a) * 40, dy: -Math.sin(a) * 40, dur: 500, forma: "pixel" }); } },
@@ -405,6 +452,8 @@ function texto(x, y, ch, { color, tam, dx, dy, dur, emoji = false, girar = 0 }) 
 }
 /** Cada estela: mover(x, y, i) se llama mientras el dedo se desliza; tocar(x, y) al apoyar el dedo. */
 export const DEDOS = {
+  dedo_cola_cometa: { mover: (x, y, i) => { particula(x, y, { color: "#e0f2fe", tam: 10, dx: 0, dy: 0, dur: 380, forma: "punto" }); if (i % 2 === 0) particula(x, y, { color: ["#38bdf8", "#a78bfa", "#fde047"][i % 3], tam: 5, dx: (Math.random() - .5) * 30, dy: (Math.random() - .5) * 30, dur: 700, forma: "estrella" }); } },
+  dedo_estela_arcoiris: { mover: (x, y, i) => particula(x, y, { color: `hsl(${(i * 18) % 360} 95% 60%)`, tam: 9, dx: 0, dy: 0, dur: 650, forma: "pixel" }) },
   dedo_turbo: { mover: (x, y) => particula(x, y, { color: ["#f97316", "#fde047", "#ef4444"][Math.floor(Math.random() * 3)], tam: 6 + Math.random() * 4, dx: (Math.random() - .5) * 10, dy: 8 + Math.random() * 14, dur: 500, forma: "pixel" }) },
   dedo_orbes: { mover: (x, y, i) => { if (i % 2 === 0) particula(x, y, { color: ["#a3e635", "#4ade80"][i % 4 ? 0 : 1], tam: 8, dx: (Math.random() - .5) * 16, dy: -18 - Math.random() * 16, dur: 800, forma: "punto" }); } },
   dedo_tinta: { mover: (x, y) => particula(x, y, { color: "#3b82f6", tam: 7 + Math.random() * 6, dx: (Math.random() - .5) * 6, dy: 10 + Math.random() * 10, dur: 700, forma: "punto" }) },
@@ -448,7 +497,7 @@ function onda(x, y, color, escala = 2.6) {
   document.body.appendChild(p);
   p.animate([{ transform: "translate(-50%,-50%) scale(.4)", opacity: .9 }, { transform: `translate(-50%,-50%) scale(${escala})`, opacity: 0 }], { duration: 450, easing: "ease-out" }).onfinish = () => p.remove();
 }
-const COLOR_DEDO = { dedo_turbo: "#f97316", dedo_orbes: "#a3e635", dedo_tinta: "#3b82f6", dedo_burbujas: "#7dd3fc", dedo_neon: "#22d3ee", dedo_codigo: "#4ade80", dedo_arcoiris: "#f59e0b", dedo_fuego: "#f97316", dedo_galaxia: "#c084fc",
+const COLOR_DEDO = { dedo_cola_cometa: "#38bdf8", dedo_estela_arcoiris: "#a855f7", dedo_turbo: "#f97316", dedo_orbes: "#a3e635", dedo_tinta: "#3b82f6", dedo_burbujas: "#7dd3fc", dedo_neon: "#22d3ee", dedo_codigo: "#4ade80", dedo_arcoiris: "#f59e0b", dedo_fuego: "#f97316", dedo_galaxia: "#c084fc",
   dedo_estrellas: "#facc15", dedo_nieve: "#bae6fd", dedo_corazones: "#f43f5e", dedo_pixeles: "#a855f7", dedo_rayo: "#fde047", dedo_sakura: "#f472b6", dedo_cometa: "#38bdf8",
   dedo_hojas: "#f97316", dedo_notas: "#a855f7", dedo_confeti: "#f43f5e", dedo_luciernagas: "#fde047", dedo_humo: "#a78bfa", dedo_dragon: "#f97316", dedo_mito: "#f0abfc" };
 
@@ -673,13 +722,15 @@ export function vistaPrevia(el, clave, tipo) {
     el.innerHTML = [["normal", "Normal"], ["mano", "Enlaces"], ["texto", "Texto"]].map(([k, t]) => `<span class="cc-prev-cur" data-k="${k}" style="cursor:url('${j[k].url}') ${j[k].x} ${j[k].y},auto"><img src="${j[k].url}" alt="" width="40" height="40"><small>${t}</small></span>`).join("");
   } else if (tipo === "tema" && TEMAS[clave]) {
     const t = TEMAS[clave];
-    el.innerHTML = `<span style="background:${t.acc}"></span><span style="background:${t.acc2}"></span><span style="background:${t.cy}"></span>`;
-    el.classList.add("cc-prev-tema");
+    const escena = escenaArticulo(clave, "tema", { tema: t });
+    if (escena) { el.innerHTML = escena + `<span class="cc-prev-paleta"><i style="background:${t.acc}"></i><i style="background:${t.acc2}"></i><i style="background:${t.cy}"></i></span>`; el.classList.add("cc-prev-escena"); }
+    else { el.innerHTML = `<span style="background:${t.acc}"></span><span style="background:${t.acc2}"></span><span style="background:${t.cy}"></span>`; el.classList.add("cc-prev-tema"); }
   } else if (tipo === "marco" && MARCOS[clave]) {
     estilo("cc-cosmeticos-base", CSS_BASE);
     el.innerHTML = `<span class="cc-marco" data-marco="${clave}"><span class="cc-prev-cara cc-prev-inicial">A</span></span>`;
   } else if (tipo === "dedo" && DEDOS[clave]) {
-    el.innerHTML = `<span class="cc-prev-efecto">${matchMedia("(pointer: coarse)").matches ? "Toca y desliza el dedo aquí" : "Mueve el mouse aquí"}</span>`;
+    el.innerHTML = `${escenaArticulo(clave, "dedo") || ""}<span class="cc-prev-efecto">${matchMedia("(pointer: coarse)").matches ? "Toca y desliza el dedo aquí" : "Mueve el mouse aquí"}</span>`;
+    el.classList.add("cc-prev-escena");
     el.style.touchAction = "none";   // dentro de la tarjeta, deslizar dibuja (no mueve la página)
     el.__quitarDedo?.();
     el.__quitarDedo = seguirDedo(el, clave);
@@ -687,7 +738,8 @@ export function vistaPrevia(el, clave, tipo) {
     el.classList.add("cc-prev-codi");
     el.innerHTML = codiSVG("saludo", { tam: 118, accesorio: clave }).replace("<svg ", "<svg data-fijo ");
   } else if (tipo === "efecto") {
-    el.innerHTML = '<span class="cc-prev-efecto">Haz clic aquí</span>';
+    el.innerHTML = `${escenaArticulo(clave, "efecto") || ""}<span class="cc-prev-efecto">Haz clic aquí</span>`;
+    el.classList.add("cc-prev-escena");
     el.onpointerdown = (e) => { const fn = EFECTOS[clave]; if (fn) fn(e.clientX, e.clientY); else for (let i = 0; i < 6; i++) particula(e.clientX, e.clientY, { color: "#facc15", tam: 9, dx: (Math.random() - .5) * 40, dy: 20 + Math.random() * 20, dur: 700, forma: "estrella" }); };
   }
 }

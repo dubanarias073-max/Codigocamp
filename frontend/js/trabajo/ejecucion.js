@@ -6,6 +6,7 @@
 //  · Python      -> Pyodide (se descarga la primera vez), igual que en Aprende.
 //  · SQL         -> sql.js (SQLite en el navegador), igual que en Aprende.
 import { color } from "./ansi.js";
+import { quitarServidor, registrarServidor, servidores } from "./puertos.js";
 import * as FS from "./fs.js";
 import { leerMarcador } from "./archivos.js";
 import { cerrarMysqlEnPython, instalarMysqlEnPython } from "./pymysql.js";
@@ -13,7 +14,8 @@ import { dependenciasDe, restaurarPaquetes, sugerenciaNode, sugerenciaPython, ur
 
 const MAX_SALIDA = 200_000;
 const TIEMPO_MAXIMO = 120_000;
-const BUILTINS = ["fs", "path", "util", "os", "events", "readline", "readline/promises", "assert", "fs/promises", "timers/promises"];
+const BUILTINS = ["fs", "path", "util", "os", "events", "readline", "readline/promises", "assert", "fs/promises", "timers/promises",
+  "http", "https", "express", "cors", "body-parser", "dotenv", "dotenv/config", "morgan", "url", "querystring", "crypto", "buffer"];
 
 // ===================================================================================================
 //  Entorno de ejecución de Node. Esta función se serializa con toString() y corre DENTRO del Worker,
@@ -308,12 +310,384 @@ export function runtimeNode(CC) {
     format: (...a) => formatear(a), promisify: (f) => (...a) => new Promise((ok, ko) => f(...a, (e, r) => (e ? ko(e) : ok(r)))),
     isDeepStrictEqual: iguales, inherits: (c, s) => { Object.setPrototypeOf(c.prototype, s.prototype); }, types: { isPromise: (x) => x instanceof Promise },
   };
+
+  // ===================================================================== servidores de desarrollo ====
+  // http.createServer / Express: el servidor queda escuchando en un puerto y la vista previa de Trabajo le manda
+  // las peticiones (como abrir http://localhost:3000 en tu PC). Ctrl+C (o «Detener» en PUERTOS) lo apaga.
+  const codificador = new TextEncoder(), decodificador = new TextDecoder();
+  class Buffer extends Uint8Array {
+    static from(x, enc) {
+      if (typeof x === "string") {
+        if (enc === "base64") { const b = atob(x); const r = new Buffer(b.length); for (let i = 0; i < b.length; i += 1) r[i] = b.charCodeAt(i); return r; }
+        if (enc === "hex") { const r = new Buffer(x.length / 2); for (let i = 0; i < r.length; i += 1) r[i] = parseInt(x.substr(i * 2, 2), 16); return r; }
+        const u = codificador.encode(x); const r = new Buffer(u.length); r.set(u); return r;
+      }
+      if (x instanceof ArrayBuffer) return new Buffer(x);
+      const r = new Buffer(x.length || 0); r.set(x); return r;
+    }
+    static alloc(n, f = 0) { return new Buffer(n).fill(f); }
+    static concat(l) { const t = l.reduce((s, b) => s + b.length, 0); const r = new Buffer(t); let o = 0; for (const b of l) { const u = typeof b === "string" ? codificador.encode(b) : b; r.set(u, o); o += u.length; } return r; }
+    static isBuffer(b) { return b instanceof Buffer; }
+    static byteLength(s) { return typeof s === "string" ? codificador.encode(s).length : s.length; }
+    toString(enc) {
+      if (enc === "base64") { let s = ""; for (let i = 0; i < this.length; i += 0x8000) s += String.fromCharCode(...this.subarray(i, i + 0x8000)); return btoa(s); }
+      if (enc === "hex") return [...this].map((b) => b.toString(16).padStart(2, "0")).join("");
+      return decodificador.decode(this);
+    }
+    toJSON() { return { type: "Buffer", data: [...this] }; }
+  }
+  self.Buffer = Buffer;
+  const ESTADOS_HTTP = { 100: "Continue", 200: "OK", 201: "Created", 202: "Accepted", 204: "No Content", 301: "Moved Permanently", 302: "Found", 303: "See Other", 304: "Not Modified", 307: "Temporary Redirect", 308: "Permanent Redirect", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 409: "Conflict", 413: "Payload Too Large", 415: "Unsupported Media Type", 422: "Unprocessable Entity", 429: "Too Many Requests", 500: "Internal Server Error", 501: "Not Implemented", 502: "Bad Gateway", 503: "Service Unavailable" };
+  const MIME = { html: "text/html; charset=utf-8", htm: "text/html; charset=utf-8", css: "text/css; charset=utf-8", js: "text/javascript; charset=utf-8", mjs: "text/javascript; charset=utf-8", json: "application/json; charset=utf-8", txt: "text/plain; charset=utf-8", md: "text/markdown; charset=utf-8", csv: "text/csv; charset=utf-8", xml: "application/xml", svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", ico: "image/x-icon", pdf: "application/pdf", mp3: "audio/mpeg", mp4: "video/mp4", wav: "audio/wav", woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", map: "application/json", webmanifest: "application/manifest+json" };
+  const mimeDe = (r) => MIME[String(r).split(".").pop().toLowerCase()] || "application/octet-stream";
+  const esMarcadorBin = (t) => typeof t === "string" && /^cc(?:img|bin):v1:[a-f0-9]{64}:/.test(t);
+  const servidoresHttp = new Map();
+  const esperandoPuerto = new Map();
+
+  class IncomingMessage extends EventEmitter {
+    constructor(d) {
+      super();
+      this.method = String(d.method || "GET").toUpperCase(); this.url = d.url || "/"; this.httpVersion = "1.1"; this.complete = false;
+      this.headers = {}; this.rawHeaders = [];
+      for (const [k, v] of d.headers || []) { this.headers[k.toLowerCase()] = v; this.rawHeaders.push(k, v); }
+      this.socket = this.connection = { remoteAddress: "127.0.0.1", encrypted: false };
+      this._cuerpo = d.cuerpo || "";
+    }
+    setEncoding() { return this; }
+    pipe(destino) { this.on("data", (c) => destino.write(c)); this.on("end", () => destino.end && destino.end()); return destino; }
+    [Symbol.asyncIterator]() { const c = this._cuerpo; let hecho = !c; return { next: async () => (hecho ? { done: true, value: undefined } : ((hecho = true), { done: false, value: Buffer.from(c) })) }; }
+  }
+  class ServerResponse extends EventEmitter {
+    constructor(id, req) { super(); this._id = id; this.req = req; this.statusCode = 200; this.statusMessage = ""; this._h = {}; this._partes = []; this.headersSent = false; this.finished = false; this.writableEnded = false; this.locals = {}; }
+    setHeader(k, v) { this._h[String(k).toLowerCase()] = [k, v]; return this; }
+    getHeader(k) { return this._h[String(k).toLowerCase()]?.[1]; }
+    getHeaders() { return Object.fromEntries(Object.entries(this._h).map(([k, [, v]]) => [k, v])); }
+    getHeaderNames() { return Object.keys(this._h); }
+    hasHeader(k) { return String(k).toLowerCase() in this._h; }
+    removeHeader(k) { delete this._h[String(k).toLowerCase()]; }
+    writeHead(s, m, h) { if (m && typeof m === "object") h = m; this.statusCode = s; if (typeof m === "string") this.statusMessage = m; if (h) for (const [k, v] of Array.isArray(h) ? h : Object.entries(h)) this.setHeader(k, v); this.headersSent = true; return this; }
+    write(c, enc, cb) { if (c != null) this._partes.push(typeof c === "string" ? c : Buffer.from(c)); this.headersSent = true; if (typeof enc === "function") enc(); else if (cb) cb(); return true; }
+    end(c, enc, cb) {
+      if (typeof c === "function") { cb = c; c = null; } else if (typeof enc === "function") cb = enc;
+      if (this.writableEnded) return this;
+      if (c != null) this._partes.push(typeof c === "string" ? c : Buffer.from(c));
+      this.writableEnded = this.finished = this.headersSent = true;
+      const cabeceras = [];
+      for (const [, [k, v]] of Object.entries(this._h)) (Array.isArray(v) ? v : [v]).forEach((x) => cabeceras.push([k, String(x)]));
+      const cuerpo = this.req && this.req.method === "HEAD" ? new Uint8Array(0) : Buffer.concat(this._partes);
+      enviar({ t: "respuesta", id: this._id, status: this.statusCode, headers: cabeceras, body: cuerpo, archivo: this._archivo || null });
+      nativo.setTimeout(() => { this.emit("finish"); this.emit("close"); if (cb) cb(); }, 0);
+      return this;
+    }
+    flushHeaders() {} setTimeout() { return this; } cork() {} uncork() {}
+  }
+  function crearServidorHttp(a, b) {
+    const manejador = typeof a === "function" ? a : b;
+    const srv = new EventEmitter();
+    if (manejador) srv.on("request", manejador);
+    srv.listening = false; srv.keepAliveTimeout = 5000; srv.headersTimeout = 60000;
+    srv.listen = (...args) => {
+      let puerto = args[0];
+      const cb = args.find((x) => typeof x === "function");
+      if (puerto && typeof puerto === "object") puerto = puerto.port;
+      puerto = Number(puerto);
+      if (!Number.isInteger(puerto) || puerto < 0 || puerto > 65535) { const e = new RangeError(`options.port should be >= 0 and < 65536. Received ${args[0]}.`); e.code = "ERR_SOCKET_BAD_PORT"; throw e; }
+      if (!puerto) puerto = 30000 + Math.floor(Math.random() * 20000);
+      if (cb) srv.once("listening", cb);
+      srv._puerto = puerto;
+      pendientesE_S += 1;   // un servidor escuchando mantiene vivo el programa (como en Node)
+      esperandoPuerto.set(puerto, srv);
+      enviar({ t: "escucha", puerto, express: Boolean(srv._express) });
+      return srv;
+    };
+    srv.close = (cb) => {
+      if (servidoresHttp.get(srv._puerto) === srv) { servidoresHttp.delete(srv._puerto); pendientesE_S -= 1; enviar({ t: "cierra", puerto: srv._puerto }); }
+      srv.listening = false;
+      nativo.setTimeout(() => { srv.emit("close"); if (cb) cb(); revisar(); }, 0);
+      return srv;
+    };
+    srv.address = () => (srv.listening ? { address: "::", family: "IPv6", port: srv._puerto } : null);
+    srv.setTimeout = () => srv; srv.ref = () => srv; srv.unref = () => srv; srv.closeAllConnections = () => {}; srv.getConnections = (cb) => cb(null, 0);
+    return srv;
+  }
+  self.addEventListener("message", (ev) => {
+    const m = ev.data;
+    if (!m) return;
+    if (m.t === "escuchando" || m.t === "ocupado") {
+      const srv = esperandoPuerto.get(m.puerto);
+      if (!srv) return;
+      esperandoPuerto.delete(m.puerto);
+      if (m.t === "ocupado") {
+        pendientesE_S -= 1;
+        const e = new Error(`listen EADDRINUSE: address already in use :::${m.puerto}`); e.code = "EADDRINUSE"; e.errno = -98; e.syscall = "listen"; e.port = m.puerto;
+        try { srv.emit("error", e); } catch (x) { fatal(x); }
+        revisar();
+        return;
+      }
+      servidoresHttp.set(m.puerto, srv); srv.listening = true;
+      try { srv.emit("listening"); } catch (x) { fatal(x); }
+      return;
+    }
+    if (m.t !== "peticion") return;
+    const srv = servidoresHttp.get(m.puerto);
+    if (!srv) { enviar({ t: "respuesta", id: m.id, status: 502, headers: [["content-type", "text/plain"]], body: codificador.encode("El servidor no está escuchando.") }); return; }
+    const req = new IncomingMessage(m);
+    const res = new ServerResponse(m.id, req);
+    try { srv.emit("request", req, res); } catch (e) { fatal(e); return; }
+    nativo.setTimeout(() => { if (req._cuerpo) req.emit("data", Buffer.from(req._cuerpo)); req.complete = true; req.emit("end"); }, 0);
+  });
+  const httpModulo = { createServer: crearServidorHttp, Server: function Server(h) { return crearServidorHttp(h); }, STATUS_CODES: ESTADOS_HTTP, METHODS: ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"], IncomingMessage, ServerResponse,
+    request() { throw new Error("http.request no está disponible: usa fetch() para pedir datos a otras páginas."); }, get() { throw new Error("http.get no está disponible: usa fetch()."); } };
+
+  // ---- querystring / url ----
+  const qsParse = (s) => { const o = {}; for (const [k, v] of new URLSearchParams(String(s || "").replace(/^\?/, ""))) { if (k in o) o[k] = [].concat(o[k], v); else o[k] = v; } return o; };
+  const qsStringify = (o) => new URLSearchParams(Object.entries(o || {}).flatMap(([k, v]) => (Array.isArray(v) ? v.map((x) => [k, x]) : [[k, v]]))).toString();
+  const querystring = { parse: qsParse, stringify: qsStringify, escape: encodeURIComponent, unescape: decodeURIComponent };
+  const urlModulo = { URL, URLSearchParams, parse: (u, conQuery) => { const x = new URL(u, "http://localhost"); const abs = /^[a-z]+:\/\//i.test(u); return { protocol: abs ? x.protocol : null, host: abs ? x.host : null, hostname: abs ? x.hostname : null, port: abs ? x.port || null : null, pathname: x.pathname, search: x.search || null, query: conQuery ? qsParse(x.search) : (x.search.slice(1) || null), hash: x.hash || null, href: u, path: x.pathname + x.search }; }, format: (o) => (typeof o === "string" ? o : (o.protocol ? o.protocol + "//" + (o.host || o.hostname) : "") + (o.pathname || "") + (o.search || "")), fileURLToPath: (u) => String(u).replace(/^file:\/\//, ""), pathToFileURL: (p) => new URL("file://" + p) };
+
+  // ---- Express (lo que se usa en clase y en proyectos: rutas, Router, middleware, errores, json, static…) ----
+  function compilarRuta(ruta, final) {
+    if (ruta instanceof RegExp) return { re: ruta, claves: [] };
+    const claves = [];
+    const limpia = String(ruta).replace(/\/+$/, "");
+    let fuente = "";
+    for (const seg of limpia.split("/").slice(1)) {
+      if (seg === "*" || seg === "(.*)") { claves.push("0"); fuente += "/(.*)"; continue; }
+      const m = /^:(\w+)(\(.+\))?(\?)?$/.exec(seg);
+      if (m) { claves.push(m[1]); fuente += m[3] ? `(?:/(${m[2] ? m[2].slice(1, -1) : "[^/]+?"}))?` : `/(${m[2] ? m[2].slice(1, -1) : "[^/]+?"})`; continue; }
+      fuente += "/" + seg.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, k) => { claves.push(k); return "([^/]+?)"; });
+    }
+    return { re: new RegExp("^" + fuente + (final ? "/?$" : "(?=/|$)"), "i"), claves };
+  }
+  const METODOS = ["get", "post", "put", "patch", "delete", "options", "head", "all"];
+  function crearRouter(opciones = {}) {
+    const capas = [];
+    const router = function (req, res, salir) { manejar(req, res, salir || (() => {})); };
+    router.__esRouter = true; router.stack = capas;
+    const agregar = (metodo, ruta, fns, final) => { fns = fns.flat(Infinity).filter(Boolean); for (const r of Array.isArray(ruta) ? ruta : [ruta]) capas.push({ metodo, ...compilarRuta(r, final), fns, final }); };
+    router.use = (...a) => { const ruta = typeof a[0] === "string" || a[0] instanceof RegExp || (Array.isArray(a[0]) && typeof a[0][0] === "string") ? a.shift() : "/"; agregar(null, ruta, a, false); return router; };
+    for (const m of METODOS) router[m] = (ruta, ...fns) => { agregar(m === "all" ? "*" : m.toUpperCase(), ruta, fns, true); return router; };
+    router.route = (ruta) => { const r = {}; for (const m of METODOS) r[m] = (...fns) => { router[m](ruta, ...fns); return r; }; return r; };
+    router.param = () => router;
+    function manejar(req, res, salir) {
+      let i = 0;
+      const urlOriginal = req.url, baseOriginal = req.baseUrl || "", paramsOriginales = req.params || {};
+      const restaurar = () => { req.url = urlOriginal; req.baseUrl = baseOriginal; };
+      const siguiente = (err) => {
+        if (err === "router") { restaurar(); return salir(); }
+        const capa = capas[i++];
+        if (!capa) { restaurar(); req.params = paramsOriginales; return salir(err); }
+        let camino = (urlOriginal.split("?")[0] || "/");
+        try { camino = decodeURI(camino); } catch { /* se deja como vino */ }
+        const m = capa.re.exec(camino);
+        if (!m) return siguiente(err);
+        if (capa.metodo && capa.metodo !== "*" && capa.metodo !== req.method && !(capa.metodo === "GET" && req.method === "HEAD")) return siguiente(err);
+        const params = {};
+        capa.claves.forEach((k, j) => { if (m[j + 1] !== undefined) { try { params[k] = decodeURIComponent(m[j + 1]); } catch { params[k] = m[j + 1]; } } });
+        req.params = opciones.mergeParams ? { ...paramsOriginales, ...params } : (capa.final ? params : { ...paramsOriginales, ...params });
+        let k = 0;
+        const prefijo = capa.final ? "" : m[0];
+        const correr = (e) => {
+          if (e === "route") return siguiente();
+          if (e === "router") return siguiente("router");
+          const fn = capa.fns[k++];
+          if (!fn) { restaurar(); return siguiente(e); }
+          if (prefijo && prefijo !== "/") { req.baseUrl = baseOriginal + prefijo; req.url = urlOriginal.slice(prefijo.length) || "/"; if (!req.url.startsWith("/")) req.url = "/" + req.url; }
+          let llamado = false;
+          const sig = (x) => { if (llamado) return; llamado = true; restaurar(); correr(x); };
+          try {
+            let r;
+            if (e) { if (fn.length === 4) r = fn(e, req, res, sig); else return sig(e); }
+            else if (fn.length === 4) return sig();
+            else r = fn(req, res, sig);
+            if (r && typeof r.then === "function") r.then(null, (x) => sig(x || new Error("Promise rejected")));
+          } catch (x) { sig(x); }
+        };
+        correr(err);
+      };
+      siguiente();
+    }
+    return router;
+  }
+  function decorar(req, res, app) {
+    req.app = res.app = app; req.res = res; res.req = req; req.__exp = true;
+    req.originalUrl = req.originalUrl || req.url; req.baseUrl = ""; req.params = {};
+    Object.defineProperty(req, "path", { get() { return (this.url.split("?")[0]) || "/"; }, configurable: true });
+    Object.defineProperty(req, "query", { get() { return qsParse(this.url.split("?")[1] || ""); }, configurable: true });
+    req.get = req.header = (n) => { const k = String(n).toLowerCase(); return k === "referer" || k === "referrer" ? req.headers.referer || req.headers.referrer : req.headers[k]; };
+    req.hostname = "localhost"; req.protocol = "http"; req.secure = false; req.ip = "127.0.0.1"; req.ips = []; req.subdomains = [];
+    req.xhr = (req.headers["x-requested-with"] || "").toLowerCase() === "xmlhttprequest";
+    req.cookies = Object.fromEntries(String(req.headers.cookie || "").split(/;\s*/).filter(Boolean).map((c) => { const i = c.indexOf("="); return [c.slice(0, i), decodeURIComponent(c.slice(i + 1))]; }));
+    req.is = (t) => { const ct = req.headers["content-type"] || ""; return [].concat(t).some((x) => ct.includes(x.replace("json", "json").replace(/^\w+$/, (w) => (w === "json" ? "application/json" : w)))) ? t : false; };
+    req.accepts = (...t) => [].concat(...t)[0] || false;
+    res.status = (c) => { res.statusCode = c; return res; };
+    res.set = res.header = (k, v) => { if (typeof k === "object") Object.entries(k).forEach(([a, b]) => res.setHeader(a, b)); else res.setHeader(k, v); return res; };
+    res.get = (k) => res.getHeader(k);
+    res.type = res.contentType = (t) => { res.setHeader("Content-Type", t.includes("/") ? t : mimeDe("x." + t.replace(/^\./, ""))); return res; };
+    res.append = (k, v) => { const a = res.getHeader(k); res.setHeader(k, a ? [].concat(a, v) : v); return res; };
+    res.location = (u) => { res.setHeader("Location", u); return res; };
+    res.links = () => res; res.vary = () => res;
+    res.json = (o) => { if (!res.hasHeader("content-type")) res.setHeader("Content-Type", "application/json; charset=utf-8"); return res.end(JSON.stringify(o, null, app.ajustes["json spaces"] || 0)); };
+    res.jsonp = res.json;
+    res.send = (b) => {
+      if (typeof b === "number") { res.statusCode = b; b = ESTADOS_HTTP[b] || String(b); }
+      if (b === null || b === undefined) return res.end();
+      if (b instanceof Uint8Array) { if (!res.hasHeader("content-type")) res.setHeader("Content-Type", "application/octet-stream"); return res.end(b); }
+      if (typeof b === "object" || typeof b === "boolean") return res.json(b);
+      if (!res.hasHeader("content-type")) res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.end(String(b));
+    };
+    res.sendStatus = (c) => { res.statusCode = c; res.setHeader("Content-Type", "text/plain; charset=utf-8"); return res.end(ESTADOS_HTTP[c] || String(c)); };
+    res.redirect = (a, b) => { const [c, u] = typeof a === "number" ? [a, b] : [302, a]; res.statusCode = c; res.setHeader("Location", u); res.setHeader("Content-Type", "text/html; charset=utf-8"); return res.end(`<p>Found. Redirecting to <a href="${u}">${u}</a></p>`); };
+    res.sendFile = (ruta, opciones, cb) => {
+      if (typeof opciones === "function") { cb = opciones; opciones = {}; }
+      const base = opciones && opciones.root ? rutaNode.resolve(opciones.root, String(ruta).replace(/^\//, "")) : rutaNode.resolve(String(ruta));
+      const r = aInterna(base);
+      if (r === null || !(r in archivos)) { const e = errorFs("ENOENT", "no such file or directory, stat", base); e.status = e.statusCode = 404; if (cb) return cb(e); return req.next ? req.next(e) : res.status(404).send("Not Found"); }
+      if (!res.hasHeader("content-type")) res.setHeader("Content-Type", mimeDe(r));
+      if (esMarcadorBin(archivos[r])) { res._archivo = archivos[r]; res.end(); } else res.end(archivos[r]);
+      if (cb) nativo.setTimeout(() => cb(), 0);
+      return res;
+    };
+    res.download = (ruta, nombre, cb) => { res.setHeader("Content-Disposition", `attachment; filename="${typeof nombre === "string" ? nombre : rutaNode.basename(String(ruta))}"`); return res.sendFile(ruta, typeof nombre === "function" ? nombre : cb); };
+    res.attachment = (n) => { res.setHeader("Content-Disposition", n ? `attachment; filename="${n}"` : "attachment"); if (n) res.type(n.split(".").pop()); return res; };
+    res.cookie = (n, v, o = {}) => { let c = `${n}=${encodeURIComponent(typeof v === "object" ? "j:" + JSON.stringify(v) : v)}; Path=${o.path || "/"}`; if (o.maxAge) c += `; Max-Age=${Math.floor(o.maxAge / 1000)}`; if (o.httpOnly) c += "; HttpOnly"; if (o.sameSite) c += `; SameSite=${o.sameSite === true ? "Strict" : o.sameSite}`; return res.append("Set-Cookie", c); };
+    res.clearCookie = (n, o = {}) => res.append("Set-Cookie", `${n}=; Path=${o.path || "/"}; Max-Age=0`);
+    res.format = (obj) => { const f = obj["application/json"] || obj.json || obj["text/html"] || obj.html || obj.default || Object.values(obj)[0]; return f && f(); };
+    res.render = (vista, datos, cb) => {
+      const motor = app.ajustes["view engine"];
+      const carpeta = app.ajustes.views ? rutaNode.resolve(app.ajustes.views) : rutaNode.resolve("views");
+      const r = aInterna(rutaNode.join(carpeta, vista + (/\.\w+$/.test(vista) ? "" : "." + (motor || "html"))));
+      if (r === null || !(r in archivos)) { const e = new Error(`Failed to lookup view "${vista}" in views directory "${carpeta}"`); e.status = 500; if (cb) return cb(e); throw e; }
+      const vars = { ...app.locals, ...res.locals, ...(datos || {}) };
+      let html = archivos[r];
+      if (motor === "ejs" || /\.ejs$/.test(r)) {
+        // EJS básico: <%= valor %>, <%- html %>, <% código %>
+        const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        let codigo = "let __s='';"; let ult = 0; const re = /<%([=-]?)([\s\S]*?)%>/g; let mm;
+        while ((mm = re.exec(html))) { codigo += `__s+=${JSON.stringify(html.slice(ult, mm.index))};`; codigo += mm[1] === "=" ? `__s+=__e(${mm[2]});` : mm[1] === "-" ? `__s+=(${mm[2]})??'';` : mm[2]; ult = re.lastIndex; }
+        codigo += `__s+=${JSON.stringify(html.slice(ult))};return __s;`;
+        try { html = new Function("__e", "locals", `with(locals){${codigo}}`)(esc, vars); } catch (e) { if (cb) return cb(e); throw e; }
+      } else html = html.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, k) => k.split(".").reduce((o, p) => (o == null ? "" : o[p]), vars) ?? "");
+      if (cb) return cb(null, html);
+      res.setHeader("Content-Type", "text/html; charset=utf-8"); return res.end(html);
+    };
+  }
+  function cuerpoMiddleware(tipo, probar, convertir) {
+    return (opciones = {}) => (req, res, next) => {
+      if (req._cuerpoLeido) return next();
+      const ct = String(req.headers["content-type"] || "");
+      if (!probar(ct, opciones)) { if (req.body === undefined) req.body = tipo === "raw" ? undefined : {}; return next(); }
+      req._cuerpoLeido = true;
+      try { req.body = convertir(req._cuerpo || "", opciones); next(); }
+      catch (e) { const x = new SyntaxError(`Unexpected token in JSON at position 0 (${e.message})`); x.status = x.statusCode = 400; x.type = "entity.parse.failed"; x.body = req._cuerpo; next(x); }
+    };
+  }
+  const json = cuerpoMiddleware("json", (ct, o) => (o.type ? ct.includes(o.type) : /json/.test(ct)), (c) => (c.trim() ? JSON.parse(c) : {}));
+  const urlencoded = cuerpoMiddleware("urlencoded", (ct) => /x-www-form-urlencoded/.test(ct), (c) => qsParse(c));
+  const textoMw = cuerpoMiddleware("text", (ct, o) => (o.type ? ct.includes(o.type) : /^text\//.test(ct)), (c) => c);
+  const rawMw = cuerpoMiddleware("raw", (ct, o) => (o.type ? ct.includes(o.type) : /octet-stream/.test(ct)), (c) => Buffer.from(c));
+  function estaticos(raizDir, opciones = {}) {
+    const base = rutaNode.resolve(String(raizDir || "."));
+    return (req, res, next) => {
+      if (req.method !== "GET" && req.method !== "HEAD") return next();
+      let camino = req.path; try { camino = decodeURIComponent(camino); } catch { /* nada */ }
+      if (camino.split("/").includes("..")) return next();
+      let r = aInterna(rutaNode.join(base, camino));
+      if (r === null) return next();
+      if (esCarpeta(r)) { const indice = opciones.index === false ? null : (r ? r + "/" : "") + (opciones.index || "index.html"); if (indice && indice in archivos) r = indice; else return next(); }
+      if (!(r in archivos)) { if (opciones.extensions) { const e = [].concat(opciones.extensions).map((x) => r + "." + x).find((x) => x in archivos); if (!e) return next(); r = e; } else return next(); }
+      res.setHeader("Content-Type", mimeDe(r));
+      if (esMarcadorBin(archivos[r])) { res._archivo = archivos[r]; return res.end(); }
+      return res.end(archivos[r]);
+    };
+  }
+  function crearExpress() {
+    const router = crearRouter();
+    const app = function (req, res, next) { return app.handle(req, res, next); };
+    app.ajustes = { "x-powered-by": true, env: "development", "json spaces": 0 };
+    Object.assign(app, {
+      locals: {}, settings: app.ajustes, mountpath: "/", _router: router,
+      use(...a) {
+        // app.use(otraApp) / app.use('/api', router)
+        router.use(...a.map((x) => (typeof x === "function" && x.handle && !x.__esRouter ? (req, res, next) => x.handle(req, res, next) : x)));
+        return app;
+      },
+      route: (r) => router.route(r), param: () => app,
+      set(k, v) { if (arguments.length === 1) return app.ajustes[k]; app.ajustes[k] = v; return app; },
+      enable: (k) => app.set(k, true), disable: (k) => app.set(k, false), enabled: (k) => Boolean(app.ajustes[k]), disabled: (k) => !app.ajustes[k],
+      engine: () => app, render: (v, d, cb) => cb && cb(new Error("app.render no está disponible: usa res.render")),
+      listen(...a) { const srv = crearServidorHttp(app); srv._express = true; return srv.listen(...a); },
+      handle(req, res, fuera) {
+        if (!req.__exp) { decorar(req, res, app); if (app.ajustes["x-powered-by"]) res.setHeader("X-Powered-By", "Express"); }
+        req.next = undefined;
+        router(req, res, (err) => {
+          if (fuera) return fuera(err);
+          if (err) {
+            const c = err.status || err.statusCode || 500;
+            if (c >= 500) consola.error(err && err.stack ? err.stack : err);
+            if (res.headersSent) return res.end();
+            res.statusCode = c; res.setHeader("Content-Type", "text/html; charset=utf-8");
+            return res.end(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Error</title></head><body><pre>${String(c >= 500 && err.stack ? err.stack : err.message || err).replace(/</g, "&lt;")}</pre></body></html>`);
+          }
+          if (res.headersSent) return;
+          res.statusCode = 404; res.setHeader("Content-Type", "text/html; charset=utf-8"); res.setHeader("Content-Security-Policy", "default-src 'none'");
+          res.end(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Error</title></head><body><pre>Cannot ${req.method} ${(req.originalUrl || req.url).split("?")[0]}</pre></body></html>`);
+        });
+      },
+    });
+    for (const m of METODOS) app[m] = (ruta, ...fns) => { if (m === "get" && !fns.length && typeof ruta === "string") return app.ajustes[ruta]; router[m](ruta, ...fns); return app; };
+    return app;
+  }
+  const express = Object.assign(crearExpress, { Router: crearRouter, json, urlencoded, text: textoMw, raw: rawMw, static: estaticos, request: IncomingMessage.prototype, response: ServerResponse.prototype });
+  express.default = express;
+  const cors = (o = {}) => (req, res, next) => {
+    const origen = o.origin === undefined || o.origin === true || o.origin === "*" ? (o.credentials ? req.headers.origin || "*" : "*") : Array.isArray(o.origin) ? (o.origin.includes(req.headers.origin) ? req.headers.origin : o.origin[0]) : String(o.origin);
+    res.setHeader("Access-Control-Allow-Origin", origen);
+    if (o.credentials) res.setHeader("Access-Control-Allow-Credentials", "true");
+    if (req.method === "OPTIONS") {
+      res.setHeader("Access-Control-Allow-Methods", [].concat(o.methods || "GET,HEAD,PUT,PATCH,POST,DELETE").join(","));
+      res.setHeader("Access-Control-Allow-Headers", [].concat(o.allowedHeaders || req.headers["access-control-request-headers"] || "Content-Type,Authorization").join(","));
+      res.statusCode = o.optionsSuccessStatus || 204; return res.end();
+    }
+    next();
+  };
+  const leerEnv = (opciones = {}) => {
+    const ruta = aInterna(rutaNode.resolve(opciones.path || ".env"));
+    if (ruta === null || !(ruta in archivos)) return { error: errorFs("ENOENT", "no such file or directory, open", opciones.path || ".env") };
+    const parsed = {};
+    for (const l of archivos[ruta].split(/\r?\n/)) {
+      const m = /^\s*(?:export\s+)?([\w.-]+)\s*=\s*(.*?)\s*$/.exec(l);
+      if (!m || l.trim().startsWith("#")) continue;
+      let v = m[2]; const q = v[0];
+      if ((q === '"' || q === "'" || q === "`") && v.endsWith(q)) v = v.slice(1, -1); else v = v.replace(/\s+#.*$/, "");
+      if (q === '"') v = v.replace(/\\n/g, "\n");
+      parsed[m[1]] = v;
+      if (opciones.override || !(m[1] in proceso.env)) proceso.env[m[1]] = v;
+    }
+    return { parsed };
+  };
+  const dotenv = { config: leerEnv, parse: (t) => { const o = {}; String(t).split(/\r?\n/).forEach((l) => { const m = /^\s*([\w.-]+)\s*=\s*(.*)$/.exec(l); if (m) o[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2"); }); return o; } };
+  const morgan = (formato = "dev") => (req, res, next) => {
+    const t0 = performance.now();
+    res.on("finish", () => {
+      const ms = (performance.now() - t0).toFixed(3); const c = res.statusCode;
+      const col = c >= 500 ? 31 : c >= 400 ? 33 : c >= 300 ? 36 : 32;
+      const largo = res.getHeader("content-length") || "-";
+      escribir("out", formato === "dev" || formato === "tiny" ? `${req.method} ${req.originalUrl || req.url} \x1b[${col}m${c}\x1b[0m ${ms} ms - ${largo}\n` : `::1 - - [${new Date().toUTCString()}] "${req.method} ${req.originalUrl || req.url} HTTP/1.1" ${c} ${largo}\n`);
+    });
+    next();
+  };
+  const cryptoModulo = { randomUUID: () => crypto.randomUUID(), randomBytes: (n) => { const b = new Buffer(n); crypto.getRandomValues(b); return b; }, randomInt: (a, b) => (b === undefined ? Math.floor(Math.random() * a) : a + Math.floor(Math.random() * (b - a))), webcrypto: crypto, getRandomValues: (a) => crypto.getRandomValues(a) };
+
   const builtins = {
     fs: fsModulo, "fs/promises": fsPromesas, path: rutaNode, util, events: EventEmitter, assert, "assert/strict": assert,
     os: { EOL: "\n", platform: () => "linux", homedir: () => RAIZ, tmpdir: () => "/tmp", cpus: () => [], type: () => "Linux", arch: () => "x64", hostname: () => "codigocamp" },
     readline: { createInterface: crearInterfaz(false), promises: { createInterface: crearInterfaz(true) } },
     "readline/promises": { createInterface: crearInterfaz(true) },
     "timers/promises": { setTimeout: (ms, v) => new Promise((ok) => self.setTimeout(() => ok(v), ms)) },
+    http: httpModulo, https: httpModulo, express, cors, "body-parser": { json, urlencoded, text: textoMw, raw: rawMw }, dotenv,
+    get "dotenv/config"() { leerEnv(); return {}; }, morgan, url: urlModulo, querystring, crypto: cryptoModulo, buffer: { Buffer },
   };
   const requerirIntegrado = (n) => { const k = String(n).replace(/^node:/, ""); return k in builtins ? builtins[k] : undefined; };
   self.__cc_require = (n) => { const m = requerirIntegrado(n); if (m === undefined) throw new Error(`Cannot find module '${n}'`); return m; };
@@ -322,7 +696,7 @@ export function runtimeNode(CC) {
   const inicio = performance.now();
   const procesoEventos = new EventEmitter();
   const proceso = Object.assign(procesoEventos, {
-    argv: ["/usr/local/bin/node", RAIZ + "/" + (CC.main === "[eval]" ? "" : CC.main), ...CC.args], env: {}, platform: "linux", arch: "x64", pid: 1, version: "v22.0.0", versions: { node: "22.0.0", navegador: "CódigoCamp" },
+    argv: ["/usr/local/bin/node", RAIZ + "/" + (CC.main === "[eval]" ? "" : CC.main), ...CC.args], env: { NODE_ENV: "development", ...(CC.env || {}) }, platform: "linux", arch: "x64", pid: 1, version: "v22.0.0", versions: { node: "22.0.0", navegador: "CódigoCamp" },
     exitCode: undefined, cwd: () => RAIZ + (CC.cwd ? "/" + CC.cwd : ""), uptime: () => (performance.now() - inicio) / 1000,
     exit: (c) => { if (c !== undefined) proceso.exitCode = c; throw EXIT; }, memoryUsage: () => ({ rss: 0, heapTotal: 0, heapUsed: 0 }),
     nextTick: (f, ...a) => queueMicrotask(() => { try { f(...a); } catch (e) { fatal(e); } }),
@@ -417,7 +791,7 @@ async function prepararModulo(ruta, codigo, py, urls, enCurso, deps) {
     let reemplazo;
     const nombre = spec.replace(/^node:/, "");
     if (BUILTINS.includes(nombre)) {
-      const t = palabra === "import" && clausula.trim() ? transformarImportIntegrado(clausula.replace(/\s*from\s*$/, ""), nombre) : (palabra === "import" ? "" : null);
+      const t = palabra === "import" && clausula.trim() ? transformarImportIntegrado(clausula.replace(/\s*from\s*$/, ""), nombre) : (palabra === "import" ? `__cc_require(${JSON.stringify(nombre)});` : null);
       if (t === null) throw new Error(`No se puede usar «export ... from "${spec}"» con módulos integrados.`);
       reemplazo = t;
     } else if (/^\.{1,2}\//.test(spec)) {
@@ -467,7 +841,7 @@ export async function ejecutarNode(o) {
   const py = o.proyecto;
   const archivos = o.archivos || py.files;
   const esm = o.ruta !== "[eval]" && esModulo(o.codigo);
-  const CC = { files: archivos, folders: py.folders, main: o.ruta, args: o.args || [], cwd: o.cwd || "", esm, codigo: o.ruta === "[eval]" ? o.codigo : undefined, imprimir: Boolean(o.imprimir) };
+  const CC = { files: archivos, folders: py.folders, main: o.ruta, args: o.args || [], cwd: o.cwd || "", esm, env: o.env || {}, codigo: o.ruta === "[eval]" ? o.codigo : undefined, imprimir: Boolean(o.imprimir) };
   const urls = new Map();
   let worker;
   let urlScript;
@@ -487,6 +861,19 @@ export async function ejecutarNode(o) {
     return 1;
   }
   const limpiarUrls = () => { [urlScript, ...urls.values()].forEach((u) => { try { URL.revokeObjectURL(u); } catch { /* nada */ } }); };
+  // Servidores (http.createServer / Express) que abra este programa: se registran en PUERTOS y la vista previa
+  // les manda las peticiones por mensajes al Worker.
+  const misPuertos = new Map();
+  const respuestas = new Map();
+  let sigPeticion = 0;
+  const usaExpress = /require\(\s*["']express["']\s*\)|from\s+["']express["']/.test(Object.values(archivos).filter((t) => typeof t === "string" && t.length < 400000).join("\n"));
+  const pedirAlWorker = (puerto, req) => new Promise((ok) => {
+    const id = ++sigPeticion;
+    const reloj = setTimeout(() => { respuestas.delete(id); ok({ status: 504, headers: [["content-type", "text/plain; charset=utf-8"]], body: new TextEncoder().encode("Tu servidor no respondió en 30 segundos (¿olvidaste res.send() o res.end()?).") }); }, 30_000);
+    respuestas.set(id, (r) => { clearTimeout(reloj); ok(r); });
+    const cuerpo = req.body == null ? "" : typeof req.body === "string" ? req.body : new TextDecoder().decode(req.body instanceof ArrayBuffer ? new Uint8Array(req.body) : req.body);
+    worker.postMessage({ t: "peticion", id, puerto, method: req.method || "GET", url: req.url || "/", headers: [["host", `localhost:${puerto}`], ...(req.headers || [])], cuerpo });
+  });
   return new Promise((resolver) => {
     let hecho = false;
     let textoErr = "";
@@ -495,6 +882,9 @@ export async function ejecutarNode(o) {
       hecho = true;
       clearTimeout(limite);
       worker.terminate();
+      for (const [puerto, reg] of misPuertos) quitarServidor(puerto, reg);
+      for (const fn of respuestas.values()) fn({ status: 502, headers: [["content-type", "text/plain; charset=utf-8"]], body: new TextEncoder().encode("El servidor se detuvo.") });
+      respuestas.clear();
       limpiarUrls();
       if (mensaje) o.err(mensaje);
       if (codigo === 1 && /\b(document|window|alert|navigator|localStorage|sessionStorage|location) is not defined/.test(textoErr)) {
@@ -516,6 +906,24 @@ export async function ejecutarNode(o) {
       } else if (m.t === "fin") {
         if (aplicarCambios(py, m.cambios)) o.cambio?.({});
         terminar(m.codigo);
+      } else if (m.t === "escucha") {
+        const reg = { framework: usaExpress ? "Express" : "Node.js", comando: o.comando || `node ${o.ruta}`, pedir: (req) => pedirAlWorker(m.puerto, req), detener: () => terminar(130) };
+        if (!registrarServidor(m.puerto, reg)) { worker.postMessage({ t: "ocupado", puerto: m.puerto }); return; }
+        misPuertos.set(m.puerto, servidores.get(m.puerto));
+        clearTimeout(limite);   // un servidor de desarrollo corre hasta que lo detengas (sin límite de 2 minutos)
+        worker.postMessage({ t: "escuchando", puerto: m.puerto });
+        o.out(color.gris(`  → http://localhost:${m.puerto} · se abre en la vista previa · panel PUERTOS · Ctrl+C detiene el servidor\n`));
+        if (misPuertos.size === 1) o.abrir?.(`http://localhost:${m.puerto}/`);
+      } else if (m.t === "cierra") {
+        quitarServidor(m.puerto, misPuertos.get(m.puerto));
+        misPuertos.delete(m.puerto);
+      } else if (m.t === "respuesta") {
+        const fn = respuestas.get(m.id);
+        if (!fn) return;
+        respuestas.delete(m.id);
+        let body = m.body;
+        if (m.archivo && o.clienteArchivos) { try { body = await o.clienteArchivos.bytes(m.archivo); } catch { body = new Uint8Array(0); } }
+        fn({ status: m.status, headers: m.headers, body });
       }
     };
     worker.onerror = (ev) => terminar(1, `${ev.message || "Error al iniciar el programa"}\n`);
@@ -826,7 +1234,7 @@ export async function ejecutarSQL(o) {
 /** Los ejecutores que usa el shell. `api` es la función de llamadas al servidor (js/auth.js). */
 export function crearEjecutores({ api, almacenPip = null, archivos = null, bd = null }) {
   return {
-    node: ejecutarNode,
+    node: (o) => ejecutarNode({ ...o, clienteArchivos: archivos }),
     ts: ejecutarTS,
     python: (o) => ejecutarPython({ ...o, almacenPip: o.almacenPip ?? almacenPip, archivos, bd }),
     servidorPy: async (o) => (await import("./servidorpy.js")).ejecutarServidorPy({ ...o, almacenPip: o.almacenPip ?? almacenPip, archivos, bd }),
@@ -840,6 +1248,8 @@ export function crearEjecutores({ api, almacenPip = null, archivos = null, bd = 
         return { salida: error.message, error: true, puertos: [] };
       }
     },
+    bytesDe: (marcador) => archivos.bytes(marcador),
+    async phpServidor(accion, datos) { return api(`/api/trabajo/php/${accion}`, datos); },
     async pythonServidor({ ruta, archivos, entrada = "", args = [] }) {
       try {
         const d = await api("/api/python/run", { ruta, archivos, entrada, args });

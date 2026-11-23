@@ -23,17 +23,29 @@ export class Explorador {
    * @param {(carpeta:string)=>void} [o.alSubirEn]   «Subir archivos aquí…»
    * @param {(ruta:string)=>void} [o.alDescargar]   «Descargar»
    */
-  constructor({ raiz, proyecto, expandidas, alAbrir, alCambiar, alBorrar, alAbrirTerminalEn, alSoltarArchivos = null, alSubirEn = null, alDescargar = null }) {
-    Object.assign(this, { raiz, proyecto, expandidas, alAbrir, alCambiar, alBorrar, alAbrirTerminalEn, alSoltarArchivos, alSubirEn, alDescargar });
+  constructor({ raiz, proyecto, expandidas, alAbrir, alCambiar, alBorrar, alAbrirTerminalEn, alSoltarArchivos = null, alSubirEn = null, alDescargar = null,
+    rutaCompleta = null, urlDe = null, entrarEn = null }) {
+    Object.assign(this, { raiz, proyecto, expandidas, alAbrir, alCambiar, alBorrar, alAbrirTerminalEn, alSoltarArchivos, alSubirEn, alDescargar, rutaCompleta, urlDe, entrarEn });
+    this.portapapeles = null;   // { rutas: [...], cortar: bool } — Copiar / Cortar / Pegar como en VS Code
     this.seleccion = null;
     this.activo = null;
     this.edicion = null;
+    this.prob = new Map();  // ruta → { e: errores, a: advertencias } (archivos dañados en rojo, con advertencias en amarillo)
     this.git = new Map();   // ruta → M | U | A | C (como los colores de Git en VS Code)
     raiz.tabIndex = 0;
     raiz.setAttribute("role", "tree");
     raiz.setAttribute("aria-label", "Archivos del proyecto");
     raiz.addEventListener("click", (e) => this.#clic(e));
     raiz.addEventListener("contextmenu", (e) => this.#menu(e));
+    // Pegar archivos copiados en el computador (Explorador de Windows, Finder, una captura de pantalla…)
+    raiz.addEventListener("paste", (e) => {
+      const archivos = [...(e.clipboardData?.files || [])];
+      if (!archivos.length || !this.alSoltarArchivos) return;
+      e.preventDefault();
+      const sel = this.seleccion && FS.existe(this.proyecto(), this.seleccion) ? this.seleccion : "";
+      const destino = sel && FS.esCarpeta(this.proyecto(), sel) ? sel : FS.carpetaDe(sel);
+      this.alSoltarArchivos({ entradas: [], archivos, destino });
+    });
     // Celular: mantener pulsado un archivo o carpeta (vibra) y luego:
     //   · soltar sin mover  -> menú (Renombrar, Mover a…, Eliminar…)
     //   · sin soltar, arrastrar el dedo -> se mueve a la carpeta donde lo sueltes (como arrastrar con el mouse)
@@ -135,6 +147,24 @@ export class Explorador {
     this.render();
   }
 
+  /** Problemas por archivo: mapa ruta → {e, a}. El archivo y sus carpetas se pintan de rojo (errores) o amarillo. */
+  decorarProblemas(mapa) {
+    const nuevo = mapa instanceof Map ? mapa : new Map();
+    const clave = (m) => [...m].map(([r, x]) => `${r}:${x.e}:${x.a}`).sort().join("|");
+    if (clave(nuevo) === clave(this.prob)) return;
+    this.prob = nuevo;
+    this.render();
+  }
+
+  #problemaDe(f) {
+    if (!this.prob.size) return null;
+    if (f.tipo !== "dir") return this.prob.get(f.ruta) || null;
+    const pref = f.ruta ? f.ruta + "/" : "";
+    let e = 0, a = 0;
+    for (const [r, x] of this.prob) if (r.startsWith(pref)) { e += x.e; a += x.a; }
+    return e || a ? { e, a } : null;
+  }
+
   #letraCarpeta(ruta) {
     const pref = ruta ? ruta + "/" : "";
     let letra = null;
@@ -155,11 +185,13 @@ export class Explorador {
       if (f.tipo === "edicion") return this.#filaEdicion(f.nivel, "", this.edicion.modo === "carpeta");
       if (this.edicion?.modo === "renombrar" && this.edicion.ruta === f.ruta) return this.#filaEdicion(f.nivel, f.nombre, f.tipo === "dir");
       const letra = this.git.size ? (f.tipo === "dir" ? this.#letraCarpeta(f.ruta) : this.git.get(f.ruta)) : null;
-      const clases = ["fila", f.tipo === "dir" ? "dir" : "", f.ruta === this.seleccion ? "sel" : "", f.ruta === this.activo ? "activo" : "", letra ? `g-${letra}` : ""].filter(Boolean).join(" ");
+      const pr = this.#problemaDe(f);
+      const clases = ["fila", f.tipo === "dir" ? "dir" : "", f.ruta === this.seleccion ? "sel" : "", f.ruta === this.activo ? "activo" : "", letra ? `g-${letra}` : "", pr ? (pr.e ? "p-error" : "p-aviso") : ""].filter(Boolean).join(" ");
+      const marcaProb = pr ? (f.tipo === "dir" ? `<span class="prob-d" aria-label="contiene problemas">●</span>` : `<span class="prob-d" title="${pr.e ? `${pr.e} error${pr.e === 1 ? "" : "es"}` : ""}${pr.e && pr.a ? ", " : ""}${pr.a ? `${pr.a} advertencia${pr.a === 1 ? "" : "s"}` : ""}">${pr.e + pr.a > 9 ? "9+" : pr.e + pr.a}</span>`) : "";
       const NOMBRE_GIT = { M: "modificado", U: "sin seguimiento (nuevo)", A: "agregado", C: "en conflicto" };
       const marca = letra ? (f.tipo === "dir" ? `<span class="git-d" aria-label="contiene cambios">●</span>` : `<span class="git-d" title="${NOMBRE_GIT[letra]}">${letra === "C" ? "!" : letra}</span>`) : "";
       const icono = f.tipo === "dir" ? `${chevron}${iconoCarpeta(f.abierta)}` : `<span class="chev-vacio"></span>${iconoArchivo(f.ruta)}`;
-      return `<div class="${clases}" role="treeitem" aria-level="${f.nivel + 1}" ${f.tipo === "dir" ? `aria-expanded="${f.abierta}"` : ""} aria-selected="${f.ruta === this.seleccion}" data-ruta="${esc(f.ruta)}" data-tipo="${f.tipo}" draggable="${!TACTIL}" style="--n:${f.nivel}" title="${esc(f.ruta)}${letra ? " · " + (f.tipo === "dir" ? "contiene cambios" : NOMBRE_GIT[letra]) : ""}">${icono}<span class="nom">${esc(f.nombre)}</span>${marca}<button type="button" class="fila-mas" tabindex="-1" aria-label="Acciones de ${esc(f.nombre)}" title="Renombrar, eliminar…"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12.5" cy="8" r="1.3" fill="currentColor"/></svg></button></div>`;
+      return `<div class="${clases}" role="treeitem" aria-level="${f.nivel + 1}" ${f.tipo === "dir" ? `aria-expanded="${f.abierta}"` : ""} aria-selected="${f.ruta === this.seleccion}" data-ruta="${esc(f.ruta)}" data-tipo="${f.tipo}" draggable="${!TACTIL}" style="--n:${f.nivel}" title="${esc(f.ruta)}${letra ? " · " + (f.tipo === "dir" ? "contiene cambios" : NOMBRE_GIT[letra]) : ""}">${icono}<span class="nom">${esc(f.nombre)}</span>${marcaProb}${marca}<button type="button" class="fila-mas" tabindex="-1" aria-label="Acciones de ${esc(f.nombre)}" title="Renombrar, eliminar…"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12.5" cy="8" r="1.3" fill="currentColor"/></svg></button></div>`;
     }).join("");
     this.raiz.innerHTML = html || '<p class="arbol-vacio">No hay archivos.<br>Usa los botones de arriba para crear uno.</p>';
     this.raiz.classList.toggle("vacio", !html);
@@ -251,6 +283,9 @@ export class Explorador {
       e.preventDefault();
       if (actual.tipo === "dir") { if (this.expandidas.has(actual.ruta)) this.expandidas.delete(actual.ruta); else this.expandidas.add(actual.ruta); this.alCambiar({ origen: "ui" }); this.render(); } else this.alAbrir(actual.ruta);
     } else if (e.key === "F2" && actual) { e.preventDefault(); this.renombrar(actual.ruta); }
+    else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && ["c", "x"].includes(e.key.toLowerCase()) && actual) { e.preventDefault(); this.copiar(actual.ruta, e.key.toLowerCase() === "x"); }
+    else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "v" && this.portapapeles) { e.preventDefault(); this.pegar(actual ? (actual.tipo === "dir" ? actual.ruta : FS.carpetaDe(actual.ruta)) : ""); }
+    else if (e.shiftKey && e.altKey && e.key.toLowerCase() === "c" && actual) { e.preventDefault(); this.#alPortapapeles(this.rutaCompleta?.(actual.ruta) || `/${actual.ruta}`, "Ruta copiada"); }
     else if ((e.key === "Delete" || (e.key === "Backspace" && e.metaKey)) && actual && FS.existe(py, actual.ruta)) { e.preventDefault(); void this.eliminar(actual.ruta); }
   }
 
@@ -268,15 +303,27 @@ export class Explorador {
     else { this.seleccion = null; this.render(); }
     const py = this.proyecto();
     const carpeta = ruta ? (FS.esCarpeta(py, ruta) ? ruta : FS.carpetaDe(ruta)) : "";
+    const pegar = this.portapapeles ? [{ texto: `Pegar${this.portapapeles.rutas.length === 1 ? ` «${FS.nombreBase(this.portapapeles.rutas[0])}»` : ""}`, atajo: "Ctrl+V", fn: () => this.pegar(carpeta) }] : [];
     const items = [
       { texto: "Nuevo archivo", fn: () => this.nuevo("archivo", carpeta) },
       { texto: "Nueva carpeta", fn: () => this.nuevo("carpeta", carpeta) },
       ...(this.alSubirEn ? [{ texto: "Subir archivos aquí…", fn: () => this.alSubirEn(carpeta) }] : []),
+      ...(ruta ? [] : pegar),
     ];
     if (ruta) {
+      const url = this.urlDe?.(ruta);
+      const entrar = FS.esCarpeta(py, ruta) ? this.entrarEn?.(ruta) : null;   // con tu equipo: ir a esa carpeta
+      if (entrar) items.push("-", { texto: "📂 Abrir esta carpeta (entrar)", fn: entrar });
       items.push("-",
+        { texto: "Copiar", atajo: "Ctrl+C", fn: () => this.copiar(ruta) },
+        { texto: "Cortar", atajo: "Ctrl+X", fn: () => this.copiar(ruta, true) },
+        ...pegar,
+        { texto: "Duplicar", fn: () => this.duplicar(ruta) },
+        "-",
+        { texto: "Copiar ruta", atajo: "Shift+Alt+C", fn: () => this.#alPortapapeles(this.rutaCompleta?.(ruta) || `/${ruta}`, "Ruta copiada") },
+        { texto: "Copiar ruta relativa", fn: () => this.#alPortapapeles(ruta, "Ruta relativa copiada") },
+        ...(url ? [{ texto: "Copiar URL", fn: () => this.#alPortapapeles(url, "URL copiada") }] : []),
         { texto: "Abrir en la terminal", fn: () => this.alAbrirTerminalEn(carpeta) },
-        { texto: "Copiar ruta relativa", fn: () => navigator.clipboard?.writeText(ruta).catch(() => {}) },
         ...(this.alDescargar && FS.tieneArchivo(py, ruta) ? [{ texto: "Descargar", fn: () => this.alDescargar(ruta) }] : []),
         "-",
         { texto: "Renombrar", atajo: "F2", fn: () => this.renombrar(ruta) },
@@ -284,6 +331,61 @@ export class Explorador {
         { texto: "Eliminar", atajo: "Supr", peligro: true, fn: () => this.eliminar(ruta) });
     }
     menuContextual(x, y, items);
+  }
+
+  // ------------------------------------------------- copiar / cortar / pegar ----
+  async #alPortapapeles(texto, aviso) {
+    try {
+      if (typeof texto === "function") texto = await texto();
+      await navigator.clipboard.writeText(texto);
+      this.alCambiar({ origen: "avisoInfo", texto: aviso });
+    } catch (e) {
+      if (typeof texto === "string") window.prompt("Copia este texto:", texto);
+      else this.alCambiar({ origen: "aviso", error: e.message || "No se pudo copiar." });
+    }
+  }
+
+  /** Copia (o corta) un archivo o carpeta para pegarlo en otra carpeta del proyecto. */
+  copiar(ruta, cortar = false) {
+    if (!ruta || !FS.existe(this.proyecto(), ruta)) return;
+    this.portapapeles = { rutas: [ruta], cortar };
+    navigator.clipboard?.writeText(ruta).catch(() => {});
+    this.alCambiar({ origen: "avisoInfo", texto: `${cortar ? "Cortado" : "Copiado"}: ${FS.nombreBase(ruta)} · Ctrl+V en otra carpeta para pegar` });
+    this.render();
+  }
+
+  /** Pega lo copiado en la carpeta (si ya existe un nombre igual, crea «nombre-2»). */
+  pegar(carpeta = this.carpetaDestino()) {
+    const pp = this.portapapeles;
+    if (!pp) return false;
+    const py = this.proyecto();
+    let ultimo = null;
+    for (const origen of pp.rutas) {
+      if (!FS.existe(py, origen)) continue;
+      if (pp.cortar) {
+        if (FS.carpetaDe(origen) === carpeta) continue;
+        if (this.moverA(origen, carpeta)) ultimo = FS.unir(carpeta, FS.nombreBase(origen));
+        continue;
+      }
+      const destino = FS.unir(carpeta, FS.nombreLibre(py, carpeta, FS.nombreBase(origen)));
+      const r = FS.copiar(py, origen, destino, { recursivo: true });
+      if (!r.ok) { this.alCambiar({ origen: "aviso", error: r.error }); return false; }
+      ultimo = destino;
+    }
+    if (pp.cortar) this.portapapeles = null;
+    if (!ultimo) return false;
+    for (let c = carpeta; c; c = FS.carpetaDe(c)) this.expandidas.add(c);
+    this.seleccion = ultimo;
+    if (!pp.cortar) this.alCambiar({ origen: "explorador" });
+    this.render();
+    return true;
+  }
+
+  duplicar(ruta) {
+    const antes = this.portapapeles;
+    this.portapapeles = { rutas: [ruta], cortar: false };
+    this.pegar(FS.carpetaDe(ruta));
+    this.portapapeles = antes;
   }
 
   /** Lista de carpetas a donde se puede mover (sirve en el celular, donde no se puede arrastrar). */

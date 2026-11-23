@@ -319,3 +319,23 @@ UNION ALL SELECT 'compras', COUNT(*) FROM compras
 UNION ALL SELECT 'amistades', COUNT(*) FROM amistades
 UNION ALL SELECT 'mensajes', COUNT(*) FROM mensajes
 UNION ALL SELECT 'uso_tutor', COUNT(*) FROM uso_tutor;
+
+-- Chats eliminados solo para una persona (borrado lógico)
+
+
+-- chats_borrados
+SELECT * FROM chats_borrados;
+
+-- Quién eliminó qué chat de su vista y hasta qué mensaje
+SELECT u.nombre AS borro, cb.amistad_id, cb.hasta_mensaje_id, cb.creado_en
+FROM chats_borrados cb
+JOIN usuarios u ON u.id = cb.usuario_id
+ORDER BY cb.creado_en DESC;
+
+-- Mensajes que ve un usuario en una conversación (sin los que eliminó de su vista). Cambia 1 y 5.
+SELECT m.id, m.autor_id, m.texto, m.creado_en
+FROM mensajes m
+LEFT JOIN chats_borrados cb ON cb.amistad_id = m.amistad_id AND cb.usuario_id = 1
+WHERE m.amistad_id = 5 AND m.id > COALESCE(cb.hasta_mensaje_id, 0)
+ORDER BY m.id;
+

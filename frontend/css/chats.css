@@ -4,7 +4,7 @@
 
 .pag-chats .tope, .pag-chats .titulo-pag { display: none; }
 .pag-chats .app .centro, .pag-chats .app.ancho .centro { max-width: none; margin: 0; width: 100%; height: 100vh; height: 100dvh; padding: 0; animation: none; }
-.pag-chats svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pag-chats svg:not(.codi):not(.codi *) { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .chats-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: 100%; min-height: 0; }
 .c-ico { flex: none; display: inline-grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--sub); cursor: pointer; transition: background .15s, color .15s; }
@@ -191,3 +191,21 @@ button.c-fila:hover { background: var(--panel2); }
 .pf-c .r-comun { color: #94a3b8; } .pf-c .r-raro { color: #38bdf8; } .pf-c .r-epico { color: #c084fc; } .pf-c .r-legendario { color: #f59e0b; } .pf-c .r-mitico { color: #f43f5e; }
 .pf-fechas { margin: 0; color: var(--sub); font-size: 13px; }
 .pf-escribir { justify-self: start; }
+
+/* ---------- PC: la lista de chats va en un menú hamburguesa ---------- */
+.c-hamb { display: none; }
+@media (min-width: 761px) {
+  /* el menú se superpone (absolute + z-index) sin empujar ni tapar nada fuera del área del chat */
+  .chats-grid { grid-template-columns: minmax(0, 1fr); position: relative; overflow: clip; isolation: isolate; }
+  .c-hamb { display: inline-grid; }
+  .c-btn.c-hamb { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .c-btn.c-hamb svg { width: 18px; height: 18px; }
+  .c-lista { position: absolute; z-index: 40; inset: 0 auto 0 0; width: min(360px, 90%); border-right: 1px solid var(--borde); border-radius: 0 18px 18px 0;
+    background: var(--panel); box-shadow: 0 0 40px rgba(0, 0, 0, .28); transform: translateX(-105%); visibility: hidden;
+    transition: transform .22s ease, visibility 0s linear .22s; }
+  .chats-grid.lista-abierta .c-lista { transform: none; visibility: visible; transition: transform .22s ease, visibility 0s; }
+  .c-conv { position: relative; z-index: 0; min-width: 0; }
+  .c-velo { position: absolute; inset: 0; z-index: 39; background: rgba(0, 0, 0, .35); }
+  .c-velo[hidden] { display: none; }
+  .c-lista-cab { display: flex; align-items: center; justify-content: space-between; }
+}

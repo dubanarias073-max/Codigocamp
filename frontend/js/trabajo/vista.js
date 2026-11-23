@@ -11,8 +11,11 @@ try{localStorage.length}catch(e){var M=function(){var d={};return{getItem:functi
 var sT=0;addEventListener("scroll",function(){clearTimeout(sT);sT=setTimeout(function(){P({cc:"scroll",y:scrollY})},150)},{passive:true});addEventListener("message",function(e){var d=e.data;if(d&&d.cc==="irscroll"){var n=0;(function f(){scrollTo(0,d.y);if(Math.abs(scrollY-d.y)>2&&n++<20)setTimeout(f,50)})()}});
 addEventListener("error",function(e){P({cc:"consola",nivel:"error",texto:(e.message||"Error")+(e.lineno?" (línea "+e.lineno+")":"")})});
 addEventListener("unhandledrejection",function(e){P({cc:"consola",nivel:"error",texto:"Promesa rechazada: "+((e.reason&&e.reason.message)||e.reason)})});
-document.addEventListener("click",function(e){if(window.__ccVirtual)return;var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;var h=a.getAttribute("href");if(!h||h.charAt(0)==="#"||/^(mailto:|tel:|javascript:)/i.test(h))return;
-if(/^https?:/i.test(h)){e.preventDefault();window.open(h,"_blank","noopener");return}e.preventDefault();P({cc:"nav",href:h})},true)})();`;
+var EXT=function(h){h=String(h||"").trim();if(/^\\/\\//.test(h))h="https:"+h;else if(/^www\\./i.test(h))h="https://"+h;return /^(https?:|mailto:|tel:)/i.test(h)&&!/^https?:\\/\\/(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)(:|\\/|$)/i.test(h)?h:null};
+var wo=window.open;window.open=function(u,n,f){var x=EXT(u);if(x){P({cc:"externo",href:x});return null}return wo.apply(window,arguments)};
+document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;var h=a.getAttribute("href");var x=EXT(h);if(x){e.preventDefault();P({cc:"externo",href:x});return}if(window.__ccVirtual)return;if(!h||h.charAt(0)==="#"||/^javascript:/i.test(h))return;
+e.preventDefault();P({cc:"nav",href:h})},true);
+document.addEventListener("submit",function(e){var f=e.target;var x=f&&EXT(f.getAttribute("action"));if(x&&!/^(mailto|tel):/i.test(x)&&(f.method||"get").toLowerCase()==="get"){e.preventDefault();var q=new URLSearchParams(new FormData(f)).toString();P({cc:"externo",href:x+(q?(x.indexOf("?")<0?"?":"&")+q:"")})}},true)})();`;
 
 const atributo = (etiqueta, nombre) => {
   const m = new RegExp(`\\s${nombre}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i").exec(etiqueta);

@@ -11,6 +11,7 @@ import { esMarcador, leerMarcador, formatoBytes } from "./archivos.js";
 import { LEE_ENTRADA } from "./entradateclado.js";
 import * as BASH from "./bash.js";
 import { instalarComandos } from "./comandos-extra.js";
+import { instalarServidoresDev } from "./servidores-dev.js";
 import { archivosParaServidor, necesitaServidor } from "./pyservidor.js";
 import { importarEn } from "./importar.js";
 import { comandoSqlite } from "./sqlite.js";
@@ -210,7 +211,7 @@ export function comandoParaArchivo(ruta, cwd = "") {
 
 const LENGUAJE_SERVIDOR = { java: "java", c: "c", cpp: "cpp", cc: "cpp", cs: "csharp", php: "php", go: "go", rs: "rust", swift: "swift", kt: "kotlin", rb: "ruby",
 lua: "lua", pl: "perl", r: "r", scala: "scala", hs: "haskell", exs: "elixir", ex: "elixir", jl: "julia", groovy: "groovy", cr: "crystal", nim: "nim", ml: "ocaml", d: "d", pas: "pascal", zig: "zig", lisp: "lisp" };
-const NO_DISPONIBLE = ["pnpm", "yarn", "apt", "apt-get", "brew", "sudo", "curl", "wget", "ssh", "make", "cmake", "composer", "gem", "bundle", "chown", "top"];
+const NO_DISPONIBLE = ["apt", "apt-get", "brew", "sudo", "curl", "wget", "ssh", "make", "cmake", "composer", "gem", "bundle", "chown", "top"];
 
 export const NOMBRES_COMANDOS = [
   "cat", "cd", "clear", "cls", "code", "cp", "date", "echo", "env", "exit", "export", "find", "gcc", "g++", "gh", "git", "go", "grep", "head", "help",
@@ -231,6 +232,10 @@ const AYUDA = [
   color.azul("APIs") + "       fastapi dev main.py · uvicorn main:app --reload · flask --app app run --debug   (la vista previa abre http://127.0.0.1:8000/docs)",
   color.azul("venv") + "       python -m venv .venv → source .venv/bin/activate (o .venv\\Scripts\\activate) → pip install … → deactivate",
   color.azul("React") + "      npm create vite@latest mi-app -- --template react   (o react-ts, vanilla, preact) → cd mi-app → npm run dev",
+  color.azul("Servidores") + " node server.js (Express/http) · nodemon app.js · node --watch · npm start/run dev · yarn/pnpm dev · php -S localhost:8000\n" +
+  "            python -m http.server · npx serve · http-server · live-server · npx expo start (web + celular con Expo Go)\n" +
+  "            Con Docker: next dev · ng serve · nuxi dev · astro dev · php artisan serve · rails s · mvn spring-boot:run · go run (web) · dotnet run (web)\n" +
+  "            Todos aparecen en el panel PUERTOS (junto a TERMINAL) y se abren en la vista previa.",
   "            go run · php · ruby · swift · java Archivo.java · gcc/g++ archivo -o prog && ./prog · rustc · kotlinc   (se ejecutan en el servidor)",
   color.azul("Docker") + "     docker build -t app . · docker run --rm app · docker run -d -p 8080:80 app · docker ps · logs · exec · stop · rm · docker compose up -d | ps | logs | down",
   color.azul("Varios") + "     pega varias líneas y se ejecutan en orden · printf 'Ana\\n17\\n' | python pide.py",
@@ -1182,10 +1187,23 @@ COMANDOS.node = async function node(a, io) {
   if (!ej) return ejecutorNo(io, "node");
   if (a[0] === "--version" || a[0] === "-v") { io.out("v22 (ejecutado en el navegador por CódigoCamp)\n"); return 0; }
   if (a[0] === "-e" || a[0] === "-p") return ej({ ...contexto(this, io), ruta: "[eval]", codigo: a[1] ?? "", args: [], imprimir: a[0] === "-p" });
+  if (a.some((x) => x === "--watch" || x.startsWith("--watch-path"))) return COMANDOS.__nodeWatch.call(this, a, io);
+  const env = {};
+  for (const x of a.filter((y) => y.startsWith("--env-file"))) Object.assign(env, leerEnv(io, x.split("=")[1] || ".env"));
+  a = a.filter((x) => !/^--(env-file|inspect|trace|enable-source-maps|experimental|no-warnings)/.test(x));
   if (!a.length) { io.err("node: el modo interactivo (REPL) no está disponible. Ejecuta un archivo: node archivo.js\n"); return 1; }
-  const f = archivoAEjecutar(this, io, "node", a[0], ["js"]);
-  return f ? ej({ ...contexto(this, io), ruta: f.ruta, codigo: f.codigo, args: a.slice(1) }) : 1;
+  const f = archivoAEjecutar(this, io, "node", a[0], ["js", "mjs", "cjs"]);
+  return f ? ej({ ...contexto(this, io), abrir: this.abrirUrl, comando: `node ${a.join(" ")}`, ruta: f.ruta, codigo: f.codigo, args: a.slice(1), env }) : 1;
 };
+// node --env-file=.env: las variables quedan en process.env (dotenv también funciona)
+function leerEnv(io, archivo) {
+  const r = ruta(io, archivo);
+  const texto = r !== null ? io.py().files[r] : undefined;
+  if (typeof texto !== "string") { io.err(`node: ${archivo}: not found\n`); return {}; }
+  const env = {};
+  for (const l of texto.split(/\r?\n/)) { const m = /^\s*(?:export\s+)?([\w.-]+)\s*=\s*(.*?)\s*$/.exec(l); if (m && !l.trim().startsWith("#")) env[m[1]] = m[2].replace(/^(['"`])(.*)\1$/, "$2"); }
+  return env;
+}
 COMANDOS["ts-node"] = async function tsNode(a, io) {
   const ej = this.ejecutores.ts;
   if (!ej) return ejecutorNo(io, "ts-node");
@@ -1308,6 +1326,7 @@ async function comandoFlask(a, io) {
 COMANDOS.flask = comandoFlask;
 
 COMANDOS.python = async function python(a, io) {
+  if (a[0] === "-m" && (a[1] === "http.server" || a[1] === "SimpleHTTPServer")) return COMANDOS.__httpServerPython.call(this, a.slice(2), io);
   if (a[0] === "-m" && a[1] === "pip") return COMANDOS.pip.call(this, a.slice(2), io);
   if (a[0] === "-m" && (a[1] === "venv" || a[1] === "virtualenv")) return comandoVenv(this, a.slice(2), io);
   if (a[0] === "-m" && a[1] === "uvicorn") return comandoUvicorn.call(this, a.slice(2), io);
@@ -1317,6 +1336,7 @@ COMANDOS.python = async function python(a, io) {
   if (!ej) return ejecutorNo(io, "python");
   if (a[0] === "--version" || a[0] === "-V") { io.out("Python 3.12 (Pyodide, en el navegador)\n"); return 0; }
   if (a[0] === "-m") {
+    if (a[1] === "http.server") return COMANDOS.__httpServerPython.call(this, a.slice(2), io);
     if (a[1] === "pip") return COMANDOS.pip.call(this, a.slice(2), io);
     io.err(`python: el módulo -m ${a[1] ?? ""} no está disponible aquí (solo -m pip).\n`);
     return 1;
@@ -1405,6 +1425,7 @@ COMANDOS.printf = function printf(a, io) {
   return 0;
 };
 instalarComandos(COMANDOS);
+instalarServidoresDev(COMANDOS, { contexto, archivoAEjecutar, ejecutorNo, ruta });
 COMANDOS.true = () => 0;
 COMANDOS.false = () => 1;
 COMANDOS[":"] = () => 0;
@@ -1476,6 +1497,19 @@ COMANDOS.npx = async function npx(a, io) {
   return 127;
 };
 COMANDOS.py = COMANDOS.python;
+// yarn / pnpm / bun: lo mismo que npm (yarn dev = npm run dev, yarn add x = npm install x)
+const comoNpm = (nombre) => async function (a, io) {
+  const [orden, ...resto] = a;
+  const npm = (args) => COMANDOS.npm.call(this, args, io);
+  if (!orden || orden === "install" || orden === "i") return npm(["install", ...resto]);
+  if (orden === "add") return npm(["install", ...resto.filter((x) => x !== "-D" && x !== "--dev")]);
+  if (orden === "remove" || orden === "rm") return npm(["uninstall", ...resto]);
+  if (orden === "create" || orden === "dlx" || orden === "x") return COMANDOS.npx.call(this, orden === "create" ? [`create-${resto[0]}`, ...resto.slice(1)] : resto, io);
+  if (orden === "run") return npm(["run", ...resto]);
+  if (["init", "test", "start", "list", "ls"].includes(orden)) return npm([orden, ...resto]);
+  return npm(["run", orden, ...resto]);
+};
+COMANDOS.yarn = comoNpm("yarn"); COMANDOS.pnpm = comoNpm("pnpm"); COMANDOS.bun = comoNpm("bun"); COMANDOS.bunx = COMANDOS.pnpx = function (a, io) { return COMANDOS.npx.call(this, a, io); };
 COMANDOS.sqlite3 = async function sqlite3(a, io) {
   const cargar = this.ejecutores.cargarSQL;
   if (!cargar) return ejecutorNo(io, "sqlite3");
@@ -1604,11 +1638,28 @@ const interpretado = (nombre, lenguaje, ext, previo = null) => async function in
   const f = archivoAEjecutar(this, io, nombre, args[0], [ext]);
   return f ? enServidor(this, io, lenguaje, f) : 1;
 };
-COMANDOS.php = interpretado("php", "php", "php");
+const phpNormal = interpretado("php", "php", "php");
+COMANDOS.php = function php(a, io) {
+  if (a.includes("-S")) return COMANDOS.__phpServidor.call(this, a, io);
+  if (a[0] === "artisan" && (a[1] === "serve" || a[1] === "dev")) return COMANDOS.__artisan.call(this, a.slice(2), io);
+  return phpNormal.call(this, a, io);
+};
 COMANDOS.ruby = interpretado("ruby", "ruby", "rb");
 COMANDOS.swift = interpretado("swift", "swift", "swift");
-COMANDOS.go = interpretado("go", "go", "go", "run");
-COMANDOS.dotnet = interpretado("dotnet", "csharp", "cs", "run");
+const goNormal = interpretado("go", "go", "go", "run");
+COMANDOS.go = function go(a, io) {
+  const py = io.py();
+  const codigo = Object.entries(py.files).filter(([r]) => r.endsWith(".go")).map(([, t]) => t).join("\n");
+  const m = /ListenAndServe\(\s*"[^"]*:(\d{2,5})"|\.Run\(\s*"[^"]*:(\d{2,5})"|\.Listen\(\s*"[^"]*:(\d{2,5})"/.exec(codigo);
+  if (a[0] === "run" && (m || /ListenAndServe|gin\.Default|fiber\.New|echo\.New/.test(codigo))) return COMANDOS.__goServidor.call(this, a.slice(1), io, Number(m?.[1] || m?.[2] || m?.[3] || 8080));
+  return goNormal.call(this, a, io);
+};
+const dotnetNormal = interpretado("dotnet", "csharp", "cs", "run");
+COMANDOS.dotnet = function dotnet(a, io) {
+  const py = io.py();
+  if ((a[0] === "run" || a[0] === "watch") && Object.entries(py.files).some(([r, t]) => r.endsWith(".cs") && /WebApplication\.CreateBuilder|UseUrls|MapGet\(/.test(t))) return COMANDOS.__dotnetServidor.call(this, a.slice(1), io, 5000);
+  return dotnetNormal.call(this, a, io);
+};
 // Más lenguajes (se ejecutan en el servidor de CódigoCamp o en línea): lua, perl, Rscript, scala, runghc, elixir, julia,
 // groovy, crystal run, nim r, ocaml, rdmd, fpc, zig run, sbcl. Acepta opciones antes del archivo (nim r --hints:off x.nim).
 const interpretadoFlexible = (nombre, lenguaje, exts, sub = null) => async function interpretar(a, io) {
