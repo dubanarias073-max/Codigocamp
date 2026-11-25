@@ -53,7 +53,8 @@ ACORTADORES = {"bit.ly", "tinyurl.com", "cutt.ly", "is.gd", "t.co", "rb.gy", "sh
 EJECUTABLES = {"exe", "scr", "msi", "bat", "cmd", "vbs", "ps1", "hta", "jar", "apk", "dmg", "pkg", "iso", "lnk", "dll", "com", "pif", "jse", "wsf", "reg"}
 TLD_RIESGO = {"zip", "mov", "top", "xyz", "click", "country", "gq", "tk", "ml", "cf", "ga", "work", "rest", "cam", "monster", "quest", "sbs", "cfd", "lol"}
 PALABRAS_CEBO = ("login", "verify", "verificar", "secure", "seguro", "update", "actualizar", "account", "cuenta", "wallet", "billetera",
-                 "premio", "gana", "gratis", "free", "bonus", "regalo", "password", "clave", "suspend", "bloqueo", "confirm")
+                 "premio", "gana", "gratis", "free", "bonus", "regalo", "password", "clave", "suspend", "bloqueo", "confirm",
+                 "robux", "vbucks", "generator", "generador", "hack", "airdrop", "giveaway", "sorteo", "reembolso", "soporte")
 SEGUNDO_NIVEL = {"com.co", "gov.co", "edu.co", "org.co", "net.co", "com.mx", "com.ar", "co.uk", "com.br", "com.es", "com.au", "co.jp"}
 HOMOGLIFOS = str.maketrans({"а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "х": "x", "у": "y", "і": "i", "ј": "j", "ѕ": "s", "ԁ": "d",
                             "ɡ": "g", "һ": "h", "ӏ": "l", "ο": "o", "α": "a", "ν": "v", "τ": "t", "κ": "k", "ı": "i", "ʟ": "l", "ɑ": "a"})
@@ -224,7 +225,18 @@ def _revisar(url, consultar_externos):
         if marca in etiquetas[:-2] and any(w in sin_www + ruta for w in PALABRAS_CEBO):
             return _bloq(f"El enlace usa el nombre de {marca.capitalize()} en un sitio que no es el suyo para pedir datos.")
 
+    # Un dominio «escondido» dentro de otro: login-microsoftonline.com.evil.ru, paypal.com.cuenta.top…
+    sub = sin_www[: -len(registrado)].rstrip(".") if sin_www.endswith(registrado) else ""
+    sub_etiquetas = [e.translate(CONFUSIBLES) for e in re.split(r"[.-]", sub)] if sub else []
+    if sub and set(sub_etiquetas) & {"com", "net", "org", "co", "gov", "edu"}:
+        unido = sub.translate(CONFUSIBLES).replace("-", "").replace(".", "")
+        if any(m in unido for m in MARCAS if MARCAS[m] and len(m) >= 4):
+            return _bloq(f"El enlace imita una dirección oficial, pero en realidad lleva a «{registrado}».")
+        return _adv(f"El enlace parece otra dirección, pero en realidad lleva a «{registrado}».")
+
     tld = sin_www.rsplit(".", 1)[-1]
+    if tld in TLD_RIESGO and sum(w in sin_www + ruta for w in PALABRAS_CEBO) >= 2:
+        return _bloq("Es un sitio de estafa típico: dominio de alto riesgo con palabras como «gratis», «premio» o «verificar».")
     if ext in EJECUTABLES:
         if _es_de(sin_www, ACORTADORES) or tld in TLD_RIESGO:
             return _bloq("Descarga un programa desde un sitio poco confiable.")

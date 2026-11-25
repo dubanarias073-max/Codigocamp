@@ -1,5 +1,10 @@
 """Lógica de retos: arma las preguntas de un nivel y decide si un nivel está desbloqueado."""
+import hashlib
+import hmac
 import random
+import secrets
+
+from flask import current_app
 
 from models import Challenge, CompletedLevel, Level, Section, Stage, db
 
@@ -21,7 +26,40 @@ def challenge_item(challenge):
         item.update(fn=data.get("fn"), plantilla=data.get("plantilla", ""), casos=data.get("casos", []))
     elif challenge.tipo == "caso":
         item.update(fn=data.get("fn"), defectuosa=data.get("defectuosa", ""), correcta=data.get("correcta", ""))
+    elif challenge.tipo == "parejas":
+        pares = data.get("pares", [])
+        izq = [{"id": i, "t": a} for i, (a, _b) in enumerate(pares)]
+        der = [{"id": id_pareja(challenge.id, i), "t": b} for i, (_a, b) in enumerate(pares)]
+        random.shuffle(izq)
+        random.shuffle(der)
+        sal = secrets.token_hex(6)
+        # Sellos para que el navegador diga «bien/mal» al unir cada pareja (como Duolingo) sin mandar las parejas
+        item.update(izq=izq, der=der, sal=sal, sellos=sorted(fnv1a(f"{sal}|{i}|{id_pareja(challenge.id, i)}") for i in range(len(pares))),
+                    tolerancia=tolerancia_parejas(len(pares)))
+    elif challenge.tipo == "armar":
+        fichas = list(data.get("solucion", [])) + list(data.get("trampas", []))
+        random.shuffle(fichas)
+        item["fichas"] = fichas
     return item
+
+
+def id_pareja(challenge_id, i):
+    """Id de la columna derecha: el navegador no puede saber cuál va con cuál (el servidor sí puede comprobarlo)."""
+    clave = (current_app.config.get("SECRET_KEY") or "codigocamp").encode()
+    return hmac.new(clave, f"pareja:{challenge_id}:{i}".encode(), hashlib.sha256).hexdigest()[:10]
+
+
+def fnv1a(texto):
+    """Hash corto (FNV-1a de 32 bits) que el navegador calcula igual, también en http:// (sin crypto.subtle)."""
+    h = 0x811C9DC5
+    for b in texto.encode("utf-8"):
+        h = ((h ^ b) * 0x01000193) & 0xFFFFFFFF
+    return f"{h:08x}"
+
+
+def tolerancia_parejas(n):
+    """Errores permitidos al unir: ninguno con 3 o 4 parejas, uno con 5 o más (más parejas, más fácil equivocarse)."""
+    return 1 if n >= 5 else 0
 
 
 def level_challenges(level):

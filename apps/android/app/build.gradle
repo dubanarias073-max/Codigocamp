@@ -2,6 +2,12 @@ plugins {
     id "com.android.application"
 }
 
+// Firma FIJA: Android solo deja actualizar una app si la nueva versión está firmada con la MISMA llave.
+// Antes se usaba la llave de depuración, que GitHub crea nueva en cada compilación: por eso «no se podía actualizar».
+// La llave llega por variables de entorno (en GitHub, desde los Secrets; ver .github/workflows/android.yml).
+def llave = System.getenv("CC_KEYSTORE_FILE")
+def numeroVersion = (project.findProperty("versionCode") ?: "5").toString().toInteger()
+
 def urlServidor = (project.findProperty("codigocampUrl") ?: "https://codigocamp.taila41f89.ts.net").toString().trim().replaceAll('/+$', '')
 
 android {
@@ -12,8 +18,8 @@ android {
         applicationId "com.codigocamp.app"
         minSdk 24
         targetSdk 34
-        versionCode 4
-        versionName "2.2"
+        versionCode numeroVersion        // en GitHub sube solo en cada compilación (Android no instala una versión igual o menor)
+        versionName "2.3.${numeroVersion}"
         buildConfigField "String", "URL_SERVIDOR", "\"${urlServidor}\""
     }
 
@@ -21,9 +27,24 @@ android {
         buildConfig true
     }
 
+    signingConfigs {
+        if (llave) {
+            codigocamp {
+                storeFile file(llave)
+                storePassword System.getenv("CC_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("CC_KEY_ALIAS")
+                keyPassword System.getenv("CC_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            if (llave) signingConfig signingConfigs.codigocamp
+        }
+        debug {
+            if (llave) signingConfig signingConfigs.codigocamp
         }
     }
 

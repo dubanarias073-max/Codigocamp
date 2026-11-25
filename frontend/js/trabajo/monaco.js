@@ -121,11 +121,21 @@ function modeloPara(ruta, texto) {
  * Mantiene un modelo por cada archivo de código del proyecto (para el IntelliSense entre archivos).
  * Los que están abiertos en un editor no se tocan: el editor maneja su propio texto (y lo que no se ha guardado).
  */
+// En proyectos enormes, un modelo por archivo vuelve lento todo el editor (el revisor de TypeScript analiza miles).
+// Se mantienen los más cercanos a lo que tienes abierto; los demás se revisan al abrirlos (como VS Code).
+const MAX_MODELOS = 180;
+
 export function sincronizarModelos(py, esTexto) {
   if (!monaco) return;
   const vivas = new Set();
-  for (const [ruta, texto] of Object.entries(py.files)) {
-    if (!esCodigo(ruta) || !esTexto(texto) || texto.length > 1_000_000 || deTerceros(ruta)) continue;
+  let candidatos = Object.entries(py.files).filter(([ruta, texto]) => esCodigo(ruta) && esTexto(texto) && texto.length <= 1_000_000 && !deTerceros(ruta));
+  if (candidatos.length > MAX_MODELOS) {
+    const carpetasAbiertas = [...abiertos.keys()].map((r) => r.slice(0, r.lastIndexOf("/") + 1));
+    const cerca = (ruta) => carpetasAbiertas.reduce((mejor, c) => Math.max(mejor, ruta.startsWith(c) ? c.length + 1 : 0), 0);
+    candidatos = candidatos.map((e) => [e, -cerca(e[0]) * 1000 + e[0].split("/").length * 10 + Math.min(9, e[1].length / 20000)])
+      .sort((x, y) => x[1] - y[1]).slice(0, MAX_MODELOS).map((x) => x[0]);
+  }
+  for (const [ruta, texto] of candidatos) {
     vivas.add(uriDe(ruta).toString());
     if (!abiertos.get(ruta)) vigilar(monaco, modeloPara(ruta, texto), ruta, { completo: false });
   }

@@ -167,6 +167,23 @@ def version_live(clave):
     return _cabeceras(resp)
 
 
+@bp.post("/live/<clave>/__cc_enlace")
+def enlace_live(clave):
+    """Revisa un enlace externo de la página compartida antes de abrirlo (quien la mira puede no tener cuenta).
+    Los enlaces de virus o estafas nunca se abren. Nada se guarda."""
+    from servicios.seguridad_enlaces import revisar_enlace
+    from utilidades import client_ip, too_many
+    if _workspace(clave) is None:
+        return jsonify(nivel="bloqueado", motivo="Este enlace de CódigoCamp ya no funciona."), 404
+    if too_many(f"live-enlace:{client_ip()}", 60, 60):
+        return jsonify(nivel="advertencia", motivo="Se revisaron muchos enlaces seguidos. Revisa bien este antes de abrirlo."), 429
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url", ""))[:4000]
+    resp = jsonify(revisar_enlace(url))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp.get("/live/<clave>/__cc_proyecto")
 def proyecto_live(clave):
     """Los archivos del proyecto para armar la página en el navegador igual que la vista previa de Trabajo

@@ -359,6 +359,7 @@ $("fMsg").onsubmit = async (e) => {
   try {
     const adjuntos = await adj.listos();
     const r = await api(`/api/chat/${activo}/?despues=${ultimo}`, { texto, adjuntos });
+    if (r.desafios_completados?.length) import("/js/cofres.js").then((m) => m.avisarPremios(r.desafios_completados)).catch(() => {});
     adj.limpiar();
     $("texto").value = "";
     $("log").querySelector(".c-saludo")?.remove();

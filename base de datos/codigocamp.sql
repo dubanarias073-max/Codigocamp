@@ -146,7 +146,7 @@ CREATE TABLE retos (
   id          INT         NOT NULL AUTO_INCREMENT,
   nivel_id    INT         NOT NULL,
   orden       SMALLINT    NOT NULL,
-  tipo        VARCHAR(10) NOT NULL DEFAULT 'opcion' COMMENT 'opcion, completar, ordenar, error, codigo, caso',
+  tipo        VARCHAR(10) NOT NULL DEFAULT 'opcion' COMMENT 'opcion, completar, ordenar, error, codigo, caso, parejas, armar',
   enunciado   TEXT        NOT NULL,
   codigo      TEXT        NOT NULL,
   opciones    LONGTEXT        NOT NULL COMMENT 'JSON',

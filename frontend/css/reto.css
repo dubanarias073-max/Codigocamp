@@ -118,3 +118,25 @@
 .r-porque-ia p{margin:0;font-size:14px;line-height:1.45}
 .r-porque-ia code{padding:1px 5px;border-radius:6px;background:var(--panel2);font:13px ui-monospace,Consolas,monospace}
 .r-porque-codi{flex:none;width:44px;height:44px}
+
+/* ===== Unir parejas (como Duolingo) ===== */
+.parejas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin: 6px 0 10px; }
+.par-col { display: flex; flex-direction: column; gap: 10px; }
+.par { min-height: 54px; padding: 10px 12px; border: 2px solid var(--borde); border-bottom-width: 4px; border-radius: 14px; background: var(--panel2);
+  color: var(--txt); font: 600 14.5px/1.3 system-ui, sans-serif; text-align: center; cursor: pointer; transition: transform .12s, border-color .12s, background .15s, opacity .3s; }
+.par:hover:not(:disabled) { border-color: var(--cy); transform: translateY(-1px); }
+.par.sel { border-color: #38bdf8; background: color-mix(in srgb, #38bdf8 16%, var(--panel2)); transform: scale(1.02); }
+.par.hecha { border-color: #22c55e; background: color-mix(in srgb, #22c55e 15%, var(--panel2)); color: var(--sub); opacity: .55; animation: par-bien .45s ease; cursor: default; }
+.par.mal { border-color: #ef4444; background: color-mix(in srgb, #ef4444 14%, var(--panel2)); animation: par-mal .45s ease; }
+@keyframes par-bien { 0% { transform: scale(1); } 40% { transform: scale(1.07); } 100% { transform: scale(1); } }
+@keyframes par-mal { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(4px); } }
+.par-aviso { min-height: 1.3em; margin: 0 0 6px; color: #f87171; font-size: 13.5px; font-weight: 600; }
+
+/* ===== Armar la línea con fichas ===== */
+.hueco-cod { display: inline-block; min-width: 4ch; padding: 0 6px; border-radius: 6px; background: color-mix(in srgb, var(--cy) 22%, transparent);
+  outline: 2px dashed color-mix(in srgb, var(--cy) 70%, transparent); outline-offset: 1px; color: #f8fafc; font-weight: 700; }
+.zona-armar { min-height: 58px; }
+.ficha { animation: ficha-entra .18s ease; }
+@keyframes ficha-entra { from { transform: translateY(6px) scale(.94); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 560px) { .parejas { gap: 8px; } .par { min-height: 50px; font-size: 13.5px; padding: 8px; } }
+@media (prefers-reduced-motion: reduce) { .par, .ficha { animation: none !important; transition: none; } }

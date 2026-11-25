@@ -6,3 +6,22 @@
 .google-acceso span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#fff;color:#4285f4;font-weight:900;box-shadow:0 0 0 1px var(--borde)}
 .separador-acceso{display:flex;align-items:center;gap:12px;margin:14px 0;color:var(--sub);font-size:12px}
 .separador-acceso::before,.separador-acceso::after{content:"";height:1px;flex:1;background:var(--borde)}
+
+/* Codi en el registro */
+.reg-codi{display:flex;align-items:center;gap:12px;margin:0 0 18px}
+.reg-codi-fig{flex:none;width:112px;height:112px;padding:0;border:0;background:none;cursor:pointer;border-radius:50%;transition:transform .2s}
+.reg-codi-fig:hover{transform:scale(1.05)}.reg-codi-fig:focus-visible{outline:3px solid var(--cy);outline-offset:4px}
+.reg-globo{position:relative;margin:0;max-width:300px;padding:12px 16px;border:2px solid var(--borde);border-radius:18px;background:var(--panel);color:var(--txt);font-weight:700;line-height:1.35;box-shadow:0 8px 22px rgba(15,23,42,.08)}
+.reg-globo::before{content:"";position:absolute;left:-9px;top:50%;width:14px;height:14px;background:var(--panel);border-left:2px solid var(--borde);border-bottom:2px solid var(--borde);transform:translateY(-50%) rotate(45deg)}
+.reg-globo.habla{animation:regGlobo .3s cubic-bezier(.3,1.6,.5,1)}
+@media(max-width:860px){.reg-codi{justify-content:center}.reg-codi-fig{width:92px;height:92px}}
+.reg-codi-hueco{height:0}
+@media(max-width:860px){
+  .reg-codi.flotando{position:fixed;z-index:30;top:76px;left:10px;right:10px;margin:0;padding:6px 10px 6px 6px;border-radius:18px;background:color-mix(in srgb,var(--panel) 94%,transparent);
+    box-shadow:0 10px 30px rgba(2,6,23,.28);backdrop-filter:blur(8px);animation:regGlobo .25s ease-out;justify-content:flex-start}
+  .reg-codi.flotando .reg-codi-fig{width:56px;height:56px}
+  .reg-codi.flotando .reg-globo{padding:7px 11px;font-size:14px;border-width:0;box-shadow:none;background:none}
+  .reg-codi.flotando .reg-globo::before{display:none}
+}
+
+@keyframes regGlobo{from{transform:scale(.7) translateY(6px);opacity:0}to{transform:none;opacity:1}}

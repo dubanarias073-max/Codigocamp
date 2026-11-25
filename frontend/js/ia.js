@@ -187,6 +187,7 @@ $("f").onsubmit = async (e) => {
   const espera = burbuja("tutor", adjuntos.length ? "Revisando tus archivos…" : "", [], { pensando: true });
   try {
     const r = await api("/api/tutor/", { mensaje: t, adjuntos, ...(actual ? { conversacion_id: actual.id } : { guardar: true }), contexto: { pagina: "IA" } });
+    if (r.desafios_completados?.length) import("/js/cofres.js").then((m) => m.avisarPremios(r.desafios_completados)).catch(() => {});
     espera.closest(".msg").classList.remove("pensando");
     formato(espera, r.respuesta);
     sonar("ia");

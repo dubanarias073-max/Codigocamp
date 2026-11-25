@@ -62,6 +62,7 @@ export function juegoCursor(clave) {
 export const urlCursor = (clave) => juegoCursor(clave)?.normal.url ?? null;
 
 // --------------------------------------------------------------------------------------- temas ----
+const TEMAS_LEGENDARIOS = new Set(["tema_galaxia", "tema_synthwave", "tema_esmeralda", "tema_aurora", "tema_mito"]);
 export const TEMAS = {
   tema_oceano: { acc: "#38bdf8", acc2: "#0284c7", cy: "#22d3ee" },
   tema_neon: { acc: "#e879f9", acc2: "#a21caf", cy: "#818cf8" },
@@ -189,7 +190,7 @@ export const FONDOS = {
 export const MARCOS = {
   marco_neon: "box-shadow:0 0 0 3px #22d3ee,0 0 14px 4px rgba(34,211,238,.7)",
   marco_arcoiris: "background:conic-gradient(#f43f5e,#f59e0b,#84cc16,#22d3ee,#6366f1,#d946ef,#f43f5e) ;animation:cc-rot 4s linear infinite",
-  marco_oro: "background:linear-gradient(135deg,#fde68a,#b45309 40%,#fef3c7 55%,#92400e);box-shadow:0 0 12px rgba(251,191,36,.6)",
+  marco_oro: "background:linear-gradient(135deg,#fde68a,#b45309 30%,#fef3c7 45%,#92400e 60%,#fde68a 75%,#b45309) 0 0/300% 300%;box-shadow:0 0 12px rgba(251,191,36,.6);animation:cc-oro 3.5s linear infinite",
   marco_fuego: "background:conic-gradient(from 0deg,#7f1d1d,#ef4444,#f97316,#fde047,#f97316,#ef4444,#7f1d1d);box-shadow:0 0 16px rgba(249,115,22,.8);animation:cc-rot 2.2s linear infinite",
   marco_codigo: "background:repeating-conic-gradient(#22c55e 0 12deg,transparent 12deg 24deg);box-shadow:0 0 10px rgba(34,197,94,.6);animation:cc-rot 8s steps(30) infinite",
   marco_hielo: "background:conic-gradient(#e0f2fe,#7dd3fc,#f0f9ff,#38bdf8,#e0f2fe);box-shadow:0 0 14px rgba(125,211,252,.8),inset 0 0 6px #fff;animation:cc-rot 9s linear infinite",
@@ -230,6 +231,7 @@ const CSS_BASE = `
 @keyframes cc-titilar{0%{filter:brightness(.85)}100%{filter:brightness(1.15)}}
 @keyframes cc-grid{to{background-position:0 0,0 62%,0 calc(100% + 34px),0 0,0 0}}
 @keyframes cc-olas{to{background-position:160px 100%,-180px 100%,0 0}}
+@keyframes cc-oro{to{background-position:300% 300%}}
 @keyframes cc-cuadricula{to{background-position:0 40px,40px 0,0 0}}
 @keyframes cc-rot{to{transform:rotate(360deg)}}
 @keyframes cc-late-fondo{50%{filter:brightness(1.3) saturate(1.25)}}
@@ -633,6 +635,14 @@ export function aplicarCosmeticos(eq = {}, { fondo = true } = {}) {
   // Tema de color
   const t = TEMAS[eq.tema];
   estilo("cc-cosm-tema", t ? `:root,:root body,:root[data-tema] body{--acc:${t.acc}!important;--acc2:${t.acc2}!important;--cy:${t.cy}!important}` : "");
+  // Temas legendarios: los botones principales y las barras de progreso llevan un degradado que se mueve
+  const leg = TEMAS_LEGENDARIOS.has(eq.tema);
+  document.documentElement.classList.toggle("cc-tema-legendario", leg);
+  estilo("cc-cosm-tema-leg", leg ? `html.cc-tema-legendario :is(.bj,.btn.pri,.ide-boton.pri):not(:disabled){background-image:linear-gradient(110deg,${t.acc},${t.cy},${t.acc2},${t.acc})!important;background-size:300% 100%!important;animation:cc-tema-flujo 4s linear infinite}
+html.cc-tema-legendario :is(#prog,.barra-xp>span,.progreso>span,.barra>i,.r-barra i){background-image:linear-gradient(90deg,${t.acc},${t.cy},${t.acc2},${t.acc})!important;background-size:300% 100%!important;animation:cc-tema-flujo 3s linear infinite}
+html.cc-tema-legendario :is(.nav a.on,.menu a.on,.lateral a[aria-current])::before{animation:cc-tema-pulso 2.4s ease-in-out infinite}
+@keyframes cc-tema-flujo{to{background-position:300% 0}}@keyframes cc-tema-pulso{50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){html.cc-tema-legendario *{animation:none!important}}` : "");
   // Puntero
   const j = juegoCursor(eq.cursor);
   const c = (v, respaldo) => `url("${v.url}") ${v.x} ${v.y},${respaldo}!important`;

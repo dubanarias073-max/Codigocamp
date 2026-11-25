@@ -63,6 +63,18 @@ def revisar_nombre(nombre):
     return None
 
 
+# Carpetas donde un proyecto guarda lo que COMPILA o descarga (dependencias). Un .dll o un .exe ahí es normal
+# (un proyecto de C#, Java o C++ comprimido con su carpeta bin/); se siguen revisando la firma de virus y ClamAV.
+CARPETAS_BUILD = {"bin", "obj", "target", "build", "dist", "out", "debug", "release", "x64", "x86", "node_modules", "packages",
+                  "vendor", "venv", ".venv", "env", "__pycache__", ".gradle", "cmake-build-debug", "cmake-build-release", ".next"}
+LIBRERIAS = {"dll", "so", "dylib", "node", "pyd", "class", "wasm", "pdb", "lib", "a", "o", "obj"}
+
+
+def _de_compilacion(ruta):
+    partes = [p.lower() for p in str(ruta).replace("\\", "/").split("/")[:-1]]
+    return any(p in CARPETAS_BUILD for p in partes)
+
+
 def _revisar_zip(datos):
     try:
         z = zipfile.ZipFile(io.BytesIO(datos))
@@ -78,8 +90,9 @@ def _revisar_zip(datos):
             return "el comprimido se infla de forma anormal al abrirlo (bomba zip)"
         if i >= MAX_REVISAR_ZIP:
             continue
+        compilado = _de_compilacion(info.filename)
         motivo = revisar_nombre(info.filename)
-        if motivo and not info.filename.lower().endswith(".url"):
+        if motivo and not info.filename.lower().endswith(".url") and not (compilado and _ext(info.filename) in LIBRERIAS | {"exe"}):
             return f"dentro del comprimido hay «{os.path.basename(info.filename)[:60]}»: {motivo}"
         if info.file_size and not info.is_dir():
             try:
@@ -90,7 +103,7 @@ def _revisar_zip(datos):
             if EICAR in cabeza:
                 return "dentro del comprimido hay un archivo con firma de virus"
             ej = _es_ejecutable(cabeza)
-            if ej and _ext(info.filename) not in {"so", "dylib", "node", "pyd", "class", "wasm"}:
+            if ej and _ext(info.filename) not in LIBRERIAS and not compilado:
                 return f"dentro del comprimido hay {ej}"
     return None
 

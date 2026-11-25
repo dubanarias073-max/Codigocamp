@@ -64,6 +64,24 @@ def ORD(pregunta, *piezas, explicacion=""):
     return _reto("ordenar", pregunta, [], "", "", explicacion, {"piezas": list(piezas)})
 
 
+def PAR(pregunta, pares, explicacion=""):
+    """Unir parejas (como en Duolingo): [(izquierda, derecha), ...]. El servidor baraja las dos columnas."""
+    pares = [[str(a), str(b)] for a, b in pares]
+    if not explicacion:
+        explicacion = "Las parejas son: " + "; ".join(f"{a} → {b}" for a, b in pares) + "."
+    return _reto("parejas", pregunta, [], "", "", explicacion, {"pares": pares})
+
+
+def ARM(pregunta, codigo, solucion, trampas=(), explicacion=""):
+    """Armar una línea con fichas (como el banco de palabras de Duolingo). `solucion`: fichas en orden;
+    `trampas`: fichas que sobran. El código se muestra con la línea que falta marcada con ▁▁▁."""
+    solucion = [str(x) for x in solucion]
+    if not explicacion:
+        explicacion = f"La línea completa es: {' '.join(solucion)}"
+    return _reto("armar", pregunta, [], " ".join(solucion), codigo, explicacion,
+                 {"solucion": solucion, "trampas": [str(x) for x in trampas]})
+
+
 def reto(**campos):
     """Pregunta con todos los campos a mano (tipos 'codigo' y 'caso', que llevan datos extra)."""
     return _reto(campos["tipo"], campos["enunciado"], campos.get("opciones", []), campos.get("respuesta", ""),

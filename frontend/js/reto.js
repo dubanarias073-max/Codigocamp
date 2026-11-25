@@ -8,7 +8,14 @@ import { api, getUser } from "/js/auth.js";
 import { correr } from "/js/retos-motor.js";
 const $ = (id) => document.getElementById(id);
 const el = (tag, texto, cls) => { const e = document.createElement(tag); if (texto != null) e.textContent = texto; if (cls) e.className = cls; return e; };
-const TIPOS = { opcion: "Elige la respuesta correcta", completar: "Completa", error: "Encuentra el error", ordenar: "Ordena los pasos", codigo: "Escribe código", caso: "Caza el bug · pruebas de software" };
+const TIPOS = { opcion: "Elige la respuesta correcta", completar: "Completa", error: "Encuentra el error", ordenar: "Ordena los pasos", codigo: "Escribe código", caso: "Caza el bug · pruebas de software", parejas: "Une las parejas", armar: "Arma la línea con las fichas" };
+
+// Mismo hash que el servidor (FNV-1a de 32 bits): dice si una pareja es correcta sin conocer las parejas.
+function fnv1a(texto) {
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(texto)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, "0");
+}
 
 const user = await getUser();
 if (!user) location.replace("/pages/login.html");
@@ -137,6 +144,70 @@ const RENDER = {
     return { obtener: () => (resp.length === q.piezas.length ? resp.map((p) => p.t) : null),
       bloquear: () => { zona.classList.add("fija"); bancoEl.classList.add("fija"); cont.querySelectorAll("button").forEach((b) => { b.disabled = true; }); } };
   },
+  parejas(q, cont, cambio) {
+    // Como Duolingo: tocas uno de la izquierda y uno de la derecha. Bien: quedan en verde. Mal: tiemblan y cuenta un error.
+    const sellos = new Set(q.sellos);
+    const unidas = [];
+    let fallos = 0, elegido = null;
+    const tablero = el("div", null, "parejas");
+    const colI = el("div", null, "par-col"), colD = el("div", null, "par-col");
+    const aviso = el("p", "", "par-aviso");
+    const boton = (x, lado) => {
+      const b = el("button", x.t, "par"); b.type = "button"; b.dataset.lado = lado; b.dataset.id = x.id;
+      b.onclick = () => {
+        if (b.classList.contains("hecha")) return;
+        if (!elegido || elegido.dataset.lado === lado) {
+          tablero.querySelectorAll(".par.sel").forEach((y) => y.classList.remove("sel"));
+          elegido = b; b.classList.add("sel"); sonar("toque"); return;
+        }
+        const [iz, de] = lado === "d" ? [elegido, b] : [b, elegido];
+        elegido.classList.remove("sel"); elegido = null;
+        if (sellos.has(fnv1a(`${q.sal}|${iz.dataset.id}|${de.dataset.id}`))) {
+          unidas.push([Number(iz.dataset.id), de.dataset.id]);
+          for (const y of [iz, de]) { y.classList.add("hecha"); y.disabled = true; }
+          sonar("pareja"); vibrar(12);
+          if (unidas.length === q.izq.length) cambio();
+        } else {
+          fallos += 1;
+          for (const y of [iz, de]) { y.classList.remove("mal"); void y.offsetWidth; y.classList.add("mal"); setTimeout(() => y.classList.remove("mal"), 600); }
+          sonar("pareja_mal"); vibrar([20, 30, 20]);
+          const quedan = (q.tolerancia || 0) - fallos;
+          aviso.textContent = quedan < 0 ? "Esa no era: esta vez cuenta como error. Termina de unirlas y lee la explicación."
+            : quedan === 0 ? "Esa no era. Cuidado: otro error y cuenta como fallo." : `Esa no era. Puedes equivocarte ${quedan} vez más.`;
+        }
+      };
+      return b;
+    };
+    q.izq.forEach((x) => colI.append(boton(x, "i")));
+    q.der.forEach((x) => colD.append(boton(x, "d")));
+    tablero.append(colI, colD);
+    cont.append(tablero, aviso);
+    return { obtener: () => (unidas.length === q.izq.length ? { pares: unidas, fallos } : null),
+      bloquear: () => tablero.querySelectorAll("button").forEach((b) => { b.disabled = true; }) };
+  },
+  armar(q, cont, cambio) {
+    // Banco de fichas (como Duolingo): tocas las fichas en orden para armar la línea que falta. Algunas sobran.
+    if (q.codigo) {
+      const pre = el("pre", null, "cod");
+      q.codigo.split("▁▁▁").forEach((parte, i, todas) => {
+        pre.append(document.createTextNode(parte));
+        if (i < todas.length - 1) { const h = el("span", "", "hueco-cod"); h.id = "huecoArmar"; pre.append(h); }
+      });
+      cont.append(pre);
+    }
+    let banco = q.fichas.map((t, i) => ({ t, i })), resp = [];
+    const zona = el("div", null, "zona-resp zona-armar"), bancoEl = el("div", null, "banco");
+    const chip = (p, fn) => { const b = el("button", p.t, "pieza ficha"); b.type = "button"; b.onclick = () => { sonar("toque"); fn(); }; return b; };
+    const pintar = () => {
+      zona.replaceChildren(...resp.map((p) => chip(p, () => { resp = resp.filter((x) => x !== p); banco.push(p); banco.sort((a, b) => a.i - b.i); pintar(); cambio(); })));
+      bancoEl.replaceChildren(...banco.map((p) => chip(p, () => { banco = banco.filter((x) => x !== p); resp.push(p); pintar(); cambio(); })));
+      const h = cont.querySelector("#huecoArmar");
+      if (h) h.textContent = resp.length ? resp.map((p) => p.t).join(" ") : "▁▁▁";
+    };
+    pintar(); cont.append(el("p", "Toca las fichas en orden (algunas sobran):", "nota"), zona, bancoEl);
+    return { obtener: () => (resp.length ? resp.map((p) => p.t) : null),
+      bloquear: () => { zona.classList.add("fija"); bancoEl.classList.add("fija"); cont.querySelectorAll("button").forEach((b) => { b.disabled = true; }); } };
+  },
   codigo(q, cont, cambio, item) {
     const ej = el("div", null, "ejemplos"); ej.append(el("p", "Ejemplos (hay además pruebas ocultas):", "nota"));
     q.casos.filter((c) => c.v !== false).forEach((c) => ej.append(el("code", `${q.fn}(${c.a.map((x) => JSON.stringify(x)).join(", ")})  →  ${JSON.stringify(c.r)}`)));
@@ -171,7 +242,9 @@ const RENDER = {
 };
 
 async function main() {
-  try { datos = await api("/api/nivel/" + new URLSearchParams(location.search).get("nivel") + "/"); }
+  const idNivel = new URLSearchParams(location.search).get("nivel");
+  if (!/^\d+$/.test(idNivel || "")) { location.replace("aprende.html"); return; }
+  try { datos = await api("/api/nivel/" + idNivel + "/"); }
   catch (e) { $("cuerpo").innerHTML = ""; $("cuerpo").append(el("p", e.message, "vacio")); return; }
   vidas = datos.vidas; $("vidas").textContent = vidas;
   if (/^#[0-9a-f]{6}$/i.test(datos.curso.color || "")) {
@@ -202,6 +275,7 @@ function mostrar() {
   window.scrollTo({ top: 0 });
 }
 
+const tipoDe = () => cola[0]?.q?.tipo;
 function feedback(ok, r, extra) {
   $("pie").className = "r-pie " + (ok ? "bien" : "mal");
   const m = $("mensaje"); m.replaceChildren();
@@ -209,10 +283,11 @@ function feedback(ok, r, extra) {
   codi.className = "r-codi";
   codi.innerHTML = codiSVG(ok ? "celebra" : (vidas <= 1 ? "alarma" : "triste"), { tam: 72 });
   m.append(codi);
-  m.append(el("h2", ok ? "✅ ¡Muy bien!" : (r.correcta ? "❌ Casi. Respuesta correcta: " + r.correcta : "❌ Todavía no")));
+  m.append(el("h2", ok ? "✅ ¡Muy bien!" : tipoDe() === "parejas" ? "❌ Te equivocaste al unir más de lo permitido" : (r.correcta ? "❌ Casi. Respuesta correcta: " + r.correcta : "❌ Todavía no")));
   if (extra?.titulo) m.append(el("p", extra.titulo));
   (extra?.detalle || []).forEach((d) => m.append(el("p", (d.ok ? "✓ " : "✗ ") + d.texto, "det")));
-  if (r.explicacion) { const ex = el("p", "", "r-porque"); ex.append(el("b", "Por qué: "), document.createTextNode(r.explicacion)); m.append(ex); }
+  const tipoActual = cola[0]?.q?.tipo;
+  if (r.explicacion && !(ok && tipoActual === "parejas")) { const ex = el("p", "", "r-porque"); ex.append(el("b", "Por qué: "), document.createTextNode(r.explicacion)); m.append(ex); }
   // «¿Por qué?»: Codi (la IA) explica con más detalle, también por qué tu respuesta no era la correcta
   const reto = cola[0]?.q;
   if (reto?.id) {

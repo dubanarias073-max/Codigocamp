@@ -161,7 +161,7 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public String version() { return "2.1"; }
+        public String version() { return BuildConfig.VERSION_NAME; }
 
         /** Pide permiso para leer los contactos (solo la primera vez) y se los entrega a la página con window.ccContactosApp(json). */
         @JavascriptInterface

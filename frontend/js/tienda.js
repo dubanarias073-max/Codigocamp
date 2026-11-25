@@ -64,6 +64,28 @@ function pintar() {
   if (tab !== "coleccion") lista.sort(porValor);
   $("items").innerHTML = lista.length ? lista.map(tarjeta).join("") : '<p class="nota">Aún no tienes cosméticos. ¡Compra el primero o abre un cofre en Recompensas!</p>';
   $("items").querySelectorAll("[data-prev]").forEach((el) => vistaPrevia(el, el.dataset.prev, el.closest(".producto").dataset.tipo));
+  adornarLegendarios();
+}
+
+/** Legendarios: destellos que suben y la tarjeta se inclina en 3D siguiendo el mouse. */
+const QUIETO = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function adornarLegendarios() {
+  if (QUIETO) return;
+  $("items").querySelectorAll(".producto.rareza-legendario").forEach((t, k) => {
+    for (let i = 0; i < 6; i++) {
+      const d = document.createElement("span");
+      d.className = "destello-tienda";
+      d.style.cssText = `left:${8 + Math.random() * 84}%;bottom:${4 + Math.random() * 30}%;animation-delay:${(i * 0.55 + k * 0.2).toFixed(2)}s;transform:scale(${0.6 + Math.random() * 0.8})`;
+      t.append(d);
+    }
+    t.onpointermove = (e) => {
+      if (e.pointerType !== "mouse") return;
+      const r = t.getBoundingClientRect();
+      t.style.setProperty("--ry", `${((e.clientX - r.left) / r.width - 0.5) * 14}deg`);
+      t.style.setProperty("--rx", `${(0.5 - (e.clientY - r.top) / r.height) * 12}deg`);
+    };
+    t.onpointerleave = () => { t.style.removeProperty("--rx"); t.style.removeProperty("--ry"); };
+  });
 }
 
 async function cargar() {

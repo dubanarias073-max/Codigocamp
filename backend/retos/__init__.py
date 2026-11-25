@@ -92,7 +92,7 @@ def resumen(cursos=None):
     return filas
 
 
-TIPOS = {"opcion", "completar", "error", "ordenar", "codigo", "caso"}
+TIPOS = {"opcion", "completar", "error", "ordenar", "codigo", "caso", "parejas", "armar"}
 
 
 def errores_catalogo(cursos=None):
@@ -104,7 +104,8 @@ def errores_catalogo(cursos=None):
             for seccion in etapa["secciones"]:
                 for lec in seccion["lecciones"]:
                     for r in lec["retos"]:
-                        clave = (" ".join(r["enunciado"].casefold().split()), r["codigo"], tuple(r["datos"].get("piezas", [])))
+                        clave = (" ".join(r["enunciado"].casefold().split()), r["codigo"], tuple(r["datos"].get("piezas", [])),
+                                 tuple(map(tuple, r["datos"].get("pares", []))), tuple(r["datos"].get("solucion", [])))
                         if clave in vistos:
                             errores.append(f"{slug} · {seccion['titulo']} › {lec['titulo']}: repite una pregunta de «{vistos[clave]}» (ninguna pregunta se repite en el curso)")
                         vistos.setdefault(clave, seccion["titulo"])
@@ -131,7 +132,7 @@ def errores_catalogo(cursos=None):
                     for n, r in enumerate(lec["retos"], 1):
                         prefijo = f"{donde} #{n}"
                         errores += [f"{prefijo}: {m}" for m in _problemas_reto(r)]
-                        enunciado = " ".join(r["enunciado"].casefold().split())
+                        enunciado = " ".join(r["enunciado"].casefold().split()) + "|" + r["codigo"] + "|" + str(r["datos"].get("pares", ""))
                         if enunciado in enunciados:
                             errores.append(f"{prefijo}: repite el enunciado de la pregunta #{enunciados[enunciado]}")
                         else:
@@ -169,6 +170,16 @@ def _problemas_reto(r):
             return ["la línea del error no existe en el código"]
     elif r["tipo"] == "ordenar" and len(r["datos"].get("piezas", [])) < 2:
         return ["faltan piezas para ordenar"]
+    elif r["tipo"] == "parejas":
+        pares = r["datos"].get("pares", [])
+        if len(pares) < 3 or len({a for a, _ in pares}) != len(pares) or len({b for _, b in pares}) != len(pares):
+            return ["las parejas deben ser 3 o más, sin repetir textos"]
+    elif r["tipo"] == "armar":
+        sol, trampas = r["datos"].get("solucion", []), r["datos"].get("trampas", [])
+        if len(sol) < 2 or "▁▁▁" not in r["codigo"]:
+            return ["la línea para armar necesita 2 fichas o más y el hueco ▁▁▁ en el código"]
+        if set(trampas) & set(sol):
+            return ["una ficha trampa también está en la solución"]
     return []
 
 

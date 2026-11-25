@@ -55,7 +55,7 @@ import urllib.request
 SERVIDOR = "%SERVIDOR%"   # al descargarlo desde CódigoCamp ya viene con la dirección correcta
 CONFIG = os.path.join(os.path.expanduser("~"), ".codigocamp-conector.json")
 WINDOWS = os.name == "nt"
-VERSION_CONECTOR = 5          # sube cuando el Conector aprende algo nuevo (Trabajo avisa si el tuyo es viejo)
+VERSION_CONECTOR = 6          # sube cuando el Conector aprende algo nuevo (Trabajo avisa si el tuyo es viejo)
 CAPACIDADES = ["pty", "partes", "ws", "actualizar"]
 IGNORAR = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".next", ".dart_tool", "target"}
 MAX_TRAER = 2_000_000   # bytes por archivo al traer la carpeta a Trabajo
@@ -970,8 +970,8 @@ class Agente:
                     continue
                 archivos.append({"ruta": rel, "tamano": st.st_size, "modificado": _ms(st)})
                 if len(archivos) >= MAX_LISTAR:
-                    return {"archivos": archivos, "carpetas": carpetas, "incompleto": True}
-        return {"archivos": archivos, "carpetas": carpetas}
+                    return {"archivos": archivos, "carpetas": carpetas, "incompleto": True, "carpeta": self.carpeta}
+        return {"archivos": archivos, "carpetas": carpetas, "carpeta": self.carpeta}
 
     def _leer_bytes(self, ruta, rel):
         try:
@@ -1026,7 +1026,7 @@ class Agente:
             self.infectados.add(rel)
             print(f"{R}[virus]{N} {rel}: {amenaza}")
             archivos[rel] = {"error": f"🛡️ El antivirus de este equipo encontró «{amenaza}» en «{rel}». No se envió a CódigoCamp.", "virus": True}
-        return {"archivos": archivos}
+        return {"archivos": archivos, "carpeta": self.carpeta}
 
     def fs_leer_parte(self, o):
         """Una parte de un archivo grande. En la primera parte, el antivirus del equipo revisa el archivo completo."""

@@ -115,6 +115,25 @@ def reto_responder(challenge_id):
         given = data.get("respuesta")
         correct = isinstance(given, list) and [str(item) for item in given] == pieces
         answer = "  →  ".join(pieces)
+    elif challenge.tipo == "parejas":
+        from servicios.retos import id_pareja, tolerancia_parejas
+        pares = extra.get("pares", [])
+        dada = data.get("respuesta") if isinstance(data.get("respuesta"), dict) else {}
+        unidas = dada.get("pares") if isinstance(dada.get("pares"), list) else []
+        fallos = max(0, min(parse_integer(dada.get("fallos"), 99), 99))
+        bien = {(i, id_pareja(challenge.id, i)) for i in range(len(pares))}
+        try:
+            puestas = {(int(p[0]), str(p[1])) for p in unidas if isinstance(p, list) and len(p) == 2}
+        except (TypeError, ValueError):
+            puestas = set()
+        correct = puestas == bien and fallos <= tolerancia_parejas(len(pares))
+        answer = "; ".join(f"{a} → {b}" for a, b in pares)
+    elif challenge.tipo == "armar":
+        sol = [str(x) for x in extra.get("solucion", [])]
+        given = data.get("respuesta")
+        junto = lambda fichas: "".join("".join(str(x).split()) for x in fichas)
+        correct = isinstance(given, list) and len(given) <= 40 and junto(given) == junto(sol)
+        answer = " ".join(sol)
     else:
         correct, answer = bool(data.get("correcto")), ""
     if not correct:

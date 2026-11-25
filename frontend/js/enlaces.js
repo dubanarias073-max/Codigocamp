@@ -34,6 +34,14 @@ function ventana({ titulo, html, botones }) {
  * @param {{ abrir?: (url:string) => void }} [o]  cómo abrirlo (por defecto window.open; en la app de Android, abrirFuera)
  * @returns {Promise<boolean>} true si se abrió
  */
+/** Abre en una pestaña nueva sin dejarle a esa página acceso a CódigoCamp. false si el navegador la bloqueó. */
+export function abrirPestana(x) {
+  const w = window.open(x, "_blank");
+  if (!w) return false;
+  try { w.opener = null; } catch { /* nada */ }
+  return true;
+}
+
 export async function abrirSeguro(url, { abrir } = {}) {
   let u;
   try { u = new URL(url, location.href); } catch { return false; }
@@ -42,7 +50,12 @@ export async function abrirSeguro(url, { abrir } = {}) {
   const r = await revisarEnlace(href);
   const abrirYa = abrir || ((x) => {
     if (window.CodigoCampApp?.abrirFuera) { try { window.CodigoCampApp.abrirFuera(x); return; } catch { /* sigue */ } }
-    if (!window.open(x, "_blank", "noopener,noreferrer")) location.assign(x);
+    // OJO: window.open(…, "noopener") SIEMPRE devuelve null, aunque sí abra la pestaña. Antes eso hacía que además se
+    // abriera el enlace en la misma pestaña de CódigoCamp (dos veces). Se abre sin «noopener» y se corta el vínculo.
+    if (abrirPestana(x)) return;
+    // El navegador bloqueó la ventana nueva: un toque más la abre (nunca se sale de CódigoCamp)
+    ventana({ titulo: "Abrir enlace", html: `<p style="margin:0">Tu navegador bloqueó la pestaña nueva. Toca «Abrir» para ir a <b style="word-break:break-all">${esc(new URL(x).hostname)}</b>.</p>`,
+      botones: [["abrir", "Abrir ↗"], ["cancelar", "Cancelar"]] }).then((v) => { if (v === "abrir") abrirPestana(x); });
   });
   if (r.nivel === "bloqueado") {
     import("/js/sonidos.js").then((m) => m.sonar("incorrecto")).catch(() => {});

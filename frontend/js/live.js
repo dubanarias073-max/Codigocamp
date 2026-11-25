@@ -115,6 +115,53 @@ function ir(ruta, { reemplazar = false, url = null } = {}) {
   pintar();
 }
 
+/* ===== Enlaces externos de la página compartida (https://, www., wa.me, mailto:…) =====
+ * Antes no hacían nada: la página está aislada y el aviso «externo» no se atendía aquí.
+ * Ahora se revisan (virus y estafas se bloquean y NUNCA se abren) y se abren en una pestaña nueva. */
+const escE = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function tarjetaEnlace(html, botones = []) {
+  document.getElementById("ccEnlace")?.remove();
+  const d = document.createElement("div");
+  d.id = "ccEnlace";
+  d.setAttribute("role", "dialog");
+  d.style.cssText = "position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:20;width:min(440px,calc(100vw - 24px));box-sizing:border-box;padding:14px 16px;border-radius:14px;background:#0f172a;color:#e2e8f0;font:14px/1.45 system-ui,sans-serif;box-shadow:0 14px 40px rgba(0,0,0,.35)";
+  d.innerHTML = html + `<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap">${botones.map(([id, t, pri]) =>
+    `<button type="button" data-b="${id}" style="padding:8px 14px;border-radius:10px;border:0;cursor:pointer;font:700 13px system-ui;${pri ? "background:#22c55e;color:#052e16" : "background:#334155;color:#e2e8f0"}">${t}</button>`).join("")}</div>`;
+  document.body.appendChild(d);
+  return new Promise((ok) => { d.onclick = (e) => { const b = e.target.closest("[data-b]"); if (b) { d.remove(); ok(b.dataset.b); } }; });
+}
+function abrirPestana(href) {
+  if (window.CodigoCampApp?.abrirFuera) { try { window.CodigoCampApp.abrirFuera(href); return true; } catch { /* sigue */ } }
+  const w = window.open(href, "_blank");
+  if (w) { try { w.opener = null; } catch { /* nada */ } return true; }
+  return false;
+}
+async function abrirExterno(href) {
+  let u;
+  try { u = new URL(/^www\./i.test(href) ? "https://" + href : href); } catch { return; }
+  if (/^(mailto|tel):$/.test(u.protocol)) { location.href = u.href; return; }
+  if (!/^https?:$/.test(u.protocol)) return;
+  let r;
+  try {
+    const resp = await fetch(`${BASE}/__cc_enlace`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: u.href }) });
+    r = await resp.json();
+  } catch { r = { nivel: "advertencia", motivo: "No se pudo revisar este enlace ahora mismo." }; }
+  const sitio = `<b style="word-break:break-all">${escE(u.hostname)}</b>`;
+  if (r.nivel === "bloqueado") {
+    await tarjetaEnlace(`<b>🛡️ Enlace bloqueado</b><p style="margin:6px 0 0">CódigoCamp no abrirá ${sitio} porque puede dañar tu equipo o robar tus datos. ${escE(r.motivo || "")}</p>`, [["ok", "Entendido"]]);
+    return;
+  }
+  if (r.nivel === "advertencia") {
+    const v = await tarjetaEnlace(`<b>⚠️ Revisa este enlace</b><p style="margin:6px 0 0">Vas a abrir ${sitio}. ${escE(r.motivo || "")}</p>`, [["no", "No abrir"], ["si", "Abrir de todos modos"]]);
+    if (v === "si" && !abrirPestana(u.href)) location.assign(u.href);
+    return;
+  }
+  // Seguro: se abre al instante; si el navegador bloqueó la ventana nueva, un toque más la abre
+  if (abrirPestana(u.href)) return;
+  const v = await tarjetaEnlace(`<b>Enlace externo</b><p style="margin:6px 0 0">Esta página quiere abrir ${sitio}.</p>`, [["no", "Cancelar"], ["si", "Abrir ↗", true]]);
+  if (v === "si" && !abrirPestana(u.href)) location.assign(u.href);
+}
+
 // Lo que pide la página: navegar a otra página del proyecto, guardar su localStorage, su scroll…
 addEventListener("message", (e) => {
   if (e.source !== marco.contentWindow) return;
@@ -131,14 +178,16 @@ addEventListener("message", (e) => {
     const raiz = raizDe(pagina);
     const d = resolverDestino(py, raiz, String(m.url), proxyDeVite(py, raiz));
     if (d.tipo === "archivo") { if (m.cc === "vnav") ir(d.ruta, { url: String(m.url) }); else urlVirtual = String(m.url); }
-    else if (d.tipo === "externo" && m.cc === "vnav") window.open(d.url, "_blank", "noopener");
+    else if (d.tipo === "externo" && m.cc === "vnav") abrirExterno(d.url);
     else if (m.cc === "vnav") mostrarMensaje(d.tipo === "remoto"
       ? `<h2>Esta parte necesita tu backend</h2><p>La dirección <code>${esc(m.url)}</code> va a un servidor (Flask, FastAPI, Express…). Ese servidor corre en Trabajo: ábrela desde la vista previa de Trabajo.</p><p><a href="${BASE}/" target="_top">← Volver al inicio</a></p>`
       : `<h2>Cannot GET ${esc(new URL(String(m.url)).pathname)}</h2><p>No hay ningún archivo en esa dirección del proyecto.</p><p><a href="${BASE}/" target="_top">← Volver al inicio</a></p>`);
   } else if (m.cc === "nav") {
     const destino = resolverEnlace(py, pagina || "", String(m.href || ""));
     if (destino) ir(destino);
-    else if (/^https?:/i.test(String(m.href))) window.open(String(m.href), "_blank", "noopener");
+    else if (/^https?:/i.test(String(m.href))) abrirExterno(String(m.href));
+  } else if (m.cc === "externo") {
+    abrirExterno(String(m.href || ""));
   } else if (m.cc === "http") {
     // fetch() a un backend: en el navegador no hay uno corriendo (ese corre en Trabajo)
     try { e.source.postMessage({ cc: "http-r", id: m.id, error: "Failed to fetch (tu backend corre en Trabajo, no en este enlace)" }, "*"); } catch { /* nada */ }

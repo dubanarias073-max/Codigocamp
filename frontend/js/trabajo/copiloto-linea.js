@@ -3,7 +3,8 @@
 //  · Alt + ] / Alt + [ : siguiente / anterior (las de Monaco). Ctrl + → acepta palabra por palabra.
 //  · Se activan o desactivan con «Copiloto» en la barra de estado (se recuerda en este navegador).
 const CLAVE = "cc_copiloto_linea";
-const ESPERA_MS = 550;
+const ESPERA_MS = 900;   // esperar a que de verdad dejes de escribir (gasta menos cuota de la IA)
+let pausaHasta = 0;       // si el servidor pide calma, las sugerencias automáticas descansan un rato
 
 export const copilotoActivo = () => { try { return localStorage.getItem(CLAVE) !== "0"; } catch { return true; } };
 export const activarCopiloto = (si) => { try { localStorage.setItem(CLAVE, si ? "1" : "0"); } catch { /* nada */ } };
@@ -35,6 +36,8 @@ export function registrarCopilotoEnLinea(monaco, { pedir, otrosArchivos = () => 
       const despues = modelo.getValueInRange({ startLineNumber: pos.lineNumber, startColumn: pos.column, endLineNumber: total.endLineNumber, endColumn: total.endColumn });
       const manual = contexto?.triggerKind === 1;   // Alt+\ o el comando «Sugerencia en línea»
       if (!manual && !convienePedir(antes, despues)) return { items: [] };
+      // El chat de la IA tiene prioridad: mientras responde, o si la cuota está apretada, no se piden sugerencias
+      if (!manual && (Date.now() < pausaHasta || globalThis.__ccIAOcupada)) return { items: [] };
       const clave = antes.slice(-400) + "\u0000" + despues.slice(0, 80);
       let texto;
       if (ultimo.clave === clave) texto = ultimo.texto;
@@ -45,6 +48,7 @@ export function registrarCopilotoEnLinea(monaco, { pedir, otrosArchivos = () => 
         try {
           const r = await pedir({ antes: antes.slice(-6000), despues: despues.slice(0, 2000), ruta, lenguaje: modelo.getLanguageId(), otros: otrosArchivos(ruta) });
           texto = r?.texto || "";
+          if (r?.espera) pausaHasta = Date.now() + 30_000;
         } catch { texto = ""; }
         if (cancelar?.isCancellationRequested) return { items: [] };
         ultimo = { clave, texto };

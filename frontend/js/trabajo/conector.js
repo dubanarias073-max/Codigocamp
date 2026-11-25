@@ -141,10 +141,11 @@ export { DiscoConector, ErrorEquipo, leerEstadoGit, bytesABase64, base64ABytes }
 
 /** Una operación de archivos o Git en el equipo. Devuelve los datos que respondió el Conector. */
 export async function fsEquipo(equipo, accion, datos = {}) {
-  let orden;
-  try { ({ orden } = await api(`/api/conector/${equipo.id}/fs`, { accion, ...datos })); }
+  let orden, resultado;
+  try { ({ orden, resultado } = await api(`/api/conector/${equipo.id}/fs`, { accion, ...datos })); }
   catch (e) { throw new ErrorEquipo(e.message, { desconectado: /no está conectado|409/.test(e.message) || e.status === 409 }); }
-  const r = await esperarOrden(orden);
+  // El servidor ya suele traer la respuesta en la misma petición; si tardó más, se espera como antes
+  const r = resultado ? { texto: resultado.texto || "", codigo: resultado.codigo, datos: resultado.datos } : await esperarOrden(orden);
   if (r.codigo === 255) throw new ErrorEquipo(`«${equipo.equipo}» se desconectó. Abre el Conector otra vez.`, { desconectado: true });
   if (r.codigo !== 0) throw new ErrorEquipo(r.datos?.error || r.texto.trim() || "El equipo no pudo hacerlo.", r.datos || {});
   return r.datos || {};

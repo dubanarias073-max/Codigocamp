@@ -95,6 +95,12 @@ const SONIDOS = {
     ruido(t, 0.05, { vol: 0.03, desde: 300, hasta: 500, q: 4 });
   },
   clic(t) { tecla(t, { vol: 0.05 }); },
+  // Tocar una ficha o una pareja: tecla suave
+  toque(t) { tecla(t, { vol: 0.035, agudo: 5200 }); },
+  // Pareja correcta: «clic-ding» que sube
+  pareja(t) { tecla(t, { vol: 0.03 }); tono(nota(84), t + 0.02, 0.09, { vol: 0.05 }); tono(nota(91), t + 0.08, 0.16, { tipo: "triangle", vol: 0.045 }); },
+  // Pareja equivocada: «bup» corto (más suave que el de error)
+  pareja_mal(t) { filtrado(nota(52), t, 0.12, { tipo: "sawtooth", vol: 0.05, corte: 800, fin: nota(47) }); },
   // Ráfaga de tecleo (Codi escribiendo código)
   teclear(t) { for (let i = 0; i < 7; i++) tecla(t + i * (0.055 + Math.random() * 0.04), { vol: 0.04, agudo: 3800 + Math.random() * 1600 }); },
   // git commit: «ping» de 8 bits
@@ -148,6 +154,24 @@ const SONIDOS = {
   codi_feliz(t) { [79, 84, 88, 91].forEach((n, i) => filtrado(nota(n), t + i * 0.06, 0.08, { tipo: "square", vol: 0.035, corte: 3200 })); },
   // Codi se ríe: «ji-ji-ji» de 8 bits
   codi_risa(t) { for (let i = 0; i < 4; i++) filtrado(nota(86 - i), t + i * 0.09, 0.06, { tipo: "square", vol: 0.04, corte: 3500, fin: nota(90 - i) }); },
+  // Codi saluda: «¡ho-la!» de robot (dos notas que suben y una que cae)
+  codi_hola(t) { filtrado(nota(76), t, 0.1, { tipo: "square", vol: 0.045, corte: 3000, fin: nota(81) }); filtrado(nota(84), t + 0.12, 0.16, { tipo: "square", vol: 0.04, corte: 3200, fin: nota(79) }); },
+  // Codi se asombra: «¡uooo!» que sube
+  codi_wow(t) { tono(nota(64), t, 0.32, { tipo: "triangle", vol: 0.055, fin: nota(84), ataque: 0.03 }); filtrado(nota(88), t + 0.3, 0.1, { tipo: "square", vol: 0.03, corte: 4000 }); },
+  // Guiño: «tlin» corto
+  codi_guino(t) { tecla(t, { vol: 0.025, agudo: 6000 }); tono(nota(93), t + 0.02, 0.14, { vol: 0.04 }); },
+  // Amor: dos latidos y campanita
+  codi_amor(t) { tono(nota(57), t, 0.08, { tipo: "sine", vol: 0.08 }); tono(nota(57), t + 0.16, 0.1, { tipo: "sine", vol: 0.07 }); [84, 88, 91].forEach((n, i) => tono(nota(n), t + 0.3 + i * 0.07, 0.25, { vol: 0.035 })); },
+  // Baile: un compás de 8 bits (bombo, platillo y melodía)
+  codi_baile(t) {
+    for (let i = 0; i < 4; i++) {
+      tono(70, t + i * 0.24, 0.12, { tipo: "sine", vol: 0.12, fin: 45 });
+      ruido(t + i * 0.24 + 0.12, 0.05, { vol: 0.03, desde: 6000, hasta: 9000, q: 1 });
+    }
+    [72, 76, 79, 76, 81, 79, 76, 72].forEach((n, i) => filtrado(nota(n), t + i * 0.12, 0.09, { tipo: "square", vol: 0.035, corte: 3500 }));
+  },
+  // Se tapa los ojos: «¡uy!» que baja
+  codi_tapa(t) { filtrado(nota(84), t, 0.18, { tipo: "square", vol: 0.04, corte: 2600, fin: nota(72) }); },
   // Codi se duerme / despierta
   codi_bostezo(t) { tono(nota(67), t, 0.5, { tipo: "triangle", vol: 0.05, fin: nota(55) }); },
   codi_despierta(t) { tono(nota(60), t, 0.18, { tipo: "triangle", vol: 0.05, fin: nota(76) }); filtrado(nota(84), t + 0.16, 0.08, { tipo: "square", vol: 0.03, corte: 3000 }); },

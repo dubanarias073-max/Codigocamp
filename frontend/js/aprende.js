@@ -78,6 +78,9 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 function pintarLangs() {
   $('langs').innerHTML = Object.entries(LEC).map(([k, v]) =>
     `<button type="button" class="lg${k === lang ? ' on' : ''}" data-k="${k}" style="--c:${v.c}" aria-pressed="${k === lang}">${logo(v.f, 20)}${v.n}</button>`).join('');
+  // En celular los lenguajes van en una tira: se centra el elegido (sin mover la página)
+  const tira = $('langs'), on = tira.querySelector('.on');
+  if (on && tira.scrollWidth > tira.clientWidth) tira.scrollLeft = on.offsetLeft - (tira.clientWidth - on.offsetWidth) / 2;
 }
 
 /** Primera lección que aún no has hecho (si ya hiciste todas, la última). */
@@ -106,7 +109,7 @@ async function abrir(k, i = null) {
   $('rutaTit').textContent = 'Lecciones de ' + C.n;
   if (!C.l.length) {
     try {
-      C.l = (await import('/js/lecciones/' + C.f + '.js')).default.map((o) => [o.t, o.x, o.p, o.c, o.m, o.r, o.e, o.u, o.h]);
+      C.l = (await import('/js/lecciones/' + C.f + '.js')).default.map((o) => [o.t, o.x, o.p, o.c, o.m, o.r, o.e, o.u, o.h, o.q, o.a, o.f]);
     } catch {
       $('pasos').innerHTML = '';
       $('teoria').textContent = 'No se pudieron cargar las lecciones de ' + C.n + '.';
@@ -154,15 +157,19 @@ function pintar() {
 
   const t = $('teoria');
   t.style.setProperty('--c', L.c);
+  const leer = sinCodigo(L, x);
+  $('lab').hidden = leer;
   t.innerHTML =
     `<span class="etq">${esc(L.n)} · ${esc(x[4])} · lección ${idx + 1} de ${L.l.length}</span>` +
     `<h1>${esc(x[0])}</h1>` +
     (x[7] ? '<h2>¿Qué es?</h2>' : '') + parrafos(x[1]) +
     (x[7] ? '<h2>¿Para qué sirve?</h2>' + parrafos(x[7]) : '') +
     `<h2>Puntos clave</h2><ul>${x[2].map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` +
-    (x[8] ? `<h2>Mira el código</h2><p>${esc(x[8])} Los comentarios del código te explican cada parte.</p>` : '') +
-    (x[6] ? `<div class="nota-e"><b>⚠️ Error común</b><p>${esc(x[6])}</p></div>` : '') +
-    (x[5] ? `<div class="nota-r"><b>🎯 Ahora tú</b><p>${esc(x[5])}</p></div>` : '') +
+    (leer
+      ? `<h2>${L.run === 'ver' ? 'Mira el ejemplo' : 'Para recordar'}</h2>${x[8] ? `<p>${esc(x[8])}</p>` : ''}<div class="cod-ver"><button type="button" class="btn soft sm cod-copiar">Copiar</button><pre><code>${esc(x[3])}</code></pre></div>`
+      : x[8] ? `<h2>Mira el código</h2><p>${esc(x[8])} Los comentarios del código te explican cada parte.</p>` : '') +
+    (x[11] && x[2].length >= 2 ? quizError(x) : x[6] ? `<div class="nota-e"><b>⚠️ Error común</b><p>${esc(x[6])}</p></div>` : '') +
+    (x[9] && x[10] ? retoVivo(x, L, leer) : x[5] ? `<div class="nota-r"><b>🎯 Ahora tú</b><p>${esc(x[5])}</p></div>` : '') +
     `<a class="practicar" href="/pages/inicio.html?curso=${encodeURIComponent(L.f)}">Practicar ${esc(L.n)} con retos →</a>`;
 
   const claveCodigo = lang + ':' + idx;
@@ -180,6 +187,89 @@ function pintar() {
   $('prev').disabled = idx === 0;
   $('next').textContent = idx === L.l.length - 1 ? 'Marcar como hecha y terminar' : 'Marcar como hecha y seguir';
   history.replaceState(null, '', '#' + lang);
+  // Entrada animada de la lección (cada parte aparece un poco después de la anterior)
+  t.classList.remove('entra'); void t.offsetWidth; t.classList.add('entra');
+  [...t.children].forEach((h, n) => h.style.setProperty('--n', Math.min(n, 14)));
+  activarInteractivos(t, x);
+}
+
+/* ===== Lección interactiva: «¿Cuál es el error común?» y el reto para completar ===== */
+// Orden estable por lección (no cambia al volver a pintar), distinto entre lecciones
+const barajar = (lista, semilla) => lista.map((v, i) => [((semilla + 1) * 2654435761 + i * 40503) % 1000, v]).sort((a, b) => a[0] - b[0]).map((p) => p[1]);
+const normal = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[\s"'`();]/g, '').replace(/\(\)$/, '');
+const sonarA = (n) => import('/js/sonidos.js').then((m) => m.sonar(n)).catch(() => {});
+const codi = (animo, frase) => import('/js/mascota.js').then((m) => m.codiReacciona(animo, frase, 2600)).catch(() => {});
+
+function quizError(x) {
+  const ops = barajar([[x[11], 1], [x[2][0], 0], [x[2][1], 0]], idx + lang.length);
+  return `<div class="quiz-e" data-quiz><b>🕵️ ¿Detectas el error común?</b><p class="quiz-sub">Dos frases son ciertas. Toca la que es un <em>error</em> que comete mucha gente.</p>` +
+    `<div class="quiz-ops">${ops.map(([t, ok]) => `<button type="button" class="quiz-op" data-ok="${ok}">${esc(t)}</button>`).join('')}</div>` +
+    `<div class="nota-e quiz-expl" hidden><b>⚠️ Error común</b><p>${esc(x[6])}</p></div></div>`;
+}
+
+/** Lecciones donde no hay nada que ejecutar: cursos «para leer» (Bases de datos) o ejemplos que son solo comentarios. */
+function sinCodigo(L, x) {
+  if (L.run === 'ver') return true;
+  return String(x[3] || '').split('\n').every((s) => !s.trim() || /^\s*(#|\/\/|--|<!--|\/\*|\*)/.test(s));
+}
+
+function retoVivo(x, L, leer = false) {
+  const partes = String(x[9]).split('___');
+  const pista = esc(partes.slice(1).join('___'));
+  const ancho = Math.max(4, Math.min(18, String(x[10]).length + 1));
+  const intro = /^(Cambia el código|Reto mental)/.test(x[5] || '') ? (leer ? 'Piénsalo y completa:' : 'Cambia el código de abajo y mira qué pasa. Luego completa:') : esc(x[5]);
+  return `<form class="nota-r reto-vivo" data-reto autocomplete="off"><b>🎯 Ahora tú</b><p>${intro}</p>` +
+    `<p class="reto-frase">${esc(partes[0])}${partes.length > 1 ? `<input class="reto-in" aria-label="Tu respuesta" style="--ch:${ancho}ch" spellcheck="false" autocapitalize="off">${pista}` : `</p><p><input class="reto-in" aria-label="Tu respuesta" style="--ch:${ancho}ch" spellcheck="false" autocapitalize="off">`}</p>` +
+    `<div class="reto-acc"><button class="btn pri sm" type="submit">Comprobar</button><button class="btn ghost sm reto-pista" type="button" hidden>💡 Pista</button><span class="reto-res" aria-live="polite"></span></div></form>`;
+}
+
+function activarInteractivos(t, x) {
+  const copiar = t.querySelector('.cod-copiar');
+  if (copiar) copiar.onclick = async () => {
+    try { await navigator.clipboard.writeText(x[3]); copiar.textContent = '¡Copiado! ✔'; sonarA('clic'); }
+    catch { copiar.textContent = 'No se pudo copiar'; }
+    setTimeout(() => { copiar.textContent = 'Copiar'; }, 1600);
+  };
+  const quiz = t.querySelector('[data-quiz]');
+  if (quiz) quiz.onclick = (e) => {
+    const b = e.target.closest('.quiz-op'); if (!b || quiz.classList.contains('resuelto')) return;
+    if (b.dataset.ok === '1') {
+      b.classList.add('bien'); quiz.classList.add('resuelto'); sonarA('correcto');
+      quiz.querySelectorAll('.quiz-op').forEach((o) => { o.disabled = true; });
+      quiz.querySelector('.quiz-expl').hidden = false;
+      codi('asombro', '¡Ojo de detective! 🕵️');
+    } else {
+      b.classList.add('mal'); b.disabled = true; sonarA('incorrecto');
+      b.title = 'Esta frase es cierta';
+    }
+  };
+  const f = t.querySelector('[data-reto]'); if (!f) return;
+  const inp = f.querySelector('.reto-in'), res = f.querySelector('.reto-res'), btnP = f.querySelector('.reto-pista');
+  const resp = String(x[10]); let fallos = 0, pistas = 0;
+  inp.oninput = () => { inp.classList.remove('mal'); res.textContent = ''; };
+  btnP.onclick = () => {
+    pistas++;
+    if (pistas >= 3 || pistas >= resp.length) { inp.value = resp; res.textContent = 'Esta era la respuesta. ¡La próxima sale sola!'; btnP.hidden = true; return; }
+    inp.value = resp.slice(0, pistas); inp.focus();
+    res.textContent = `Empieza por «${resp.slice(0, pistas)}»…`;
+  };
+  f.onsubmit = (e) => {
+    e.preventDefault();
+    if (!inp.value.trim()) { inp.focus(); return; }
+    if (normal(inp.value) === normal(resp)) {
+      f.classList.add('resuelto'); inp.classList.add('bien'); inp.readOnly = true; btnP.hidden = true;
+      f.querySelector('[type=submit]').disabled = true;
+      res.textContent = pistas ? '¡Bien! ✔' : ['¡Exacto! ✔', '¡Perfecto! ✔', '¡Lo tienes! ✔'][idx % 3];
+      sonarA('correcto'); codi(pistas ? 'feliz' : 'baila', pistas ? '¡Bien hecho!' : '¡A la primera! 🎉');
+      if (!pistas) import('/js/cofres.js').then((m) => m.confeti?.(28)).catch(() => {});
+      $('next').classList.add('late');
+    } else {
+      fallos++; sonarA('incorrecto');
+      inp.classList.remove('mal'); void inp.offsetWidth; inp.classList.add('mal');
+      res.textContent = fallos === 1 ? 'Casi… vuelve a leer el ejemplo.' : 'Todavía no. Puedes pedir una pista.';
+      if (fallos >= 2) btnP.hidden = false;
+    }
+  };
 }
 
 /* ===== Eventos ===== */
@@ -204,7 +294,12 @@ $('next').onclick = () => {
   let sig = idx + 1;
   while (sig < total && hs.has(sig)) sig++;
   if (sig >= total) sig = primeraPendiente(lang);
-  if (hs.size >= total) { sig = idx; aviso(`¡Terminaste todas las lecciones de ${LEC[lang].n}! 🎉`); }
+  const modulo = LEC[lang].l[idx][4];
+  const delModulo = LEC[lang].l.map((y, i) => [y[4], i]).filter(([m]) => m === modulo);
+  if (hs.size >= total) { sig = idx; aviso(`¡Terminaste todas las lecciones de ${LEC[lang].n}! 🎉`); import('/js/cofres.js').then((m) => m.confeti?.(90)).catch(() => {}); codi('baila', '¡Curso completo! 🏆'); }
+  else if (delModulo.every(([, i]) => hs.has(i))) { aviso(`¡Módulo «${modulo}» completo! ✨`); import('/js/cofres.js').then((m) => m.confeti?.(50)).catch(() => {}); codi('asombro', '¡Módulo terminado!'); }
+  else codi('feliz', ['¡Una más! 💪', '¡Vas muy bien!', '¡Sigue así!', '¡Bien hecho!'][hs.size % 4]);
+  $('next').classList.remove('late');
   idx = sig;
   pintar();
   scrollTo({ top: 0, behavior: 'smooth' });
@@ -226,6 +321,12 @@ ed.onkeydown = (e) => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ejecutar(); }
 };
 $('run').onclick = ejecutar;
+// Alt + ← / → para moverte entre lecciones
+addEventListener('keydown', (e) => {
+  if (!e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'ArrowRight' && LEC[lang].l.length && idx < LEC[lang].l.length - 1) { e.preventDefault(); idx++; pintar(); }
+  if (e.key === 'ArrowLeft' && idx > 0) { e.preventDefault(); idx--; pintar(); }
+});
 
 /* ===== Ejecutores ===== */
 const cargar = (u) => new Promise((ok, ko) => {

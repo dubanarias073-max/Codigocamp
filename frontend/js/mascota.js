@@ -33,6 +33,10 @@ const REACCIONES = [
   { animo: "feliz", frase: "¡Bip bup! Estoy listo", sonido: "boop", clase: "m-gira" },
   { animo: "pensando", frase: null, sonido: "boop", clase: "m-inclina", tipo: "consejo" },
   { animo: "celebra", frase: null, sonido: "codi_risa", clase: "m-salta", tipo: "chiste" },
+  { animo: "guino", frase: "Psst… tú puedes con todo 😉", sonido: "codi_guino", clase: "m-saluda" },
+  { animo: "asombro", frase: "¡Wow! ¿Ya viste todo lo que has aprendido?", sonido: "codi_wow", clase: "m-salta" },
+  { animo: "ama", frase: "¡Me encanta programar contigo! 💙", sonido: "codi_amor", clase: "m-saluda" },
+  { animo: "espia", frase: "¿Qué estás programando? 👀", sonido: "codi_tapa", clase: "m-inclina" },
 ];
 const azar = (l) => l[Math.floor(Math.random() * l.length)];
 const reducido = () => matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.classList.contains("menos-movimiento");
@@ -176,8 +180,8 @@ export function activarMascota(raiz, { animo = "saludo", tam = 64, globo = null,
     }
   }
   function bailar() {
-    sonar("codi_feliz");
-    reaccionar("celebra", azar(["¡A bailar! 🕺", "¡Modo fiesta activado! 🎉", "Bip bip bup, ¡qué ritmo!"]), 2800, "m-baila");
+    sonar("codi_baile");
+    reaccionar("baila", azar(["¡A bailar! 🕺", "¡Modo fiesta activado! 🎉", "Bip bip bup, ¡qué ritmo!"]), 3200, "m-baila");
     corazones(3);
   }
 
@@ -193,7 +197,9 @@ export function activarMascota(raiz, { animo = "saludo", tam = 64, globo = null,
       ["🕺", "¡Baila!", bailar],
       ["😂", "Cuéntame un chiste", () => { sonar("codi_risa"); reaccionar("celebra", azar(CHISTES), 6000, "m-salta"); }],
       ["💡", "Dame un consejo", () => { sonar("boop"); reaccionar("pensando", azar(CONSEJOS), 6000, "m-inclina"); }],
-      ["💙", "Acariciar", () => { sonar("codi_feliz"); corazones(); reaccionar("feliz", "¡Gracias! Eres lo máximo 💙", 2600, "m-saluda"); }],
+      ["💙", "Acariciar", () => { sonar("codi_amor"); corazones(); reaccionar("ama", "¡Gracias! Eres lo máximo 💙", 2800, "m-saluda"); }],
+      ["😉", "Guíñame un ojo", () => { sonar("codi_guino"); reaccionar("guino", azar(["😉 Te guardo el secreto", "Tú puedes, crack 😉", "Esto queda entre nosotros"]), 2600, "m-saluda"); }],
+      ["🙈", "Juguemos a esconderse", () => { sonar("codi_tapa"); reaccionar("tapa", "1, 2, 3… ¡no estoy mirando! 🙈", 1800, "m-inclina"); setTimeout(() => { sonar("codi_wow"); reaccionar("espia", "¡Te encontré! 👀", 2200, "m-salta"); }, 1900); }],
       ["😴", "A dormir", dormir],
     ];
     m.innerHTML = ops.map(([ic, t], i) => `<button type="button" role="menuitem" data-i="${i}"><span>${ic}</span>${t}</button>`).join("");

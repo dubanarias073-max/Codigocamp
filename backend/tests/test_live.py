@@ -1,3 +1,4 @@
+from unittest.mock import patch
 """Enlace «en vivo» de Trabajo (como Live Server): /live/<clave>/…"""
 import tempfile
 import unittest
@@ -94,6 +95,16 @@ class LiveTest(unittest.TestCase):
         self.guardar(c, nuevo)
         self.assertNotEqual(self.app.test_client().get(base + "__cc_version").get_json()["v"], v1)
         self.assertIn("Cambié", self.app.test_client().get(base + "__cc_proyecto").get_json()["files"]["index.html"])
+
+    def test_enlaces_externos_de_la_pagina_compartida_se_revisan_sin_cuenta(self):
+        c = self.cliente(); self.guardar(c); base = self.enlace(c)
+        otro = self.app.test_client()   # quien abre la página compartida no tiene cuenta
+        with patch("servicios.seguridad_enlaces._safe_browsing", return_value=None):
+            r = otro.post(base + "__cc_enlace", json={"url": "https://example.com/"})
+            self.assertEqual(r.status_code, 200); self.assertEqual(r.get_json()["nivel"], "seguro")
+            r = otro.post(base + "__cc_enlace", json={"url": "https://login-microsoftonline.com.evil.ru/"})
+            self.assertEqual(r.get_json()["nivel"], "bloqueado")
+        self.assertEqual(otro.post("/live/claveQueNoExiste1/__cc_enlace", json={"url": "https://example.com/"}).status_code, 404)
 
     def test_cambiar_enlace_corta_el_anterior_y_cada_cuenta_tiene_el_suyo(self):
         c = self.cliente(); self.guardar(c); base = self.enlace(c)

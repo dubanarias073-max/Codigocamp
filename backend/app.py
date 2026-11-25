@@ -79,6 +79,8 @@ def create_app(test_config=None):
         REMEMBER_COOKIE_SECURE=os.getenv("DEBUG", "1") != "1",
         GEMINI_API_KEY=os.getenv("GEMINI_API_KEY", "").strip().strip('"'),
         GEMINI_MODEL=(os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip(),
+        # Modelo para el autocompletado de Trabajo: aparte del chat (cada modelo tiene su propia cuota gratis)
+        GEMINI_MODEL_RAPIDO=(os.getenv("GEMINI_MODEL_RAPIDO") or "gemini-3.5-flash-lite").strip(),
         GOOGLE_CLIENT_ID=os.getenv("GOOGLE_CLIENT_ID", ""),
         GOOGLE_CLIENT_SECRET=os.getenv("GOOGLE_CLIENT_SECRET", ""),
         GOOGLE_REDIRECT_URI=os.getenv("GOOGLE_REDIRECT_URI", ""),

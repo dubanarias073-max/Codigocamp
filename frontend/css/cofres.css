@@ -51,3 +51,15 @@
 .cofre-mini{width:58px;height:52px;flex:none}
 .vista-dedo{background:var(--panel2);touch-action:none;user-select:none}
 
+/* Aviso pequeño de premio (Trabajo e IA): no tapa lo que estás haciendo */
+.aviso-premio{position:fixed;right:16px;bottom:16px;z-index:70;display:flex;align-items:center;gap:10px;max-width:min(380px,calc(100vw - 32px));padding:10px 12px;border-radius:14px;
+  border:1px solid color-mix(in srgb,#fbbf24 55%,transparent);background:var(--panel,#11172a);color:var(--txt,#e5eaff);box-shadow:0 14px 40px rgba(0,0,0,.35);animation:apIn .35s cubic-bezier(.2,.8,.2,1)}
+.aviso-premio.sale{animation:apOut .3s forwards}
+.aviso-premio .ap-ic{font-size:26px;animation:apBote 1.2s ease-in-out infinite}
+.aviso-premio .ap-tx{display:grid;min-width:0}.aviso-premio .ap-tx small{opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aviso-premio .ap-x{border:0;background:none;color:inherit;opacity:.6;cursor:pointer;font-size:15px;padding:4px}
+@keyframes apIn{from{opacity:0;transform:translateY(16px) scale(.96)}}
+@keyframes apOut{to{opacity:0;transform:translateY(16px)}}
+@keyframes apBote{50%{transform:translateY(-3px) rotate(-6deg)}}
+@media(max-width:700px){.aviso-premio{bottom:84px;right:12px;left:12px;max-width:none}}
+@media(prefers-reduced-motion:reduce){.aviso-premio,.aviso-premio .ap-ic{animation:none}}

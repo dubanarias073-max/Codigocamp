@@ -91,3 +91,51 @@
 
 /* Estelas del dedo: la tarjeta es una zona para tocar y deslizar */
 .vista-dedo{background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--cy) 12%,var(--panel2)),var(--panel2));font-size:12px;cursor:crosshair;user-select:none;-webkit-user-select:none;touch-action:none}
+
+/* ===== Épicos y legendarios con movimiento ===== */
+@property --giro { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+/* Borde de luz que gira alrededor de la tarjeta */
+.producto.rareza-epico, .producto.rareza-legendario { isolation: isolate; border-color: transparent; }
+.producto.rareza-epico::before, .producto.rareza-legendario::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; padding: 2px; border-radius: inherit; pointer-events: none;
+  background: conic-gradient(from var(--giro), #7c3aed, #c084fc, #f0abfc, #7c3aed 40%, #4c1d95, #a855f7, #7c3aed);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: giro-borde 5s linear infinite;
+}
+.producto.rareza-legendario::before {
+  padding: 3px;
+  background: conic-gradient(from var(--giro), #f59e0b, #fde68a, #f472b6, #a78bfa, #38bdf8, #4ade80, #fde68a, #f59e0b);
+  animation-duration: 3.2s;
+}
+@keyframes giro-borde { to { --giro: 360deg; } }
+.producto.rareza-epico { animation: pulso-epico 3.4s ease-in-out infinite; }
+@keyframes pulso-epico { 50% { box-shadow: 0 0 26px color-mix(in srgb, #a855f7 38%, transparent); } }
+.producto.rareza-legendario { animation: pulso-legendario 2.6s ease-in-out infinite; transform-style: preserve-3d; will-change: transform; }
+@keyframes pulso-legendario { 0%, 100% { box-shadow: 0 0 22px color-mix(in srgb, #f5b73b 35%, transparent); } 50% { box-shadow: 0 0 42px color-mix(in srgb, #f5b73b 60%, transparent), 0 0 80px color-mix(in srgb, #f472b6 22%, transparent); } }
+/* Brillo holográfico más fuerte en los legendarios */
+.producto.rareza-legendario::after { background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.18) 42%, rgba(253,230,138,.38) 50%, rgba(244,114,182,.2) 58%, transparent 70%); animation-duration: 2.6s; }
+/* Etiqueta y nombre que brillan */
+.producto.rareza-legendario .producto-rango { background: linear-gradient(90deg, #f59e0b, #fde68a, #f472b6, #fde68a, #f59e0b) 0 0 / 300% 100%; color: #1c1206; border: 0; animation: brillo-texto 3s linear infinite; box-shadow: 0 0 14px color-mix(in srgb, #f5b73b 55%, transparent); }
+.producto.rareza-epico .producto-rango { background: color-mix(in srgb, #a855f7 16%, transparent); animation: latido 2.4s ease-in-out infinite; }
+.producto.rareza-legendario h3 { background: linear-gradient(90deg, #b45309, #f59e0b, #fde68a, #f59e0b, #b45309) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: brillo-texto 4s linear infinite; }
+:root[data-tema="oscuro"] .producto.rareza-legendario h3 { background-image: linear-gradient(90deg, #f59e0b, #fde68a, #fff7d6, #fde68a, #f59e0b); }
+@keyframes brillo-texto { to { background-position: 300% 0; } }
+@keyframes latido { 50% { transform: scale(1.06); } }
+/* La vista previa flota */
+.producto.rareza-epico .vista, .producto.rareza-epico .ic { animation: flota 3.4s ease-in-out infinite; }
+.producto.rareza-legendario .vista, .producto.rareza-legendario .ic { animation: flota-alto 2.8s ease-in-out infinite; }
+@keyframes flota-alto { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-7px) scale(1.02); } }
+/* Destellos que suben (los pone tienda.js en cada legendario) */
+.destello-tienda { position: absolute; z-index: 2; width: 10px; height: 10px; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle, #fff 0 18%, #fde68a 30%, transparent 70%); clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  animation: destello-sube 3.2s ease-in infinite; }
+@keyframes destello-sube { 0% { opacity: 0; transform: translateY(0) scale(.4) rotate(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-120px) scale(1.15) rotate(180deg); } }
+/* Inclinación 3D al pasar el mouse (tienda.js pone --rx y --ry) */
+@media (hover: hover) {
+  .producto.rareza-legendario:hover { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-6px) scale(1.02); }
+  .producto.rareza-epico:hover { transform: translateY(-6px) scale(1.015); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .producto.rareza-epico, .producto.rareza-legendario, .producto::before, .producto .vista, .producto-rango, .producto h3, .destello-tienda { animation: none !important; }
+  .producto.rareza-legendario:hover { transform: translateY(-5px); }
+}

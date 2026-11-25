@@ -206,7 +206,7 @@ DB_HOST=127.0.0.1
 DB_PORT=3307
 DB_NAME=codigocamp
 DB_USER=codigocamp
-DB_PASSWORD="123456"
+DB_PASSWORD="12345"
 
 # --- Direcciones del proyecto: el túnel (sección 6) y localhost, separadas por coma ---
 # CódigoCamp usa la misma por la que entró cada persona. La primera va en los avisos automáticos de racha.

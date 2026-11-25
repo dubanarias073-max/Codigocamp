@@ -25,6 +25,7 @@ def _perfil_zona():
 @bp.route("/api/chat/<int:friendship_id>/", methods=["GET", "POST"])
 @login_required
 def chat(friendship_id):
+    premios = []
     friendship = my_friendships(current_user.id).filter_by(id=friendship_id, estado="aceptada").first()
     if not friendship:
         return api_error("Esa conversación no existe.", 404)
@@ -47,7 +48,7 @@ def chat(friendship_id):
             db.session.rollback()
             return api_error(str(e))
         from servicios.perfil import contar_actividad, get_profile
-        contar_actividad(get_profile(current_user), "mensajes")
+        premios = contar_actividad(get_profile(current_user), "mensajes")
         db.session.commit()
     after = parse_integer(request.args.get("despues"), 0)
     query = Message.query.filter(Message.amistad_id == friendship.id, Message.id > borrado_hasta(current_user.id, friendship.id))
@@ -62,7 +63,7 @@ def chat(friendship_id):
             adj.setdefault(a.mensaje_id, []).append(publico(a))
     # Mensajes que se eliminaron hace poco (para quitarlos también de la pantalla de la otra persona)
     borrados = [m.id for m in query.filter(Message.borrado_en.isnot(None), Message.borrado_en > utcnow() - timedelta(days=2)).with_entities(Message.id).all()]
-    return jsonify(mensajes=[_ser(message, adj) for message in messages], borrados=borrados)
+    return jsonify(mensajes=[_ser(message, adj) for message in messages], borrados=borrados, desafios_completados=premios)
 
 
 def borrado_hasta(usuario_id, amistad_id):

@@ -161,6 +161,7 @@ export class Sincronizador {
 
   /** Lee la carpeta: Map ruta → { valor, bytes? } de lo que el proyecto puede guardar. */
   async #leerDisco() {
+    this.#medida = null;   // el proyecto pudo cambiar desde la última vuelta
     const { archivos, carpetas } = await this.disco.listar();
     const salida = new Map();
     const omitidos = new Map();
@@ -205,11 +206,26 @@ export class Sincronizador {
   }
 
   /** Pone en el proyecto lo que vino del disco, respetando los límites. Devuelve false si no cupo. */
+  /** Medidas del proyecto (cuántos archivos, cuánto texto, qué carpetas) calculadas UNA vez por vuelta y luego
+   *  actualizadas archivo por archivo. Antes se recalculaban por cada archivo: con miles de archivos tardaba segundos. */
+  #medida = null;
+  #medir(py) {
+    const m = this.#medida;
+    if (m && m.py === py && m.files === py.files && m.folders === py.folders) return m;
+    let caracteres = 0;
+    for (const t of Object.values(py.files)) if (!(t.startsWith("cc") && /^cc(?:img|bin):v1:[a-f0-9]{64}:/.test(t))) caracteres += t.length;
+    return (this.#medida = { py, files: py.files, folders: py.folders, cuenta: Object.keys(py.files).length, caracteres, carpetas: new Set(py.folders) });
+  }
+
   async #ponerEnProyecto(py, ruta, d) {
+    const m = this.#medir(py);
     const previo = py.files[ruta];
-    const cuenta = Object.keys(py.files).length + (previo === undefined ? 1 : 0);
-    const caracteres = FS.usoCaracteres(py) - (previo?.length ?? 0) + d.valor.length;
-    const choca = FS.esCarpeta(py, ruta) || Object.keys(py.files).some((r) => ruta.startsWith(r + "/"));
+    const esMarca = (t) => typeof t === "string" && t.startsWith("cc") && /^cc(?:img|bin):v1:[a-f0-9]{64}:/.test(t);
+    const largo = (t) => (t === undefined || esMarca(t) ? 0 : t.length);
+    const cuenta = m.cuenta + (previo === undefined ? 1 : 0);
+    const caracteres = m.caracteres - largo(previo) + largo(d.valor);
+    let choca = ruta !== "" && m.carpetas.has(ruta);
+    for (let c = FS.carpetaDe(ruta); c && !choca; c = FS.carpetaDe(c)) if (py.files[c] !== undefined) choca = true;
     let motivo = null;
     if (choca) motivo = "en el proyecto hay una carpeta o un archivo que choca con ese nombre";
     else if (cuenta > FS.LIMITES.archivos) motivo = `el proyecto admite ${FS.LIMITES.archivos} archivos`;
@@ -228,9 +244,12 @@ export class Sincronizador {
       return false;
     }
     this.rechazados.delete(ruta);
+    m.caracteres += largo(valor) - largo(previo);
+    if (previo === undefined) m.cuenta++;
     py.files[ruta] = valor;
-    for (let c = FS.carpetaDe(ruta); c; c = FS.carpetaDe(c)) if (!py.folders.includes(c)) py.folders.push(c);
-    py.folders.sort();
+    let nuevas = false;
+    for (let c = FS.carpetaDe(ruta); c; c = FS.carpetaDe(c)) if (!m.carpetas.has(c)) { m.carpetas.add(c); py.folders.push(c); nuevas = true; }
+    if (nuevas) py.folders.sort();
     return true;
   }
 

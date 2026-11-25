@@ -17,6 +17,12 @@ const FRASES = {
   pensando: ["Déjame pensar…", "Analizando tu código…", "Mmm, interesante…"],
   triste: ["Se apagó la racha… ¡empecemos otra!", "Mañana volvemos con todo", "Toda racha empieza con un día"],
   celebra: ["¡Lo lograste!", "¡Nivel superado!", "¡Eso es todo!"],
+  guino: ["Tú puedes 😉", "Te guardo el secreto", "Esto queda entre nosotros"],
+  asombro: ["¡Wow!", "¿¡En serio!?", "¡No lo puedo creer!"],
+  ama: ["¡Me encanta! 💙", "¡Eres lo máximo!", "Te quiero, humano"],
+  baila: ["¡A bailar! 🎶", "¡Bip bup bip!", "Modo fiesta activado"],
+  tapa: ["No estoy mirando 🙈", "Tu contraseña es secreta", "Ojos tapados"],
+  espia: ["Solo una miradita 👀", "Ups, ¡te vi!", "Mmm, ¿segura?"],
 };
 export const ANIMOS = Object.keys(FRASES);
 export function fraseDe(animo, semilla = Math.floor(Date.now() / 600000)) {
@@ -48,6 +54,20 @@ function ojos(a, id, c) {
       return `<g stroke="${c}" stroke-width="3.5" stroke-linecap="round" opacity=".85"><path d="M71 80l15-5"/><path d="M129 80l-15-5"/></g>
         <g class="cdx-ojos cdx-parpadeo" fill="${c}" filter="url(#${id}b)"><rect x="73" y="86" width="14" height="16" rx="7"/><rect x="113" y="86" width="14" height="16" rx="7"/></g>
         <path class="cdx-lagrima" d="M84 104c3 5 4 7 4 9a4 4 0 0 1-8 0c0-2 1-4 4-9z" fill="#7aa7ff"/>`;
+    case "guino":
+      return `<g class="cdx-ojos" filter="url(#${id}b)"><path d="M70 94q10-10 20 0" stroke="${c}" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+        <rect class="cdx-parpadeo" x="112" y="80" width="15" height="23" rx="7.5" fill="${c}"/></g>${brillo(118, 86)}`;
+    case "asombro":
+      return `<g class="cdx-ojos" fill="${c}" filter="url(#${id}b)"><circle cx="80" cy="90" r="11"/><circle cx="120" cy="90" r="11"/></g>
+        ${brillo(84, 85)}${brillo(124, 85)}<circle cx="77" cy="94" r="1.6" fill="#fff" opacity=".6"/><circle cx="117" cy="94" r="1.6" fill="#fff" opacity=".6"/>`;
+    case "ama":
+      return `<g class="cdx-ojos cdx-latido" fill="#ff5c9d" filter="url(#${id}b)">
+        <path d="M80 100l-9-9a5.5 5.5 0 0 1 9-6.5a5.5 5.5 0 0 1 9 6.5z"/><path d="M120 100l-9-9a5.5 5.5 0 0 1 9-6.5a5.5 5.5 0 0 1 9 6.5z"/></g>`;
+    case "baila":
+      return `<g class="cdx-ojos" stroke="${c}" stroke-width="6.5" stroke-linecap="round" fill="none" filter="url(#${id}b)">
+        <path d="M70 94q10-12 20 0"/><path d="M110 94q10-12 20 0"/></g>`;
+    case "tapa": case "espia":
+      return `<g class="cdx-ojos cdx-parpadeo" fill="${c}" filter="url(#${id}b)"><rect x="73" y="80" width="15" height="23" rx="7.5"/><rect x="112" y="80" width="15" height="23" rx="7.5"/></g>`;
     case "pensando":
       return `<g class="cdx-ojos cdx-parpadeo" fill="${c}" filter="url(#${id}b)"><rect x="80" y="80" width="14" height="20" rx="7"/><rect x="118" y="80" width="14" height="20" rx="7"/></g>
         ${brillo(86, 85)}${brillo(124, 85)}`;
@@ -65,6 +85,9 @@ function boca(a, c) {
     preocupado: `<path d="M90 112q5-4 10 0t10 0" ${s}/>`, triste: `<path d="M91 113q9-7 18 0" ${s}/>`,
     alarma: `<ellipse cx="100" cy="112" rx="6" ry="7" fill="${c}"/>`, pensando: `<path d="M93 111h12" ${s}/>`,
     dormido: `<path d="M95 111q5 3 10 0" ${s} opacity=".7"/>`,
+    guino: `<path d="M88 108q12 10 24-2" ${s}/>`, asombro: `<ellipse cx="100" cy="112" rx="5" ry="6.5" fill="none" stroke="${c}" stroke-width="3.5"/>`,
+    ama: `<path d="M88 107q12 11 24 0z" fill="${c}"/>`, baila: `<path d="M87 106q13 14 26 0z" fill="${c}"/>`,
+    tapa: `<path d="M92 111q8 5 16 0" ${s}/>`, espia: `<path d="M93 112q7-4 14 0" ${s}/>`,
   }[a] ?? `<path d="M90 109q10 8 20 0" ${s}/>`;
 }
 
@@ -96,6 +119,10 @@ function extras(a, id) {
     pensando: `<g class="cdx-puntos" fill="#5ef2ff"><circle cx="150" cy="40" r="4"/><circle cx="162" cy="30" r="5"/><circle cx="176" cy="18" r="6"/></g>`,
     saludo: "",
     triste: "",
+    asombro: `<g class="cdx-alerta" stroke="#ffd34e" stroke-width="4" stroke-linecap="round"><path d="M160 44l10-10M168 58h14M150 32l2-14"/></g>`,
+    ama: `<g class="cdx-corazones" fill="#ff5c9d"><path d="M162 54l-7-7a4.5 4.5 0 0 1 7-5a4.5 4.5 0 0 1 7 5z"/><path d="M36 60l-6-6a4 4 0 0 1 6-4.5a4 4 0 0 1 6 4.5z"/><path d="M176 30l-5-5a3.5 3.5 0 0 1 5-3.5a3.5 3.5 0 0 1 5 3.5z"/></g>`,
+    baila: `<g class="cdx-notas" fill="#d4ff5a" font-family="system-ui,sans-serif" font-weight="900"><text x="150" y="44" font-size="22">♪</text><text x="22" y="56" font-size="18">♫</text><text x="168" y="80" font-size="15">♪</text></g>`,
+    guino: `<path class="cdx-chispas" d="M150 66l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="#ffd34e"/>`,
   }[a] ?? "";
 }
 
@@ -164,15 +191,21 @@ function redibujarCodis() {
     svg.outerHTML = codiSVG(animo, { tam, animado: svg.classList.contains("codi-animado"), titulo: svg.getAttribute("aria-label") || undefined });
   }
 }
-const capaAcc = (acc, capa, a) => (acc && acc.capa === capa ? `<g class="cdx-acc cdx-acc-${capa}">${typeof acc.svg === "function" ? acc.svg(a) : acc.svg}</g>` : "");
+const capaAcc = (acc, capa, a, clave = "") => (acc && acc.capa === capa ? `<g class="cdx-acc cdx-acc-${capa}" data-acc="${clave}"><g class="cdx-acc-mueve">${typeof acc.svg === "function" ? acc.svg(a) : acc.svg}</g></g>` : "");
+// Los accesorios épicos y legendarios se mueven; los legendarios además sueltan destellos alrededor de Codi.
+const ACC_LEGENDARIOS = new Set(["codi_birrete", "codi_astronauta", "codi_alas", "codi_kart", "codi_jefe_final", "codi_jetpack"]);
+const destellos = () => `<g class="cdx-destellos" aria-hidden="true">${[[24, 40, 0], [176, 52, .5], [14, 128, 1], [186, 140, 1.4], [100, 6, .8], [44, 186, 1.8]]
+  .map(([x, y, d]) => `<path d="M${x} ${y - 7}l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#fde68a" style="animation-delay:${d}s"/>`).join("")}</g>`;
 
 /** El SVG de Codi. tam en px (o null para que llene su contenedor). accesorio: clave de ACCESORIOS_CODI (por defecto el que tiene puesto). */
 export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "Codi, la mascota de CódigoCamp", accesorio } = {}) {
   const a = FRASES[animo] ? animo : "feliz";
-  const acc = ACCESORIOS_CODI[accesorio === undefined ? (accesorioPuesto || accesorioTemporada) : accesorio] || null;
+  const claveAcc = accesorio === undefined ? (accesorioPuesto || accesorioTemporada) : accesorio;
+  const acc = ACCESORIOS_CODI[claveAcc] || null;
   const id = `cdx${++n}`;
   const c = COLOR_OJOS[a] || "#5ef2ff";
   const visor = a === "alarma" ? ["#2a0a16", "#140611"] : ["#08142a", "#040a18"];
+  let brazoIzqEsp = "", brazoDerEsp = "";
   const brazoDer = a === "saludo" || a === "celebra"
     ? `<g class="cdx-saluda"><path d="M140 156c18-2 30-14 36-34" stroke="url(#${id}cuerpo)" stroke-width="15" stroke-linecap="round" fill="none"/><path d="M140 156c18-2 30-14 36-34" stroke="#5ef2ff" stroke-opacity=".35" stroke-width="2" fill="none"/><circle cx="177" cy="118" r="10" fill="#2b4170" stroke="#5ef2ff" stroke-width="2"/></g>`
     : `<path d="M145 148c9 4 13 12 13 20" stroke="url(#${id}cuerpo)" stroke-width="14" stroke-linecap="round" fill="none"/><circle cx="158" cy="170" r="8" fill="#2b4170" stroke="#5ef2ff" stroke-width="2" stroke-opacity=".6"/>`;
@@ -181,7 +214,13 @@ export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "C
     : a === "pensando"
       ? `<path d="M62 160c-14-4-10-22 10-26" stroke="url(#${id}cuerpo)" stroke-width="14" stroke-linecap="round" fill="none"/><path d="M62 160c-14-4-10-22 10-26" stroke="#5ef2ff" stroke-opacity=".35" stroke-width="2" fill="none"/><circle cx="76" cy="132" r="9" fill="#2b4170" stroke="#5ef2ff" stroke-width="2"/>`
       : `<path d="M55 148c-9 4-13 12-13 20" stroke="url(#${id}cuerpo)" stroke-width="14" stroke-linecap="round" fill="none"/><circle cx="42" cy="170" r="8" fill="#2b4170" stroke="#5ef2ff" stroke-width="2" stroke-opacity=".6"/>`;
-  const arriba = a === "saludo" || a === "celebra" || a === "pensando";
+  if (a === "tapa" || a === "espia") {
+    // manos sobre el visor (como cuando no quieres ver una contraseña); al espiar, la derecha baja un poco
+    const mano = (x0, y0, x, y) => `<path d="M${x0} ${y0}C${x0 + (x - x0) * .2} ${y0 - 20} ${x} ${y + 30} ${x} ${y + 8}" stroke="url(#${id}cuerpo)" stroke-width="15" stroke-linecap="round" fill="none"/><path d="M${x0} ${y0}C${x0 + (x - x0) * .2} ${y0 - 20} ${x} ${y + 30} ${x} ${y + 8}" stroke="#5ef2ff" stroke-opacity=".35" stroke-width="2" fill="none"/><circle cx="${x}" cy="${y}" r="15" fill="#2b4170" stroke="#5ef2ff" stroke-width="2.5" stroke-opacity=".7"/>`;
+    brazoIzqEsp = mano(58, 154, 80, 91);
+    brazoDerEsp = a === "tapa" ? mano(142, 154, 120, 91) : mano(142, 154, 126, 112);
+  }
+  const arriba = a === "saludo" || a === "celebra" || a === "pensando" || a === "tapa" || a === "espia";
   const tamAttr = tam ? `width="${tam}" height="${tam}"` : "";
   return `<svg class="codi codi-${a}${animado ? " codi-animado" : ""}" viewBox="0 0 200 200" ${tamAttr} role="img" aria-label="${titulo}" xmlns="http://www.w3.org/2000/svg">
   <title>${titulo}</title>
@@ -206,12 +245,43 @@ export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "C
     .codi-pensando.codi-animado .cdx-todo{animation:cdxPiensa 3.2s ease-in-out infinite}
     .codi-dormido.codi-animado .cdx-todo{animation:cdxRespira 4s ease-in-out infinite}
     .codi-preocupado.codi-animado .cdx-todo{animation:cdxFlota 3.2s ease-in-out infinite}
+    .codi-baila.codi-animado .cdx-todo{animation:cdxBaila .8s ease-in-out infinite}
+    .codi-asombro.codi-animado .cdx-todo{animation:cdxSalto 1.1s cubic-bezier(.3,.7,.4,1) 1}
+    .codi-ama.codi-animado .cdx-todo,.codi-guino.codi-animado .cdx-todo{animation:cdxFeliz 2.6s ease-in-out infinite}
+    .codi-tapa.codi-animado .cdx-todo{animation:cdxRisita .5s ease-in-out infinite}
+    .codi-espia.codi-animado .cdx-todo{animation:cdxPiensa 2.4s ease-in-out infinite}
+    .codi-animado .cdx-latido{transform-box:fill-box;transform-origin:center;animation:cdxLatido .7s ease-in-out infinite}
+    .codi-animado .cdx-corazones path,.codi-animado .cdx-notas text{transform-box:fill-box;transform-origin:center;animation:cdxSube 1.8s ease-out infinite}
+    .codi-animado .cdx-corazones path:nth-child(2),.codi-animado .cdx-notas text:nth-child(2){animation-delay:.6s}
+    .codi-animado .cdx-corazones path:nth-child(3),.codi-animado .cdx-notas text:nth-child(3){animation-delay:1.2s}
+    @keyframes cdxBaila{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-8px) rotate(-10deg)}50%{transform:translateY(0) rotate(0) scale(1.05,.95)}75%{transform:translateY(-8px) rotate(10deg)}}
+    @keyframes cdxRisita{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg) translateY(1px)}}
+    @keyframes cdxLatido{50%{transform:scale(1.22)}}
+    @keyframes cdxSube{0%{opacity:0;transform:translateY(8px) scale(.6)}25%{opacity:1}100%{opacity:0;transform:translateY(-18px) scale(1.1)}}
     .codi-preocupado.codi-animado .cdx-ojos{transform-box:view-box;animation:cdxMira 3.6s ease-in-out infinite}
     .codi-animado .cdx-parpadeo{transform-box:fill-box;transform-origin:center;animation:cdxParpadea 4.6s infinite}
     .codi-preocupado.codi-animado .cdx-parpadeo{animation:cdxParpadea 4.6s infinite,cdxMira 3.6s ease-in-out infinite}
     .codi-animado .cdx-llama{transform-box:fill-box;transform-origin:50% 100%;animation:cdxLlama .5s ease-in-out infinite alternate}
     .codi-animado .cdx-alas{transform-box:fill-box;transform-origin:50% 90%;animation:cdxAlas .55s ease-in-out infinite alternate}
     @keyframes cdxAlas{to{transform:scaleY(.78) translateY(4px)}}
+    .codi-animado .cdx-acc-mueve{transform-box:view-box}
+    .codi-animado [data-acc=codi_halo] .cdx-acc-mueve{animation:cdxHalo 2.4s ease-in-out infinite}
+    .codi-animado [data-acc=codi_mago] .cdx-acc-mueve,.codi-animado [data-acc=codi_birrete] .cdx-acc-mueve,.codi-animado [data-acc=codi_explorador] .cdx-acc-mueve,.codi-animado [data-acc=codi_caballero] .cdx-acc-mueve{transform-origin:100px 54px;animation:cdxBalanceo 3s ease-in-out infinite}
+    .codi-animado [data-acc=codi_corona] .cdx-acc-mueve,.codi-animado [data-acc=codi_jefe_final] .cdx-acc-mueve{animation:cdxCorona 2.6s ease-in-out infinite}
+    .codi-animado [data-acc=codi_capa] .cdx-acc-mueve{transform-origin:100px 136px;animation:cdxCapa 2.2s ease-in-out infinite}
+    .codi-animado [data-acc=codi_astronauta] .cdx-acc-mueve{animation:cdxCasco 3.2s ease-in-out infinite}
+    .codi-animado [data-acc=codi_kart] .cdx-acc-mueve{animation:cdxKart .32s steps(2) infinite}
+    .codi-animado [data-acc=codi_jetpack] .cdx-acc-mueve{animation:cdxJet .5s ease-in-out infinite alternate}
+    .codi-animado [data-acc=codi_escudo] .cdx-acc-mueve{animation:cdxCorona 2.8s ease-in-out infinite}
+    .codi-animado .cdx-destellos path{transform-box:fill-box;transform-origin:center;animation:cdxDestello 2.2s ease-in-out infinite}
+    @keyframes cdxHalo{0%,100%{transform:translateY(0);filter:drop-shadow(0 0 2px #fde047)}50%{transform:translateY(-5px);filter:drop-shadow(0 0 9px #fde047)}}
+    @keyframes cdxBalanceo{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg) translateY(-2px)}}
+    @keyframes cdxCorona{0%,100%{filter:drop-shadow(0 0 1px #fde68a)}50%{filter:drop-shadow(0 0 8px #facc15) brightness(1.15)}}
+    @keyframes cdxCapa{0%,100%{transform:skewX(0) scaleY(1)}50%{transform:skewX(-6deg) scaleY(1.04)}}
+    @keyframes cdxCasco{0%,100%{opacity:1}50%{opacity:.75;filter:drop-shadow(0 0 6px #7dd3fc)}}
+    @keyframes cdxKart{50%{transform:translateY(-1.5px)}}
+    @keyframes cdxJet{to{transform:translateY(-3px)}}
+    @keyframes cdxDestello{0%,100%{transform:scale(.2) rotate(0);opacity:0}45%{transform:scale(1.1) rotate(45deg);opacity:1}70%{opacity:.6}}
     .codi-animado .cdx-pulso{animation:cdxPulso 2.4s ease-in-out infinite}
     .codi-animado .cdx-saluda{transform-box:view-box;transform-origin:140px 156px;animation:cdxSaluda .7s ease-in-out infinite}
     .codi-animado .cdx-z text{animation:cdxZ 2.6s ease-in-out infinite}
@@ -254,8 +324,9 @@ export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "C
   <ellipse cx="100" cy="190" rx="50" ry="7" fill="#000" opacity=".28"/>
   <circle cx="100" cy="100" r="96" fill="url(#${id}aura)"/>
   ${extras(a, id)}
+  ${ACC_LEGENDARIOS.has(claveAcc) ? destellos() : ""}
   <g class="cdx-todo">
-    ${capaAcc(acc, "atras", a)}
+    ${capaAcc(acc, "atras", a, claveAcc)}
     <!-- cuerpo con sudadera -->
     <rect x="76" y="180" width="18" height="11" rx="5.5" fill="#0d1530" stroke="#5ef2ff" stroke-opacity=".5" stroke-width="2"/>
     <rect x="106" y="180" width="18" height="11" rx="5.5" fill="#0d1530" stroke="#5ef2ff" stroke-opacity=".5" stroke-width="2"/>
@@ -269,7 +340,7 @@ export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "C
       <circle cx="72" cy="174" r="2.4" fill="#5ef2ff"/><circle cx="128" cy="174" r="2.4" fill="#b8ff3c"/></g>
     <text x="100" y="179" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="11" font-weight="900" fill="#b8ff3c">&lt;/&gt;</text>
 
-    ${capaAcc(acc, "cuello", a)}
+    ${capaAcc(acc, "cuello", a, claveAcc)}
     <!-- antena -->
     ${acc?.sinAntena ? "" : antena(a, id)}
     <!-- orejas { } -->
@@ -288,10 +359,10 @@ export function codiSVG(animo = "feliz", { tam = 96, animado = true, titulo = "C
     <ellipse cx="66" cy="112" rx="7" ry="3.5" fill="#ff7aa8" opacity="${a === "alarma" || a === "dormido" ? 0 : .35}"/>
     <ellipse cx="134" cy="112" rx="7" ry="3.5" fill="#ff7aa8" opacity="${a === "alarma" || a === "dormido" ? 0 : .35}"/>
     <path d="M64 70q12-6 26-6" stroke="#fff" stroke-opacity=".22" stroke-width="4" stroke-linecap="round" fill="none"/>
-    ${capaAcc(acc, "cara", a)}
-    ${capaAcc(acc, "cabeza", a)}
-    ${arriba ? brazoIzq + brazoDer : ""}
-    ${capaAcc(acc, "frente", a)}
+    ${capaAcc(acc, "cara", a, claveAcc)}
+    ${capaAcc(acc, "cabeza", a, claveAcc)}
+    ${arriba ? (brazoIzqEsp ? brazoIzqEsp + brazoDerEsp : brazoIzq + brazoDer) : ""}
+    ${capaAcc(acc, "frente", a, claveAcc)}
   </g>
 </svg>`;
 }

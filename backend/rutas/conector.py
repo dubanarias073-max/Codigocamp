@@ -52,7 +52,7 @@ _colas = {}             # conector_id → [orden, …] pendientes para el equipo
 _ordenes = {}           # orden_id → {conector_id, usuario_id, texto, fin, codigo, creada}
 _visto = {}             # conector_id → time.monotonic() de la última pregunta del equipo
 _estado = {}            # conector_id → {antivirus: {...}, version, capacidades} que informa el equipo al conectarse
-VERSION_CONECTOR = 5    # la del programa frontend/descargas/codigocamp-conector.py (Trabajo avisa si el del equipo es más viejo)
+VERSION_CONECTOR = 6    # la del programa frontend/descargas/codigocamp-conector.py (Trabajo avisa si el del equipo es más viejo)
 ACCIONES_FS = {"listar", "leer", "leer_parte", "escribir_parte", "leer_varios", "servicios", "escribir", "carpeta", "borrar", "explorar", "nueva", "raiz", "git", "antivirus"}
 MAX_ESCRIBIR = 42_000_000   # caracteres base64 por pedido (unos 30 MB); los archivos grandes van por partes de 8 MB
 
@@ -333,7 +333,30 @@ def sistema_archivos(cid):
             if revisar_enlace(url)["nivel"] == "bloqueado":
                 return api_error(f"🛡️ CódigoCamp bloqueó este comando: el enlace {url[:80]} es peligroso.", 403)
         datos["args"] = args
-    return jsonify(orden=_encolar(c, "fs", **datos))
+    oid = _encolar(c, "fs", **datos)
+    # Rápido: casi todas las operaciones de archivos tardan milisegundos en el equipo, así que se espera aquí mismo
+    # y se responde en UNA sola petición (antes eran dos: encolar y luego preguntar por el resultado).
+    hecho = _esperar_fin(oid, 6 if accion not in {"git", "servicios"} else 12)
+    return jsonify(orden=oid, resultado=hecho) if hecho else jsonify(orden=oid)
+
+
+def _esperar_fin(oid, segundos):
+    from flask import current_app
+    if current_app.testing:   # en las pruebas el «equipo» responde después, en el mismo hilo
+        segundos = min(segundos, 0.05)
+    limite = time.monotonic() + segundos
+    with _lock:
+        while True:
+            o = _ordenes.get(oid)
+            if not o:
+                return None
+            if o["fin"]:
+                o.setdefault("entregada", time.monotonic())
+                return {"texto": o["texto"], "codigo": o["codigo"], "datos": o["datos"]}
+            resto = limite - time.monotonic()
+            if resto <= 0 or not _en_linea(o["conector_id"]):
+                return None
+            _lock.wait(min(resto, 2))
 
 
 # ------------------------------------------------------------------------------------------ el equipo ----
@@ -400,6 +423,14 @@ def _guardar_estado(c, data):
     if isinstance(data.get("carpeta"), str) and data["carpeta"][:400] != c.carpeta:
         c.carpeta = data["carpeta"][:400]
         db.session.commit()
+
+
+class _Eq:
+    """Lo único que _guardar_salida necesita del equipo: su id."""
+    __slots__ = ("id",)
+
+    def __init__(self, cid):
+        self.id = cid
 
 
 def _guardar_salida(c, data):
@@ -591,13 +622,14 @@ if sock:
                         continue
                     if not isinstance(data, dict):
                         continue
-                    with app.app_context():
-                        eq = db.session.get(Conector, cid)
-                        if not eq:
-                            break
-                        if data.get("tipo") == "salida":
-                            _guardar_salida(eq, data)
-                        elif data.get("tipo") == "estado":
+                    if data.get("tipo") == "salida":
+                        # Rápido: la salida de la terminal no toca la base de datos (solo memoria)
+                        _guardar_salida(_Eq(cid), data)
+                    elif data.get("tipo") == "estado":
+                        with app.app_context():
+                            eq = db.session.get(Conector, cid)
+                            if not eq:
+                                break
                             _guardar_estado(eq, data)
                         with _lock:
                             _visto[cid] = time.monotonic()

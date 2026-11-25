@@ -26,6 +26,20 @@ const nombreDe = (ruta) => String(ruta || "").replace(/[\\/]+$/, "").split(/[\\/
  */
 const PARTE = 8 * 1024 * 1024;
 
+// Rápido al moverte entre carpetas del mismo equipo (proyecto → carpeta de arriba → otra vez el proyecto): lo que ya se
+// trajo se recuerda por su ruta completa en el equipo, su tamaño y su fecha; si no cambió, no se vuelve a pedir.
+const MEMORIA = new Map();   // "equipo|/ruta/completa" -> { tamano, modificado, b64 }
+const MAX_MEMORIA = 96 * 1024 * 1024;
+let pesoMemoria = 0;
+const unir = (carpeta, ruta) => (String(carpeta || "").replace(/\\/g, "/").replace(/\/+$/, "") + "/" + ruta);
+function recordar(clave, valor) {
+  const viejo = MEMORIA.get(clave);
+  if (viejo) { pesoMemoria -= viejo.b64.length; MEMORIA.delete(clave); }
+  if (valor.b64.length > 4 * 1024 * 1024) return;
+  MEMORIA.set(clave, valor); pesoMemoria += valor.b64.length;
+  for (const [k, v] of MEMORIA) { if (pesoMemoria <= MAX_MEMORIA) break; MEMORIA.delete(k); pesoMemoria -= v.b64.length; }
+}
+
 export class DiscoConector {
   /** @param {(equipo, accion, datos) => Promise<object>} fs   fsEquipo de conector.js (o uno falso en las pruebas) */
   constructor(equipo, carpeta, fs) {
@@ -40,6 +54,7 @@ export class DiscoConector {
 
   async listar() {
     const d = await this.fs("listar", { ignorar: [...CARPETAS_IGNORADAS] });
+    this.raizReal = typeof d.carpeta === "string" ? d.carpeta : null;   // la carpeta que el equipo listó de verdad (Conector nuevo)
     return { archivos: d.archivos || [], carpetas: d.carpetas || [] };
   }
 
@@ -47,13 +62,22 @@ export class DiscoConector {
   async precargar(lista) {
     this.precargados = new Map();
     let lote = [], peso = 0;
+    const info = new Map(lista.map((a) => [a.ruta, a]));
+    const raiz = this.raizReal;   // sin ella (Conector viejo) no se usa la memoria: nunca se mezclan archivos de otra carpeta
+    const clave = (ruta) => `${this.equipo?.id}|${unir(raiz, ruta)}`;
     const pedir = async () => {
       if (!lote.length) return;
       const r = await this.fs("leer_varios", { rutas: lote });
-      for (const [ruta, d] of Object.entries(r.archivos || {})) this.precargados.set(ruta, d);
+      for (const [ruta, d] of Object.entries(r.archivos || {})) {
+        this.precargados.set(ruta, d);
+        const a = info.get(ruta);
+        if (raiz && r.carpeta === raiz && a && d.b64 !== undefined && a.modificado !== undefined) recordar(clave(ruta), { tamano: a.tamano, modificado: a.modificado, b64: d.b64 });
+      }
       lote = []; peso = 0;
     };
     for (const a of lista) {
+      const m = raiz ? MEMORIA.get(clave(a.ruta)) : null;
+      if (m && m.tamano === a.tamano && m.modificado === a.modificado) { this.precargados.set(a.ruta, { b64: m.b64 }); continue; }
       if (a.tamano > 8 * 1024 * 1024) continue; // los grandes se piden solos
       if (lote.length >= 300 || peso + a.tamano > 8 * 1024 * 1024) await pedir();
       lote.push(a.ruta); peso += a.tamano;
@@ -144,3 +168,4 @@ export function leerEstadoGit(salida) {
   }
   return r;
 }
+export const memoriaEquipo = () => ({ archivos: MEMORIA.size, peso: pesoMemoria, ejemplo: [...MEMORIA.keys()][0] });

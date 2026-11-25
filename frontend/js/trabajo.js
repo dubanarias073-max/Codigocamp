@@ -1106,7 +1106,7 @@ function abrirExterno(href) {
 function ejecutarActual() {
   guardarArchivos(); // ejecutar siempre usa lo último que escribiste
   // Cuenta para los encargos de hoy («Ejecuta tu código en Trabajo»)
-  api("/api/actividad/", { campo: "ejecuciones" }).then((r) => { if (r.desafios_completados?.length) import("/js/cofres.js").then((m) => m.abrirPremiosNuevos(r.desafios_completados)).catch(() => {}); }).catch(() => {});
+  api("/api/actividad/", { campo: "ejecuciones" }).then((r) => { if (r.desafios_completados?.length) import("/js/cofres.js").then((m) => m.avisarPremios(r.desafios_completados)).catch(() => {}); }).catch(() => {});
   const ruta = ui.activo;
   if (ruta === VISTA) { renderVista(); return; }
   if (!ruta) { aviso("Abre un archivo para ejecutarlo.", { tipo: "info" }); return; }
@@ -1645,8 +1645,11 @@ $("preguntar").onsubmit = async (event) => {
   let probs = [];
   try { probs = usarMonaco ? problemas().lista.slice(0, 30).map((x) => `${x.ruta}:${x.linea} ${x.mensaje}`) : []; } catch { /* sin editor */ }
   const contexto = contextoProyecto(proyecto(), { abierto: archivo, abiertos: [...(ui.abiertos || [])], seleccion: seleccionActual(), problemas: probs, terminal: salidaTerminal(), copiloto });
+  globalThis.__ccIAOcupada = true;   // mientras el chat espera, el texto fantasma no gasta cuota de la IA
   try {
     const r = await api("/api/tutor/", { mensaje: pregunta, adjuntos, historial: historial.slice(-12), contexto });
+    globalThis.__ccIAOcupada = false;
+    if (r.desafios_completados?.length) import("/js/cofres.js").then((m) => m.avisarPremios(r.desafios_completados)).catch(() => {});
     const { texto, cambios, resumen, error } = extraerCambios(r.respuesta);
     formato(espera, texto || (cambios ? "Aquí tienes los cambios:" : r.respuesta));
     if (error) burbuja("tutor", error).classList.add("error");
@@ -1660,6 +1663,7 @@ $("preguntar").onsubmit = async (event) => {
     try { localStorage.setItem(CHAT_STORAGE, JSON.stringify(historial)); }
     catch { avisoSimple("El tutor respondió, pero no se pudo guardar el historial en este navegador.", true); }
   } catch (error) {
+    globalThis.__ccIAOcupada = false;
     espera.textContent = error.message;
     espera.classList.add("error");
     dispatchEvent(new CustomEvent("codi", { detail: { animo: "triste", frase: "Uy, no pude responder. ¿Intentamos otra vez?", ms: 3000 } }));

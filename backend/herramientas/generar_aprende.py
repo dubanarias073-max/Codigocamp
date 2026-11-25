@@ -63,13 +63,13 @@ def escribir(slug):
     (DESTINO / f"{slug}.js").write_text(
         "// GENERADO por backend/herramientas/generar_aprende.py a partir de backend/retos/conceptos/"
         f"{slug}.py. No lo edites a mano: cambia los conceptos y vuelve a generarlo.\n"
-        "// m = etapa · t = título · x = qué es · u = para qué sirve · p = puntos clave · c = código · h = qué hace · r = ahora tú · e = error común\n"
+        "// m = etapa · t = título · x = qué es · u = para qué sirve · p = puntos clave · c = código · h = qué hace · r = ahora tú · e = error común · q/a = reto y respuesta · f = error común (corto)\n"
         f"export default [\n{cuerpo}\n];\n", encoding="utf-8")
-    if slug in SALIDA_SRV:
+    if slug in SALIDA_SRV and "--sin-salidas" not in sys.argv:
         escribir_salidas(slug, datos)
     print(f"{slug}: {len(lecciones)} lecciones")
 
 
 if __name__ == "__main__":
-    for s in (sys.argv[1:] or TODOS):
+    for s in ([a for a in sys.argv[1:] if not a.startswith("--")] or TODOS):
         escribir(s)

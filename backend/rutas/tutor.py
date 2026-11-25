@@ -6,6 +6,9 @@ backend/.env:  GEMINI_API_KEY=...   GEMINI_MODEL=gemini-3.8-flash
 Los archivos de más de 8 MB (o de tipos que no van en línea) se suben a la API de archivos de Gemini, que los guarda 48 h.
 """
 import base64
+import io
+import threading
+from collections import deque
 import json
 import re
 import os
@@ -27,8 +30,12 @@ from utilidades import api_error, client_ip, json_body, too_many
 bp = Blueprint("tutor", __name__)
 API = "https://generativelanguage.googleapis.com"
 # Si el modelo de backend/.env no existe para tu clave (404), se prueban estos en orden.
-MODELOS_RESPALDO = ("gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash")
+# También se usan si el modelo está SATURADO (503 «high demand») o sin cuota (429): cada modelo va por separado.
+MODELOS_RESPALDO = ("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite",
+                    "gemini-3.1-flash-lite", "gemini-2.5-flash")
 _modelo_que_funciona = {}
+# El autocompletado solo usa modelos «lite» (rápidos y con cuota aparte): nunca le quita cuota al chat.
+RESPALDO_RAPIDO = ("gemini-3.5-flash-lite", "gemini-2.5-flash-lite", "gemini-2.0-flash-lite")
 
 
 def normalizar_modelo(nombre):
@@ -42,24 +49,93 @@ def normalizar_modelo(nombre):
     return n or MODELOS_RESPALDO[0]
 
 
-def generar(payload, api_key, modelo, timeout=180):
-    """Llama a generateContent; si Gemini dice 404 (modelo inexistente para esta clave), prueba los de respaldo."""
+# ---- Cuota de Gemini -------------------------------------------------------------------------------------
+# La clave gratis de Gemini permite pocas peticiones por minuto POR MODELO. Antes el autocompletado de Trabajo
+# (texto fantasma) gastaba esa cuota mientras escribías y el chat de la IA respondía «espera un minuto».
+# Ahora: (1) si un modelo dice 429 se usa otro modelo (cada uno tiene su propia cuota) y ese se deja descansar;
+# (2) el autocompletado usa un modelo «lite» aparte y se detiene solo cuando la cuota está apretada.
+_descanso = {}                  # modelo -> momento (monotonic) hasta el que no se usa por 429
+_llamadas = deque()             # momentos de las últimas llamadas a Gemini (todas)
+_cuota_lock = threading.Lock()
+
+
+def _anotar_llamada():
+    ahora = time.monotonic()
+    with _cuota_lock:
+        _llamadas.append(ahora)
+        while _llamadas and ahora - _llamadas[0] > 60:
+            _llamadas.popleft()
+
+
+def llamadas_ultimo_minuto():
+    ahora = time.monotonic()
+    with _cuota_lock:
+        while _llamadas and ahora - _llamadas[0] > 60:
+            _llamadas.popleft()
+        return len(_llamadas)
+
+
+def _espera_sugerida(cuerpo):
+    """Gemini dice cuánto esperar («retryDelay»: "17s"); si no, 30 s."""
+    m = re.search(r'"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"', cuerpo or "")
+    return min(120.0, float(m.group(1))) if m else 30.0
+
+
+def en_descanso(modelo):
+    return _descanso.get(normalizar_modelo(modelo), 0) > time.monotonic()
+
+
+def generar(payload, api_key, modelo, timeout=180, respaldo=True, esperar_max=0):
+    """Llama a generateContent. Si el modelo no existe (404) o se le acabó la cuota del minuto (429), prueba los de respaldo.
+    esperar_max: segundos que vale la pena esperar si TODOS están sin cuota (el chat espera un poco; el autocompletado no)."""
     modelo = normalizar_modelo(modelo)
-    candidatos = [_modelo_que_funciona.get(modelo, modelo)] + [m for m in MODELOS_RESPALDO if m != modelo]
-    ultimo = None
-    for m in dict.fromkeys(candidatos):
-        try:
-            with _peticion(f"{API}/v1beta/models/{m}:generateContent", payload, {"Content-Type": "application/json", "x-goog-api-key": api_key}, "POST", timeout) as r:
-                datos = json.load(r)
-            if m != modelo:
-                current_app.logger.warning("El modelo «%s» no está disponible para tu clave; se usó «%s». Pon GEMINI_MODEL=%s en backend/.env.", modelo, m, m)
-            _modelo_que_funciona[modelo] = m
-            return datos, m
-        except urllib.error.HTTPError as e:
-            if e.code != 404:
+    extra = list(respaldo) if isinstance(respaldo, (list, tuple)) else (list(MODELOS_RESPALDO) if respaldo else [])
+    candidatos = list(dict.fromkeys([_modelo_que_funciona.get(modelo, modelo)] + [normalizar_modelo(m) for m in extra if m]))
+    for intento in range(2):
+        ultimo, ultimo_429, espera = None, None, None
+        ahora = time.monotonic()
+        libres = [m for m in candidatos if _descanso.get(m, 0) <= ahora] or ([] if intento == 0 and esperar_max else candidatos[:1])
+        solo_404 = libres[:1] == candidatos[:1]   # ¿se llegó a este modelo solo porque los anteriores no existen?
+        for m in libres:
+            try:
+                _anotar_llamada()
+                with _peticion(f"{API}/v1beta/models/{m}:generateContent", payload, {"Content-Type": "application/json", "x-goog-api-key": api_key}, "POST", timeout) as r:
+                    datos = json.load(r)
+                if solo_404:   # el modelo del .env no existe para esta clave: se recuerda el que sí funciona
+                    if m != modelo and _modelo_que_funciona.get(modelo) != m:
+                        current_app.logger.warning("El modelo «%s» no está disponible para tu clave; se usó «%s». Pon GEMINI_MODEL=%s en backend/.env.", modelo, m, m)
+                    _modelo_que_funciona[modelo] = m
+                return datos, m
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    ultimo = e
+                    if m != modelo:   # un respaldo que no existe para esta clave: no se vuelve a probar en un rato
+                        _descanso[m] = time.monotonic() + 3600
+                    continue
+                if e.code in (429, 500, 502, 503, 504):
+                    # 429 = sin cuota; 5xx = Gemini saturado («This model is currently experiencing high demand»).
+                    # En los dos casos ese modelo descansa un rato y se usa el siguiente.
+                    solo_404 = False
+                    cuerpo = e.read()[:2000].decode("utf-8", "replace")
+                    current_app.logger.warning("Gemini «%s» respondió %s; se prueba otro modelo.", m, e.code)
+                    pausa = _espera_sugerida(cuerpo) if e.code == 429 else 60.0
+                    _descanso[m] = time.monotonic() + pausa
+                    espera = pausa if espera is None else min(espera, pausa)
+                    ultimo_429 = urllib.error.HTTPError(e.url, e.code, e.msg, e.hdrs, io.BytesIO(cuerpo.encode()))
+                    continue
                 raise
-            ultimo = e
-    raise ultimo
+        # Todos sin cuota: si la espera es corta (y quien llama puede esperar), se espera y se reintenta una vez
+        if intento == 0 and esperar_max:
+            proximo = min((_descanso.get(m, 0) for m in candidatos), default=0) - time.monotonic()
+            if 0 < proximo <= esperar_max:
+                time.sleep(proximo + 0.3)
+                continue
+        if ultimo_429 is not None:
+            raise ultimo_429
+        if ultimo is not None:
+            raise ultimo
+        break
+    raise urllib.error.HTTPError(f"{API}", 429, "Sin cuota", None, io.BytesIO(b"{}"))
 EN_LINEA_MAX = 8 * 1024 * 1024
 TEXTO_MAX = 300_000
 CONTEXTO_MAX = 180_000
@@ -366,8 +442,12 @@ def explicar_error_gemini(codigo, cuerpo, modelo, *, tecnico=False):
             pass
         if codigo == 429:
             return "Codi está atendiendo a mucha gente ahora mismo. Inténtalo de nuevo en un minuto."
+        if codigo in (500, 502, 503, 504):
+            return "Los servidores de Gemini (la IA de Google) están saturados ahora mismo. Ya probé con otros modelos; inténtalo en un minuto."
         return "Codi no pudo responder en este momento. Inténtalo de nuevo en un rato."
     texto = cuerpo.lower()
+    if codigo in (500, 502, 503, 504):
+        return f"Gemini está saturado (error {codigo}, «high demand»). Es temporal y del lado de Google; mientras tanto se usan otros modelos."
     if codigo == 429:
         return "La IA está muy ocupada o se acabó la cuota gratis de tu clave de Gemini por ahora. Inténtalo en un minuto."
     if codigo == 404 or "not found" in texto:
@@ -403,10 +483,11 @@ def tutor():
             adjuntos = tomar(ids, "ia")
         except ValueError as e:
             return api_error(str(e))
+    premios = []
     db.session.add(TutorUsage(usuario_id=usuario.id if usuario else None, ip=client_ip()))
     if usuario:
         from servicios.perfil import contar_actividad, get_profile
-        contar_actividad(get_profile(usuario), "ia")
+        premios = contar_actividad(get_profile(usuario), "ia")
     db.session.commit()
 
     history = data.get("historial") if isinstance(data.get("historial"), list) else []
@@ -437,7 +518,7 @@ def tutor():
         "generationConfig": {"temperature": 0.15 if copiloto else 0.6, "maxOutputTokens": 16384 if copiloto else 8192},
     }).encode()
     try:
-        result, modelo = generar(payload, api_key, modelo)
+        result, modelo = generar(payload, api_key, modelo, esperar_max=12)
         cand = result["candidates"][0]
         answer = "".join(part.get("text", "") for part in cand.get("content", {}).get("parts", []) if not part.get("thought")).strip()
         if not answer:
@@ -452,8 +533,8 @@ def tutor():
     if conv is not None:
         from rutas.conversaciones import guardar_intercambio
         guardar_intercambio(conv, message, [a.nombre for a in adjuntos], answer)
-        return jsonify(respuesta=answer, copiloto=copiloto, conversacion={"id": conv.id, "titulo": conv.titulo})
-    return jsonify(respuesta=answer, copiloto=copiloto)
+        return jsonify(respuesta=answer, copiloto=copiloto, conversacion={"id": conv.id, "titulo": conv.titulo}, desafios_completados=premios)
+    return jsonify(respuesta=answer, copiloto=copiloto, desafios_completados=premios)
 
 
 COMPLETAR = """Eres un motor de autocompletado de código como GitHub Copilot, dentro del editor de CódigoCamp.
@@ -478,7 +559,13 @@ def completar():
     api_key = current_app.config["GEMINI_API_KEY"]
     if not api_key:
         return api_error("La ayuda de Codi no está disponible ahora.", 503)
-    if too_many(f"completar:{current_user.id}", 40, 60):   # ~1 cada 1,5 s escribiendo seguido
+    if too_many(f"completar:{current_user.id}", 20, 60):   # como mucho 1 cada 3 s escribiendo seguido
+        return jsonify(texto="", espera=True)
+    # El chat tiene prioridad: si en el último minuto ya hubo muchas llamadas, el texto fantasma descansa
+    if llamadas_ultimo_minuto() >= current_app.config.get("IA_RESERVA_CHAT", 25):
+        return jsonify(texto="", espera=True)
+    modelo_rapido = current_app.config.get("GEMINI_MODEL_RAPIDO") or "gemini-3.5-flash-lite"
+    if en_descanso(modelo_rapido):
         return jsonify(texto="", espera=True)
     ruta, lenguaje = str(data.get("ruta", ""))[:200], str(data.get("lenguaje", ""))[:30]
     otros = ""
@@ -492,14 +579,14 @@ def completar():
         "generationConfig": {"temperature": 0.1, "maxOutputTokens": 400, "thinkingConfig": {"thinkingBudget": 0}},
     }).encode()
     try:
-        result, _ = generar(payload, api_key, current_app.config["GEMINI_MODEL"], timeout=20)
+        result, _ = generar(payload, api_key, modelo_rapido, timeout=20, respaldo=RESPALDO_RAPIDO)
         cand = result["candidates"][0]
         texto = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []) if not p.get("thought"))
     except urllib.error.HTTPError as e:
         if e.code == 400:   # modelos sin thinkingConfig: se reintenta sin él
             try:
                 p2 = json.loads(payload); p2["generationConfig"].pop("thinkingConfig", None)
-                result, _ = generar(json.dumps(p2).encode(), api_key, current_app.config["GEMINI_MODEL"], timeout=20)
+                result, _ = generar(json.dumps(p2).encode(), api_key, modelo_rapido, timeout=20, respaldo=RESPALDO_RAPIDO)
                 texto = "".join(p.get("text", "") for p in result["candidates"][0].get("content", {}).get("parts", []) if not p.get("thought"))
             except Exception:
                 return jsonify(texto="")
@@ -565,14 +652,20 @@ def porque_reto(reto_id):
     if isinstance(data, tuple):
         return data
     respuesta_alumno = data.get("respuesta")
-    if isinstance(respuesta_alumno, list):
-        respuesta_alumno = " → ".join(map(str, respuesta_alumno))
+    if isinstance(respuesta_alumno, dict):   # unir parejas: no hace falta mandar las parejas del alumno
+        respuesta_alumno = f"(se equivocó {respuesta_alumno.get('fallos', 0)} vez/veces al unir)"
+    elif isinstance(respuesta_alumno, list):
+        respuesta_alumno = (" " if reto.tipo == "armar" else " → ").join(map(str, respuesta_alumno))
     respuesta_alumno = str(respuesta_alumno or "")[:500]
     correcta = reto.respuesta.split("|")[0] if reto.tipo == "completar" else reto.respuesta
     if reto.tipo == "error":
         correcta = f"la línea {reto.respuesta}"
     elif reto.tipo == "ordenar":
         correcta = " → ".join((reto.datos or {}).get("piezas", []))
+    elif reto.tipo == "parejas":
+        correcta = "; ".join(f"{a} → {b}" for a, b in (reto.datos or {}).get("pares", []))
+    elif reto.tipo == "armar":
+        correcta = " ".join((reto.datos or {}).get("solucion", []))
     api_key = current_app.config["GEMINI_API_KEY"]
     if not api_key or too_many(f"porque:{current_user.id}", 15, 60):
         return jsonify(texto=reto.explicacion or f"La respuesta correcta es «{correcta}».", ia=False)
@@ -607,7 +700,7 @@ def _texto_gemini(prompt, sistema, tokens=1500, temperatura=0.2, timeout=40):
         raise ValueError("La IA no está configurada en este servidor (falta GEMINI_API_KEY en backend/.env).")
     payload = json.dumps({"systemInstruction": {"parts": [{"text": sistema}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}],
                           "generationConfig": {"temperature": temperatura, "maxOutputTokens": tokens}}).encode()
-    result, _ = generar(payload, api_key, current_app.config["GEMINI_MODEL"], timeout=timeout)
+    result, _ = generar(payload, api_key, current_app.config["GEMINI_MODEL"], timeout=timeout, esperar_max=8)
     return "".join(p.get("text", "") for p in result["candidates"][0].get("content", {}).get("parts", []) if not p.get("thought"))
 
 

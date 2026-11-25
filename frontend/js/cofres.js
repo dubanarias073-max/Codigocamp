@@ -101,7 +101,16 @@ function confeti(n = 60) {
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Crea (si hace falta) la capa donde se abre un cofre: así también funciona dentro de una lección. */
+/** Los estilos de los cofres se cargan solos en cualquier página (antes, en Trabajo el cofre salía sin estilos). */
+function estilos() {
+  if ([...document.styleSheets].some((h) => (h.href || "").includes("/css/cofres.css")) || document.getElementById("ccCofresCss")) return;
+  const l = document.createElement("link");
+  l.rel = "stylesheet"; l.href = "/css/cofres.css"; l.id = "ccCofresCss";
+  document.head.appendChild(l);
+}
+
 function capa() {
+  estilos();
   let fondo = document.getElementById("abrirFondo");
   if (!fondo) {
     fondo = document.createElement("div");
@@ -213,4 +222,31 @@ export function activarCofres() {
   };
   capa();
   return recargar();
+}
+export { confeti };
+
+/**
+ * Para cuando estás trabajando (Trabajo, IA…): no interrumpe con el cofre a pantalla completa.
+ * Sale un aviso pequeño; lo abres cuando quieras o lo dejas para luego (los cofres de logros esperan en Recompensas).
+ */
+export function avisarPremios(desafios = []) {
+  if (!desafios.length) return;
+  estilos();
+  document.getElementById("avisoPremio")?.remove();
+  const d = document.createElement("div");
+  d.id = "avisoPremio"; d.className = "aviso-premio"; d.setAttribute("role", "status");
+  const uno = desafios[0];
+  d.innerHTML = `<span class="ap-ic" aria-hidden="true">🎁</span><div class="ap-tx"><b></b><small></small></div>
+    <button type="button" class="btn pri sm" data-a="abrir">Abrir</button><button type="button" class="ap-x" data-a="luego" aria-label="Luego" title="Luego">✕</button>`;
+  d.querySelector("b").textContent = desafios.length > 1 ? `¡${desafios.length} encargos cumplidos!` : (uno.encabezado || "¡Encargo cumplido!");
+  d.querySelector("small").textContent = desafios.length > 1 ? "Tus premios ya están en tu cuenta" : `${uno.titulo || ""} · el premio ya está en tu cuenta`;
+  document.body.appendChild(d);
+  import("/js/sonidos.js").then((m) => m.sonar("premio")).catch(() => {});
+  const quitar = () => { d.classList.add("sale"); setTimeout(() => d.remove(), 300); };
+  const reloj = setTimeout(quitar, 12000);
+  d.onclick = async (e) => {
+    const a = e.target.closest("[data-a]")?.dataset.a; if (!a) return;
+    clearTimeout(reloj); quitar();
+    if (a === "abrir") for (const x of desafios) await mostrarCofre({ tipo: x.cofre || "madera", titulo: x.encabezado || "¡Encargo cumplido!", subtitulo: x.titulo, obtener: async () => x.datos || {} });
+  };
 }

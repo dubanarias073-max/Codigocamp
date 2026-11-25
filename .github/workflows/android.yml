@@ -41,15 +41,35 @@ jobs:
         with:
           gradle-version: "8.7"
 
+      # La llave de firma SIEMPRE es la misma (Secrets del repositorio): así cada APK nuevo actualiza al instalado.
+      # Settings → Secrets and variables → Actions → Secrets: ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD,
+      # ANDROID_KEY_ALIAS y ANDROID_KEY_PASSWORD (los valores vienen en llave-android-codigocamp/SECRETS.txt).
+      - name: Preparar la llave de firma
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS_B64" ]; then
+            echo "::error::Falta la llave de firma (Secret ANDROID_KEYSTORE_B64). Sin ella cada APK sale con otra firma y Android NO deja actualizar. Lee apps/android/FIRMA.md"
+            exit 1
+          fi
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/codigocamp.jks"
+          echo "CC_KEYSTORE_FILE=$RUNNER_TEMP/codigocamp.jks" >> "$GITHUB_ENV"
+
       - name: Compilar el APK
         env:
           CODIGOCAMP_URL: ${{ vars.CODIGOCAMP_URL }}
+          CC_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          CC_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          CC_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -n "$CODIGOCAMP_URL" ]; then EXTRA="-PcodigocampUrl=$CODIGOCAMP_URL"; else EXTRA=""; fi
-          gradle assembleDebug --no-daemon --stacktrace $EXTRA
+          # versionCode sube solo: Android no instala una versión igual o menor a la que ya tienes
+          gradle assembleRelease --no-daemon --stacktrace -PversionCode=$(( ${{ github.run_number }} + 10 )) $EXTRA
 
-      - name: Renombrar
-        run: cp app/build/outputs/apk/debug/app-debug.apk CodigoCamp.apk
+      - name: Revisar la firma y renombrar
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk CodigoCamp.apk
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs CodigoCamp.apk | grep -i "SHA-256" || { echo "::error::El APK no quedó firmado"; exit 1; }
 
       - uses: actions/upload-artifact@v7
         with:

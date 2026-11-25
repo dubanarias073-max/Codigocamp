@@ -40,8 +40,11 @@ REGLAS = [
 # Instalar desde internet con «| sh» solo desde instaladores oficiales conocidos
 INSTALADORES = ("sh.rustup.rs", "bun.sh", "deno.land", "get.docker.com", "astral.sh", "install.python-poetry.org", "get.pnpm.io",
                 "raw.githubusercontent.com/nvm-sh/", "raw.githubusercontent.com/Homebrew/", "volta.sh", "fnm.vercel.app", "get.sdkman.io",
-                "cli.github.com", "flutter.dev", "nodejs.org", "ollama.com", "claude.ai", "starship.rs", "tailscale.com")
-TUBERIA_SHELL = _R(r"(?:curl|wget|iwr|Invoke-WebRequest|irm|Invoke-RestMethod)\b[^\n|]*\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b|(?:iwr|irm|Invoke-WebRequest|Invoke-RestMethod|DownloadString)\b[^\n]*\|\s*(?:iex|Invoke-Expression)\b|\b(?:iex|Invoke-Expression)\s*\(\s*(?:New-Object\s+Net\.WebClient|\(New-Object)")
+                "cli.github.com", "flutter.dev", "nodejs.org", "ollama.com", "claude.ai", "starship.rs", "tailscale.com",
+                "deb.nodesource.com", "rpm.nodesource.com", "get.scoop.sh", "community.chocolatey.org", "bootstrap.pypa.io",
+                "pyenv.run", "raw.githubusercontent.com/pyenv/", "raw.githubusercontent.com/ohmyzsh/", "deno.com", "get.helm.sh",
+                "raw.githubusercontent.com/rbenv/", "get.rvm.io", "dot.net/v1/dotnet-install", "dotnet.microsoft.com", "sdk.cloud.google.com")
+TUBERIA_SHELL = _R(r"(?:curl|wget|iwr|Invoke-WebRequest|irm|Invoke-RestMethod)\b[^\n|]*\|\s*(?:sudo\s+(?:-\S+\s+)*)?(?:(?:ba|z|da|k|fi)?sh|python[\d.]*|perl|ruby|node|php)\b|(?:iwr|irm|Invoke-WebRequest|Invoke-RestMethod|DownloadString)\b[^\n]*\|\s*(?:iex|Invoke-Expression)\b|\b(?:iex|Invoke-Expression)\s*\(\s*(?:New-Object\s+Net\.WebClient|\(New-Object)")
 
 
 def revisar_comando(linea):
