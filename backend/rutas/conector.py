@@ -26,7 +26,6 @@ Las órdenes esperan en memoria del servidor (Flask con hilos; con varios proces
                                                                     POST /api/conector/agente/estado  {antivirus, carpeta}
 """
 import hashlib
-from pathlib import Path
 import secrets
 import threading
 import json
@@ -52,8 +51,10 @@ _colas = {}             # conector_id → [orden, …] pendientes para el equipo
 _ordenes = {}           # orden_id → {conector_id, usuario_id, texto, fin, codigo, creada}
 _visto = {}             # conector_id → time.monotonic() de la última pregunta del equipo
 _estado = {}            # conector_id → {antivirus: {...}, version, capacidades} que informa el equipo al conectarse
-VERSION_CONECTOR = 6    # la del programa frontend/descargas/codigocamp-conector.py (Trabajo avisa si el del equipo es más viejo)
-ACCIONES_FS = {"listar", "leer", "leer_parte", "escribir_parte", "leer_varios", "servicios", "escribir", "carpeta", "borrar", "explorar", "nueva", "raiz", "git", "antivirus"}
+VERSION_CONECTOR = 13    # la del programa frontend/descargas/codigocamp-conector.py (Trabajo avisa si el del equipo es más viejo)
+ACCIONES_FS = {"listar", "leer", "leer_parte", "escribir_parte", "leer_varios", "servicios", "escribir", "carpeta", "borrar", "explorar", "nueva", "raiz", "git", "antivirus",
+               "elegir_nativo", "mostrar", "http"}
+METODOS_HTTP = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 MAX_ESCRIBIR = 42_000_000   # caracteres base64 por pedido (unos 30 MB); los archivos grandes van por partes de 8 MB
 
 
@@ -168,16 +169,8 @@ def ejecutar(cid):
         return api_error("Escribe un comando.")
     if too_many(f"conector-ejecutar:{current_user.id}", 120, 60):
         return api_error("Demasiados comandos seguidos. Espera un momento.", 429)
-    # Protección del equipo: comandos destructivos y enlaces peligrosos no se envían (y no se guardan)
-    from servicios.comandos_peligrosos import revisar_comando
-    from servicios.seguridad_enlaces import enlaces_en, revisar_enlace
-    motivo = revisar_comando(linea)
-    if motivo:
-        return api_error(f"🛡️ CódigoCamp bloqueó este comando porque {motivo}. Esto protege tu equipo y no se puede saltar.", 403)
-    for url in enlaces_en(linea)[:10]:
-        r = revisar_enlace(url)
-        if r["nivel"] == "bloqueado":
-            return api_error(f"🛡️ CódigoCamp bloqueó este comando: el enlace {url[:80]} es peligroso ({r['motivo']}).", 403)
+    # Con su propio equipo la persona es responsable de lo que ejecuta (Términos, sección 7): CódigoCamp no frena ni
+    # advierte comandos aquí. Nada de esto llega al servidor: la orden solo pasa hacia el equipo y su salida hacia el navegador.
     oid = _encolar(c, "comando", linea=linea, cwd=str(data.get("cwd", ""))[:400],
                    columnas=int(data.get("columnas") or 100))
     return jsonify(orden=oid)
@@ -300,18 +293,28 @@ def sistema_archivos(cid):
     for k in ("ruta", "nombre", "cwd"):
         if k in data:
             datos[k] = str(data[k])[:1000]
+    if accion == "explorar":
+        datos["archivos"] = bool(data.get("archivos"))
+    if accion == "elegir_nativo":
+        datos["que"] = "archivo" if data.get("tipo") == "archivo" else "carpeta"   # «tipo» ya lo usa la orden
     if accion == "leer_varios":
         rutas = data.get("rutas")
-        if not isinstance(rutas, list) or len(rutas) > 500:
+        if not isinstance(rutas, list) or len(rutas) > 5000:
             return api_error("Lista de archivos no válida.")
         datos["rutas"] = [str(r)[:1000] for r in rutas]
     if accion == "listar":
         datos["ignorar"] = [str(x)[:80] for x in (data.get("ignorar") or [])][:50]
+        if isinstance(data.get("abrir"), list):
+            datos["abrir"] = [str(x)[:1000] for x in data["abrir"]][:500]   # carpetas pesadas (node_modules, venv…) que abriste
+        if data.get("previo"):
+            datos["previo"] = str(data["previo"])[:64]   # solo los cambios desde esa revisión
     if accion in {"leer_parte", "escribir_parte"}:
         desde = data.get("desde", 0)
         if not isinstance(desde, int) or desde < 0 or desde > current_app_max_archivo():
             return api_error("Parte no válida.")
         datos["desde"] = desde
+        if accion == "leer_parte" and isinstance(data.get("largo"), int) and data["largo"] > 0:
+            datos["largo"] = min(int(data["largo"]), 8 * 1024 * 1024)
         if accion == "escribir_parte":
             datos["fin"] = bool(data.get("fin"))
     if accion in {"escribir", "escribir_parte"}:
@@ -323,20 +326,25 @@ def sistema_archivos(cid):
         args = data.get("args")
         if not isinstance(args, list) or not args or len(args) > 60 or not all(isinstance(a, str) and len(a) < 4000 for a in args):
             return api_error("Comando de Git no válido.")
-        from servicios.comandos_peligrosos import revisar_comando
-        from servicios.seguridad_enlaces import enlaces_en, revisar_enlace
-        linea = "git " + " ".join(args)
-        motivo = revisar_comando(linea)
-        if motivo:
-            return api_error(f"🛡️ CódigoCamp bloqueó este comando porque {motivo}.", 403)
-        for url in enlaces_en(linea)[:5]:
-            if revisar_enlace(url)["nivel"] == "bloqueado":
-                return api_error(f"🛡️ CódigoCamp bloqueó este comando: el enlace {url[:80]} es peligroso.", 403)
         datos["args"] = args
+    if accion == "http":
+        # Cliente HTTP de Trabajo → una API que corre EN el equipo (localhost, red de la casa). La hace el Conector,
+        # no este servidor: así nunca se toca la red interna del servidor de CódigoCamp.
+        metodo = str(data.get("metodo") or "GET").upper()
+        url = str(data.get("url") or "")
+        cab = data.get("cabeceras") or []
+        cuerpo = data.get("cuerpo_b64") or ""
+        if metodo not in METODOS_HTTP or not url.lower().startswith(("http://", "https://")) or len(url) > 8000:
+            return api_error("Petición no válida.")
+        if not isinstance(cab, list) or len(cab) > 100 or not all(isinstance(x, list) and len(x) == 2 and all(isinstance(y, str) and len(y) < 8000 for y in x) for x in cab):
+            return api_error("Encabezados no válidos.")
+        if not isinstance(cuerpo, str) or len(cuerpo) > 3_000_000:
+            return api_error("El cuerpo es demasiado grande (máximo 2 MB).", 413)
+        datos.update(metodo=metodo, url=url, cabeceras=cab, cuerpo_b64=cuerpo, verificar=data.get("verificar", True) is not False)
     oid = _encolar(c, "fs", **datos)
     # Rápido: casi todas las operaciones de archivos tardan milisegundos en el equipo, así que se espera aquí mismo
     # y se responde en UNA sola petición (antes eran dos: encolar y luego preguntar por el resultado).
-    hecho = _esperar_fin(oid, 6 if accion not in {"git", "servicios"} else 12)
+    hecho = None if accion == "elegir_nativo" else _esperar_fin(oid, 6 if accion not in {"git", "servicios", "http"} else 12)
     return jsonify(orden=oid, resultado=hecho) if hecho else jsonify(orden=oid)
 
 
@@ -678,7 +686,4 @@ def _texto_programa():
     from constantes import FRONTEND
     texto = (FRONTEND / "descargas" / "codigocamp-conector.py").read_text(encoding="utf-8")
     texto = texto.replace('SERVIDOR = "%SERVIDOR%"', f'SERVIDOR = {request.host_url.rstrip("/")!r}', 1)
-    # El filtro de comandos peligrosos viaja DENTRO del programa: el equipo los bloquea aunque el servidor fallara
-    filtro = (Path(__file__).resolve().parent.parent / "servicios" / "comandos_peligrosos.py").read_text(encoding="utf-8")
-    texto = texto.replace("REVISAR_COMANDO = None  # %FILTRO%", f"{filtro}\nREVISAR_COMANDO = revisar_comando", 1)
     return Response(texto, mimetype="text/x-python", headers={"Content-Disposition": f'attachment; filename="codigocamp-conector-v{VERSION_CONECTOR}.py"', "Cache-Control": "no-store"})

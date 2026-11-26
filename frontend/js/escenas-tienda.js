@@ -120,6 +120,17 @@ const DEDO = {
 // ------------------------------------------- potenciadores (los cofres conservan su diseño de cofre) ----
 const POTENCIADOR = {
   impulso_xp: () => fondo(`f${n}`, "#1e1b4b", "#4338ca") + `<circle cx="110" cy="48" r="34" fill="#facc15" opacity=".15"/><circle cx="110" cy="48" r="24" fill="#fde047" stroke="#a16207" stroke-width="2"/>${P.rayo(110, 47, 1.25, "#fff7cc")}` + P.orbe(48, 34, 9) + P.orbe(172, 58, 11) + P.orbe(66, 72, 6) + P.texto(172, 26, "+60 XP", 12, "#bef264"),
+  // Los básicos también tienen su escena (antes salía un cuadro genérico en vida, vidas llenas, salvarrachas y kit)
+  vida: () => fondo(`f${n}`, "#4c0519", "#e11d48") + `<circle cx="110" cy="48" r="30" fill="#fff" opacity=".12"/>` + P.corazon(110, 46, 1.9, "#fff1f2") + P.corazon(110, 46, 1.45, "#f43f5e")
+    + P.brillo(150, 26, 6, "#fff") + P.brillo(68, 70, 5, "#fecdd3") + P.texto(168, 78, "+1", 15, "#fff1f2"),
+  vidas_llenas: () => fondo(`f${n}`, "#831843", "#f472b6") + [0, 1, 2, 3, 4].map((i) => P.corazon(46 + i * 32, 48 + (i % 2 ? 6 : -6), 1.05, ["#fff1f2", "#fecdd3", "#fda4af", "#fecdd3", "#fff1f2"][i])).join("")
+    + `<rect x="40" y="74" width="140" height="8" rx="4" fill="#fff" opacity=".25"/><rect x="40" y="74" width="140" height="8" rx="4" fill="#fff" opacity=".85"/>` + P.texto(110, 20, "¡LLENAS!", 12, "#fff"),
+  salvarracha: () => fondo(`f${n}`, "#0c4a6e", "#38bdf8") + `<path d="M110 12 82 22v22c0 18 12 32 28 38 16-6 28-20 28-38V22z" fill="#e0f2fe" stroke="#0369a1" stroke-width="3"/>`
+    + `<path d="M110 30c6 8 10 13 10 20a10 10 0 0 1-20 0c0-4 2-7 4-9 0 4 2 6 4 6-1-6 0-11 2-17z" fill="#f97316"/><path d="M110 44c3 4 4 6 4 8a4 4 0 0 1-8 0c0-2 2-5 4-8z" fill="#fde047"/>`
+    + P.copo(50, 34, 9, "#e0f2fe") + P.copo(172, 62, 11, "#bae6fd") + P.copo(160, 24, 7, "#fff") + P.texto(52, 80, "racha ok", 11, "#e0f2fe"),
+  kit_experto: () => fondo(`f${n}`, "#14532d", "#22c55e") + `<rect x="76" y="30" width="68" height="48" rx="8" fill="#f0fdf4" stroke="#166534" stroke-width="2.5"/><rect x="98" y="22" width="24" height="10" rx="3" fill="none" stroke="#166534" stroke-width="2.5"/>`
+    + `<rect x="104" y="42" width="12" height="26" rx="2" fill="#16a34a"/><rect x="97" y="49" width="26" height="12" rx="2" fill="#16a34a"/>`
+    + P.estrella(52, 36, 9, "#fde047") + P.estrella(170, 60, 11, "#fef08a") + P.texto(170, 26, "PRO", 12, "#dcfce7"),
   mega_vidas: () => fondo(`f${n}`, "#500724", "#be185d") + `<rect x="88" y="18" width="44" height="66" rx="9" fill="#fdf2f8" stroke="#831843" stroke-width="2.5"/><rect x="102" y="12" width="16" height="8" rx="2" fill="#831843"/>` + [0, 1, 2, 3].map((i) => `<rect x="93" y="${66 - i * 14}" width="34" height="11" rx="3" fill="${["#f43f5e", "#fb7185", "#fda4af", "#fecdd3"][i]}"/>`).join("") + P.corazon(110, 36, 1, "#fff") + P.corazon(52, 40, .9, "#fda4af") + P.corazon(170, 56, 1.1, "#fecdd3") + P.texto(168, 30, "x10", 13, "#fff1f2"),
 };
 

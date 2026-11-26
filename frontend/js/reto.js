@@ -241,17 +241,31 @@ const RENDER = {
   },
 };
 
+// Examen para «Saltar aquí» (?salto=seccion:12 o etapa:3): cada pregunta sale una vez, no gasta vidas y hay un máximo de errores
+const SALTO = (new URLSearchParams(location.search).get("salto") || "").match(/^(seccion|etapa):(\d+)$/);
+let examen = null;
+
 async function main() {
   const idNivel = new URLSearchParams(location.search).get("nivel");
-  if (!/^\d+$/.test(idNivel || "")) { location.replace("aprende.html"); return; }
-  try { datos = await api("/api/nivel/" + idNivel + "/"); }
+  if (!SALTO && !/^\d+$/.test(idNivel || "")) { location.replace("aprende.html"); return; }
+  try { datos = await api(SALTO ? `/api/salto/${SALTO[1]}/${SALTO[2]}/` : "/api/nivel/" + idNivel + "/"); examen = datos.examen || null; }
   catch (e) { $("cuerpo").innerHTML = ""; $("cuerpo").append(el("p", e.message, "vacio")); return; }
   vidas = datos.vidas; $("vidas").textContent = vidas;
   if (/^#[0-9a-f]{6}$/i.test(datos.curso.color || "")) {
     document.documentElement.style.setProperty("--curso", datos.curso.color);
   }
-  if (vidas <= 0) { enCurso = false; $("sinVidas").hidden = false; return; }
+  if (vidas <= 0 && !examen) { enCurso = false; $("sinVidas").hidden = false; return; }
   cola = datos.retos.map((q) => ({ q, ultimo: null })); total = cola.length;
+  if (examen) {   // aviso al empezar: qué es y cuántos errores se permiten
+    const caja = document.querySelector(".r-vidas");
+    if (caja) { caja.title = "Errores del examen (máximo permitido)"; caja.innerHTML = '<span id="vidas"></span>'; }
+    $("vidas").textContent = `✗ 0/${examen.tolerancia}`;
+    const av = el("div", "", "examen-aviso");
+    av.append(el("b", "⏩ Examen para saltar"), el("span", `${examen.total} preguntas de todo lo anterior a ${examen.objetivo}. Puedes fallar hasta ${examen.tolerancia}. No gasta vidas.`));
+    av.style.cssText = "position:relative;z-index:2;display:grid;gap:4px;width:min(680px,calc(100% - 32px));margin:10px auto 0;padding:12px 14px;border:2px solid var(--curso,#58cc02);border-radius:16px;background:color-mix(in srgb,var(--curso,#58cc02) 10%,transparent);font-size:14px";
+    $("cuerpo").before(av);
+    setTimeout(() => av.remove(), 9000);
+  }
   document.title = datos.nivel.titulo + " · CódigoCamp";
   enCurso = total > 0; progreso(false);
   $("pie").hidden = false; mostrar();
@@ -329,8 +343,10 @@ async function comprobar() {
       if (extra.invalido) { feedback(false, {}, { titulo: extra.mensaje }); $("pie").className = "r-pie mal"; $("accion").textContent = "Comprobar"; $("accion").disabled = false; return; }
       cuerpo = { correcto: extra.ok };
     }
-    const r = await api(`/api/reto/${cola[0].q.id}/responder/`, cuerpo);
-    vidas = r.vidas; $("vidas").textContent = vidas; ultimoOk = r.correcto;
+    const r = await api(`/api/reto/${cola[0].q.id}/responder/${examen ? "?salto=1" : ""}`, cuerpo);
+    ultimoOk = r.correcto;
+    if (examen) $("vidas").textContent = `✗ ${fallos + (r.correcto ? 0 : 1)}/${examen.tolerancia}`;
+    else { vidas = r.vidas; $("vidas").textContent = vidas; }
     reproducirRespuesta(ultimoOk);
     animarRespuesta(ultimoOk);
     if (!r.correcto) fallos++;
@@ -344,6 +360,7 @@ async function comprobar() {
 }
 
 async function continuar() {
+  if (examen) return continuarExamen();
   if (vidas <= 0) { enCurso = false; $("sinVidas").hidden = false; return; }
   const item = cola.shift();
   if (ultimoOk) { hechas++; progreso(true); } else cola.push(item);   // la pregunta fallada vuelve al final
@@ -364,6 +381,31 @@ async function continuar() {
     if (r.racha_hoy) { sonar("racha", 0.85); setTimeout(() => vibrar([20, 40, 60]), 850); }
     import("/js/cofres.js").then((m) => m.abrirPremiosNuevos(r.desafios_completados || [])).catch(() => {});
     try { navigator.serviceWorker?.controller?.postMessage("actualizar-widget"); } catch { /* sin service worker */ }
+  } catch (e) { $("cuerpo").replaceChildren(el("p", e.message, "vacio")); }
+}
+
+/** Examen de salto: cada pregunta una vez; si pasas el máximo de errores, termina. */
+async function continuarExamen() {
+  cola.shift(); hechas++; progreso(true);
+  const reprobado = fallos > examen.tolerancia;
+  if (cola.length && !reprobado) return mostrar();
+  progreso(false); $("pie").hidden = true;
+  enCurso = false; history.back();
+  const volver = `/pages/inicio.html?curso=${datos.curso.slug}`;
+  try {
+    const r = await api("/api/salto/terminar/", {});
+    if (r.aprobado) {
+      sonar("leccion"); vibrar([30, 60, 30]);
+      $("cuerpo").innerHTML = `<div class="fin"><div class="fin-codi">${codiSVG("celebra", { tam: 150 })}</div><h1>¡Aprobaste el examen!</h1>
+        <p>Saltaste a ${String(r.objetivo).replace(/[&<>]/g, "")}. Se marcaron ${r.desbloqueados} niveles anteriores como hechos.</p>
+        <div class="botin"><div>✨ +${r.xp_ganado} XP</div><div>✗ ${r.errores} de ${r.tolerancia} errores permitidos</div></div>
+        <a class="bj" href="${volver}">Seguir desde ahí</a></div>`;
+      import("/js/cofres.js").then((m) => m.abrirPremiosNuevos(r.desafios_completados || [])).catch(() => {});
+    } else {
+      $("cuerpo").innerHTML = `<div class="fin"><div class="fin-codi">${codiSVG("triste", { tam: 150 })}</div><h1>Esta vez no</h1>
+        <p>Tuviste ${r.errores} errores y el máximo era ${r.tolerancia}. Repasa las lecciones anteriores y vuelve a intentarlo cuando quieras: no perdiste vidas.</p>
+        <a class="bj" href="${volver}">Volver al camino</a></div>`;
+    }
   } catch (e) { $("cuerpo").replaceChildren(el("p", e.message, "vacio")); }
 }
 

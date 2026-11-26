@@ -37,7 +37,7 @@
         <div class="rc-dato"><b id="rsListos">0</b><small>cofres por abrir</small></div>
         <div class="rc-dato"><b id="rsHoy">0/6</b><small>encargos de hoy</small></div>
         <div class="rc-dato"><b id="cofresCuenta">0/10</b><small>cofres de logro</small></div>
-        <div class="rc-dato"><b id="rsMes">0/60</b><small>puntos de temporada</small></div>
+        <div class="rc-dato"><b id="rsMes">0/30</b><small>encargos del mes</small></div>
       </div>
       <nav class="rc-tabs" role="tablist" aria-label="Secciones de recompensas">
         <button type="button" role="tab" class="rc-tab on" data-rc="hoy" aria-selected="true">📋 Encargos de hoy</button>
@@ -62,13 +62,28 @@
           <h2 id="mesTitulo">Desafío del mes</h2>
           <p class="d-mes-copy">Encadena tus misiones diarias para desbloquear la recompensa especial.</p>
           <div class="d-card">
-            <div class="d-mes-objective"><h3>Acumula 60 puntos de misión</h3><span id="mesTexto">0 / 60</span></div>
+            <div class="d-mes-objective"><h3 id="mesMeta">Supera 30 encargos este mes</h3><span id="mesTexto">0 / 30</span></div>
             <div class="pbar" style="--c:#e09a47"><i id="mesBarra" style="width:0"></i><span class="sr-only">Progreso de temporada</span></div>
             <small id="mesNota"></small>
+            <div class="md-hitos" id="encHitos"></div>
           </div>
         </div>
       </section>
-        <p class="nota">Cada encargo cumplido suma 5 puntos. ¿Quieres ver tus días de práctica? Míralos en el <a href="/pages/perfil.html#calendario">calendario de racha de tu perfil</a>. Gasta tus diamantes en la <a href="/pages/tienda.html">tienda</a>.</p>
+      <section class="md-mes" aria-labelledby="t-medalla">
+        <div class="md-cab">
+          <div class="md-arte" id="mdArte"></div>
+          <div><p class="misiones-kicker">MEDALLA DEL MES</p><h2 id="t-medalla">Medalla de este mes</h2>
+            <p class="md-sub" id="mdSub">Completa todas las experiencias del mes para ganarla. Quedará para siempre en tu perfil.</p></div>
+        </div>
+        <div class="md-exps" id="mdExps"></div>
+        <div class="md-xp"><h3>⭐ Recompensas por experiencia del mes <small id="mdXpMes"></small></h3><div class="md-hitos" id="mdHitos"></div></div>
+        <p class="md-premio" id="mdPremio"></p>
+      </section>
+      <section class="md-coleccion" aria-labelledby="t-coleccion">
+        <div class="d-cab"><div><p class="misiones-kicker">COLECCIÓN</p><h2 id="t-coleccion">Tus medallas de <span id="mdAnio"></span></h2></div></div>
+        <div id="mdVitrina"></div>
+      </section>
+        <p class="nota">Cada encargo de hoy que superas llena la barra del mes; completa las experiencias del mes para ganar su medalla (cada mes y cada año es distinta). ¿Quieres ver tus días de práctica? Míralos en el <a href="/pages/perfil.html#calendario">calendario de racha de tu perfil</a>. Gasta tus diamantes en la <a href="/pages/tienda.html">tienda</a>.</p>
       </div>
 
 

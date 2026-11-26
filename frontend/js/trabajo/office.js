@@ -12,12 +12,15 @@ function cargarScript(src, global) {
   if (!cargados.has(src)) {
     cargados.set(src, new Promise((ok, mal) => {
       // Monaco trae un cargador AMD (define): mientras se carga la librería se esconde, para que quede en window
-      const amd = globalThis.define;
-      globalThis.define = undefined;
+      // Solo se esconde «define.amd» (no «define»): si se quitara define, los lenguajes que Monaco carga en ese
+      // instante (por ejemplo Markdown al abrir un README) fallaban con «define is not a function».
+      const def = globalThis.define, amd = def?.amd;
+      if (def && amd) def.amd = undefined;
+      const volver = () => { if (def && amd) def.amd = amd; };
       const s = document.createElement("script");
       s.src = src;
-      s.onload = () => { globalThis.define = amd; globalThis[global] ? ok(globalThis[global]) : mal(new Error("No se pudo cargar el lector de documentos.")); };
-      s.onerror = () => { globalThis.define = amd; cargados.delete(src); mal(new Error("No se pudo cargar el lector de documentos (¿sin conexión?).")); };
+      s.onload = () => { volver(); globalThis[global] ? ok(globalThis[global]) : mal(new Error("No se pudo cargar el lector de documentos.")); };
+      s.onerror = () => { volver(); cargados.delete(src); mal(new Error("No se pudo cargar el lector de documentos (¿sin conexión?).")); };
       document.head.append(s);
     }));
   }

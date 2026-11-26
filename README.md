@@ -76,6 +76,11 @@ DATABASE_URL="mysql+pymysql://root:@127.0.0.1:3306/codigocamp?charset=utf8mb4"
 GEMINI_API_KEY="<TU_API_KEY_DE_GEMINI>"
 GEMINI_MODEL="gemini-3.5-flash-lite"
 
+
+# --Panel administrador ---
+ADMIN_EMAIL="correo@gmail.com"
+ADMIN_CLAVE="clave"
+
 # --- Correo electrónico con Gmail (opcional, requiere contraseña de aplicación) ---
 SMTP_PORT="587"
 SMTP_USERNAME="finanbot.sena@gmail.com"

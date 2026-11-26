@@ -11,6 +11,7 @@ import threading
 from collections import deque
 import json
 import re
+import secrets
 import os
 import time
 import urllib.error
@@ -28,7 +29,7 @@ from servicios.perfil import get_profile
 from utilidades import api_error, client_ip, json_body, too_many
 
 bp = Blueprint("tutor", __name__)
-API = "https://generativelanguage.googleapis.com"
+API = os.environ.get("GEMINI_API_URL", "https://generativelanguage.googleapis.com").rstrip("/")   # solo se cambia para pruebas
 # Si el modelo de backend/.env no existe para tu clave (404), se prueban estos en orden.
 # También se usan si el modelo está SATURADO (503 «high demand») o sin cuota (429): cada modelo va por separado.
 MODELOS_RESPALDO = ("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite",
@@ -107,6 +108,20 @@ def generar(payload, api_key, modelo, timeout=180, respaldo=True, esperar_max=0)
                     _modelo_que_funciona[modelo] = m
                 return datos, m
             except urllib.error.HTTPError as e:
+                if e.code == 400 and b"thinking" in payload:
+                    cuerpo400 = e.read()[:1500].decode("utf-8", "replace")
+                    if "thinking" in cuerpo400.lower():
+                        p2 = json.loads(payload)
+                        p2.get("generationConfig", {}).pop("thinkingConfig", None)
+                        payload = json.dumps(p2).encode()
+                        try:
+                            _anotar_llamada()
+                            with _peticion(f"{API}/v1beta/models/{m}:generateContent", payload, {"Content-Type": "application/json", "x-goog-api-key": api_key}, "POST", timeout) as r:
+                                return json.load(r), m
+                        except urllib.error.HTTPError as e2:
+                            e = e2
+                    else:
+                        raise urllib.error.HTTPError(e.url, 400, e.msg, e.hdrs, io.BytesIO(cuerpo400.encode()))
                 if e.code == 404:
                     ultimo = e
                     if m != modelo:   # un respaldo que no existe para esta clave: no se vuelve a probar en un rato
@@ -172,6 +187,10 @@ Cómo respondes:
 - Si es un reto o ejercicio de clase, da primero una pista y ofrece la solución si la pide.
 - Si te pasan archivos (imágenes, capturas, PDF, video, audio, código), analízalos y refiérete a ellos por su nombre.
 - Si no sabes algo con seguridad, dilo. No inventes funciones ni librerías.
+- Antes de responder, revisa mentalmente que el código compile y haga lo que se pidió (imports, nombres, tipos, casos vacíos).
+  Si cambias un archivo, conserva lo que ya funcionaba y no borres código que no se pidió quitar.
+- Si la pregunta es ambigua, elige la interpretación más probable según el código y el curso del alumno y dilo en una frase.
+- Si te escribe en Trabajo conectado a su equipo, los comandos y rutas son los de SU sistema (Windows usa PowerShell; macOS y Linux, bash/zsh).
 - Usa listas cortas con guiones; evita tablas grandes y títulos largos.
 - Si la pregunta no tiene que ver con programación, tecnología o estudio, explica amablemente que eres el tutor de programación.
 - Si preguntan cómo usar CódigoCamp (dónde está algo, cómo se hace, por qué no funciona), usa la guía de abajo y di la ruta exacta
@@ -501,7 +520,19 @@ def tutor():
             conv = AIConversation(usuario_id=usuario.id)
             db.session.add(conv)
             db.session.flush()
-        history = [{"rol": m.rol, "texto": m.texto} for m in conv.mensajes[-16:]]
+        previos = list(conv.mensajes)
+        pregunta = message or "(archivos)"
+        # La misma pregunta otra vez (reintento, doble clic o la red la mandó dos veces): nunca se repite en la conversación.
+        if previos and previos[-1].rol == "yo" and previos[-1].texto == pregunta:
+            previos = previos[:-1]
+        elif (data.get("reintento") and len(previos) >= 2 and previos[-1].rol == "tutor" and previos[-2].rol == "yo"
+              and previos[-2].texto == pregunta and _reciente(previos[-1].creado)):
+            # Ya se respondió mientras la conexión estaba cortada: se devuelve esa respuesta sin volver a preguntarle a Gemini
+            return _respuesta_guardada(conv, previos[-1].texto, premios, bool(data.get("stream")))
+        else:
+            from rutas.conversaciones import guardar_pregunta
+            guardar_pregunta(conv, message, [a.nombre for a in adjuntos])
+        history = [{"rol": m.rol, "texto": m.texto} for m in previos[-16:]]
     contents = [{"role": "model" if item.get("rol") == "tutor" else "user", "parts": [{"text": str(item.get("texto", ""))[:12000] or "…"}]}
                 for item in history[-16:] if isinstance(item, dict)]
     partes = _partes_adjuntos(adjuntos, api_key) if adjuntos else []
@@ -515,8 +546,16 @@ def tutor():
     modelo = current_app.config["GEMINI_MODEL"]
     payload = json.dumps({
         "systemInstruction": {"parts": [{"text": sistema}]}, "contents": contents,
-        "generationConfig": {"temperature": 0.15 if copiloto else 0.6, "maxOutputTokens": 16384 if copiloto else 8192},
+        # Rápido e inteligente: piensa poco en preguntas simples y más en errores, código y cambios grandes
+        "generationConfig": {"temperature": 0.15 if copiloto else 0.6, "maxOutputTokens": 16384 if copiloto else 8192,
+                             "thinkingConfig": {"thinkingLevel": nivel_pensar(message, copiloto, len(adjuntos or []),
+                                                                              len(ctx.get("archivos") or []) if isinstance(ctx.get("archivos"), (list, dict)) else 0)}},
     }).encode()
+    if data.get("stream") and not copiloto:
+        # Al generador se le pasa solo el id: la sesión de la base de esta petición se cierra cuando la vista termina
+        # (en el servidor real), así que el objeto conv ya no sirve dentro de la respuesta en vivo.
+        info = {"id": conv.id, "titulo": conv.titulo} if conv is not None else None
+        return _responder_en_vivo(payload, api_key, modelo, info, message, adjuntos, premios)
     try:
         result, modelo = generar(payload, api_key, modelo, esperar_max=12)
         cand = result["candidates"][0]
@@ -531,10 +570,157 @@ def tutor():
         current_app.logger.exception("No se pudo completar la solicitud al tutor de IA.")
         return api_error("El tutor no pudo responder ahora. Inténtalo de nuevo.", 502)
     if conv is not None:
-        from rutas.conversaciones import guardar_intercambio
-        guardar_intercambio(conv, message, [a.nombre for a in adjuntos], answer)
+        from rutas.conversaciones import guardar_respuesta
+        guardar_respuesta(conv, answer)
         return jsonify(respuesta=answer, copiloto=copiloto, conversacion={"id": conv.id, "titulo": conv.titulo}, desafios_completados=premios)
     return jsonify(respuesta=answer, copiloto=copiloto, desafios_completados=premios)
+
+
+def _reciente(fecha, minutos=15):
+    if fecha is None:
+        return False
+    if fecha.tzinfo is None:
+        fecha = fecha.replace(tzinfo=timezone.utc)
+    return utcnow() - fecha <= timedelta(minutes=minutos)
+
+
+def _respuesta_guardada(conv, texto, premios, stream):
+    """Respuesta que ya estaba guardada (llegó mientras la conexión estaba cortada)."""
+    info = {"id": conv.id, "titulo": conv.titulo}
+    if not stream:
+        return jsonify(respuesta=texto, copiloto=False, conversacion=info, desafios_completados=premios)
+    from flask import Response
+
+    def eventos():
+        for d in ({"conv": info}, {"t": texto}, {"fin": True, "respuesta": texto, "copiloto": False, "desafios_completados": premios, "conversacion": info}):
+            yield f"data: {json.dumps(d, ensure_ascii=False)}\n\n"
+    return Response(eventos(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+def _trozos_gemini(payload, api_key, modelo):
+    """Pide la respuesta a Gemini EN VIVO (streamGenerateContent): devuelve los trozos de texto según llegan."""
+    m = _modelo_que_funciona.get(modelo, modelo)
+    if _descanso.get(m, 0) > time.monotonic():
+        raise urllib.error.URLError("modelo en descanso")
+    _anotar_llamada()
+    r = _peticion(f"{API}/v1beta/models/{m}:streamGenerateContent?alt=sse", payload, {"Content-Type": "application/json", "x-goog-api-key": api_key}, "POST", 120)
+    with r:
+        for linea in r:
+            linea = linea.decode("utf-8", "replace").strip()
+            if not linea.startswith("data:"):
+                continue
+            try:
+                d = json.loads(linea[5:])
+                partes = d["candidates"][0].get("content", {}).get("parts", [])
+            except (ValueError, KeyError, IndexError):
+                continue
+            texto = "".join(p.get("text", "") for p in partes if not p.get("thought"))
+            if texto:
+                yield texto
+
+
+def _guardar_respuesta_id(conv_id, texto):
+    """Guarda la respuesta buscando la conversación de nuevo (sirve dentro de la respuesta en vivo)."""
+    from models import AIConversation
+    from rutas.conversaciones import guardar_respuesta
+    try:
+        conv = db.session.get(AIConversation, conv_id)
+        if conv is not None:
+            guardar_respuesta(conv, texto)
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        raise
+
+
+def _responder_en_vivo(payload, api_key, modelo, conv, message, adjuntos, premios):
+    """conv: {"id", "titulo"} de la conversación guardada (o None)."""
+    """La respuesta llega palabra por palabra (como en las apps de chat): se siente instantánea aunque Gemini tarde.
+    Si el modelo principal falla antes de empezar, se usan los de respaldo (respuesta completa de una vez)."""
+    from flask import Response, stream_with_context
+
+    def evento(**d):
+        return f"data: {json.dumps(d, ensure_ascii=False)}\n\n"
+
+    def generar_eventos():
+        texto = ""
+        trozos = None
+        desconectado = False
+        try:
+            if conv is not None:   # el navegador sabe enseguida en qué conversación quedó (aunque luego se corte)
+                yield evento(conv=conv)
+            try:
+                trozos = _trozos_gemini(payload, api_key, modelo)
+                for trozo in trozos:
+                    texto += trozo
+                    yield evento(t=trozo)
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:   # HTTPError incluido
+                if texto:
+                    current_app.logger.warning("La respuesta en vivo se cortó: %s", e)
+                else:
+                    current_app.logger.warning("Respuesta en vivo no disponible (%s): se usa la respuesta completa.", e)
+            if not texto.strip():
+                # El modo en vivo falló o no trajo texto: se pide la respuesta completa (con modelos de respaldo)
+                result, _ = generar(payload, api_key, modelo, esperar_max=12)
+                cand = result["candidates"][0]
+                texto = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []) if not p.get("thought")).strip()
+                if not texto:
+                    raise ValueError(cand.get("finishReason", "respuesta vacía"))
+                yield evento(t=texto)
+            texto = texto.strip()
+            if not texto:
+                raise ValueError("respuesta vacía")
+            fin = {"fin": True, "respuesta": texto, "copiloto": False, "desafios_completados": premios}
+            if conv is not None:
+                _guardar_respuesta_id(conv["id"], texto)
+                fin["conversacion"] = conv
+                texto = ""   # ya quedó guardada
+            yield evento(**fin)
+        except GeneratorExit:
+            # La persona cerró la página, bloqueó el celular o se cayó la red: se termina de recibir la respuesta de Gemini
+            # y se guarda igual (la verá al volver, en cualquier dispositivo).
+            desconectado = True
+        except urllib.error.HTTPError as e:
+            cuerpo = e.read()[:800].decode("utf-8", "replace")
+            current_app.logger.warning("Gemini respondió %s: %s", e.code, cuerpo)
+            yield evento(error=explicar_error_gemini(e.code, cuerpo, modelo))
+        except Exception:   # noqa: BLE001 — cualquier fallo se le explica a la persona
+            current_app.logger.exception("No se pudo completar la respuesta en vivo.")
+            yield evento(error="El tutor no pudo responder ahora. Inténtalo de nuevo.")
+        finally:
+            if desconectado and conv is not None:
+                try:
+                    if trozos is None:   # se fue antes de empezar: se pide la respuesta completa
+                        result, _ = generar(payload, api_key, modelo, esperar_max=12)
+                        texto = "".join(p.get("text", "") for p in result["candidates"][0].get("content", {}).get("parts", []) if not p.get("thought"))
+                    else:
+                        for trozo in trozos:
+                            texto += trozo
+                except Exception:   # noqa: BLE001
+                    pass
+            if desconectado and conv is not None and texto.strip():
+                try:
+                    _guardar_respuesta_id(conv["id"], texto.strip())
+                except Exception:   # noqa: BLE001
+                    db.session.rollback()
+
+    return Response(stream_with_context(generar_eventos()), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+_PIENSA = re.compile(r"```|traceback|error|exception|bug|falla|no funciona|no sirve|por ?qu[eé]|arregl|optimiz|refactor|algoritm|complejidad|"
+                     r"diferencia entre|compar|dise[ñn]a|arquitect|seguridad|migr|base de datos|consulta|regex|recursi", re.I)
+
+
+def nivel_pensar(mensaje, copiloto=False, adjuntos=0, archivos_ctx=0):
+    """Cuánto «piensa» la IA: poco en preguntas simples (responde al instante) y más en errores, código y diseño."""
+    m = mensaje or ""
+    if copiloto:
+        return "high" if len(m) > 400 or archivos_ctx > 6 or re.search(r"todo el proyecto|refactor|migra|arquitect", m, re.I) else "medium"
+    if adjuntos or len(m) > 600 or _PIENSA.search(m):
+        return "medium"
+    if len(m) < 80 and "\n" not in m:
+        return "minimal"
+    return "low"
 
 
 COMPLETAR = """Eres un motor de autocompletado de código como GitHub Copilot, dentro del editor de CódigoCamp.
@@ -576,7 +762,7 @@ def completar():
               + f"--- {ruta} ---\n{antes}<CURSOR>{despues}")
     payload = json.dumps({
         "systemInstruction": {"parts": [{"text": COMPLETAR}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 400, "thinkingConfig": {"thinkingBudget": 0}},
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 400, "thinkingConfig": {"thinkingLevel": "minimal"}},
     }).encode()
     try:
         result, _ = generar(payload, api_key, modelo_rapido, timeout=20, respaldo=RESPALDO_RAPIDO)
@@ -755,3 +941,94 @@ def mensaje_commit():
     except Exception:
         return api_error("La IA no respondió. Inténtalo de nuevo.", 502)
     return jsonify(texto=sin_cercas(texto).strip().strip('"'))
+
+
+# ------------------------------------------------------------------------------ Codi piensa ----
+CODI_PIENSA = """Eres Codi, la mascota robot de CódigoCamp (una app para aprender a programar, en español de Colombia).
+Tienes personalidad propia: curioso, divertido, cariñoso, un poco travieso, amante del código y de los bits. Piensas por ti
+mismo: comentas lo que ves (la hora, la página, el progreso de la persona), te inventas ocurrencias, preguntas cosas,
+cuentas chistes NUEVOS sobre programación y das consejos útiles. Nunca repites frases hechas ni las que ya dijiste.
+Responde SOLO con un JSON: {"frase": "...", "animo": "..."}
+- frase: máximo 140 caracteres, natural, cercana, puedes usar 1 emoji. Sin comillas extra ni markdown.
+- animo: uno de feliz, celebra, pensando, saludo, guino, ama, asombro, baila, espia, preocupado, triste, fuego.
+Nunca pidas datos personales, nunca hables de temas para adultos, violencia o política. Si te escriben algo inapropiado,
+cambia el tema con gracia hacia programar."""
+ANIMOS_CODI = {"feliz", "celebra", "pensando", "saludo", "guino", "ama", "asombro", "baila", "espia", "preocupado", "triste", "fuego"}
+MOTIVOS_CODI = {
+    "toque": "La persona te acaba de tocar/hacer clic. Reacciona con algo espontáneo y distinto.",
+    "saludo": "La persona acaba de entrar a esta página. Salúdala comentando algo de su contexto.",
+    "vida": "Llevas un rato quieto en la pantalla. Di un pensamiento tuyo, curioso o gracioso, sin interrumpir mucho.",
+    "chiste": "Cuenta un chiste corto y original de programación (nuevo, no de los típicos).",
+    "consejo": "Da un consejo concreto y útil para aprender a programar, según lo que esté haciendo.",
+    "animo": "Dale ánimo según su progreso real (racha, XP de hoy, encargos que le faltan).",
+    "charla": "La persona te escribió el mensaje de abajo. Respóndele como Codi, corto y con personalidad.",
+    "pensar": "Te preguntaron «¿qué estás pensando?». Cuenta qué piensas tú ahora mismo, como un personaje con vida propia.",
+}
+
+
+def _contexto_codi(usuario, pagina):
+    from datetime import datetime
+    partes = [f"Página: {pagina or 'inicio'}.", f"Hora local aproximada: {datetime.now():%H:%M}."]
+    if usuario:
+        try:
+            from servicios.perfil import actividad_de_hoy, encargos_del_dia, get_profile, progreso_encargo
+            p = get_profile(usuario)
+            from servicios.zona import ahora_de
+            partes[1] = f"Hora de la persona: {ahora_de(p):%H:%M}."
+            hoy = actividad_de_hoy(p)
+            faltan = [e["titulo"] for e in encargos_del_dia(usuario.id, hoy.fecha) if progreso_encargo(e, hoy) < e["meta"]][:3]
+            partes.append(f"Se llama {usuario.nombre.split()[0]}. Nivel {p.nivel}, racha de {p.racha_actual} días, {hoy.xp} XP hoy, "
+                          f"{hoy.niveles} niveles y {hoy.lecciones} lecciones hoy, {p.vidas} vidas.")
+            if p.curso_actual:
+                partes.append(f"Está aprendiendo {p.curso_actual.nombre}.")
+            if faltan:
+                partes.append("Encargos de hoy que le faltan: " + "; ".join(faltan) + ".")
+        except Exception:  # noqa: BLE001 — el contexto es opcional
+            pass
+    return " ".join(partes)
+
+
+@bp.post("/api/codi/pensar/")
+def codi_pensar():
+    """Codi piensa por sí mismo: cada frase la crea la IA en el momento (con el contexto de la persona). Si la IA no está
+    disponible, el navegador usa sus frases de siempre."""
+    data = json_body()
+    if isinstance(data, tuple):
+        return data
+    api_key = current_app.config.get("GEMINI_API_KEY")
+    usuario = current_user if current_user.is_authenticated else None
+    quien = f"u{usuario.id}" if usuario else f"ip{client_ip()}"
+    if not api_key:
+        return api_error("Codi está pensando en silencio.", 503)
+    if too_many(f"codi:{quien}", 20 if usuario else 6, 60):
+        return api_error("Codi necesita un respiro.", 429)
+    motivo = str(data.get("motivo") or "toque")
+    if motivo not in MOTIVOS_CODI:
+        motivo = "toque"
+    mensaje = str(data.get("mensaje") or "")[:300]
+    if motivo == "charla" and not mensaje.strip():
+        return api_error("Escríbele algo a Codi.")
+    dichas = [str(x)[:160] for x in (data.get("dichas") or [])][-8:]
+    texto = (f"{MOTIVOS_CODI[motivo]}\nContexto: {_contexto_codi(usuario, str(data.get('pagina') or '')[:40])}\n"
+             + (f"Mensaje de la persona: «{mensaje}»\n" if motivo == "charla" else "")
+             + (f"NO repitas ni parafrasees estas frases que ya dijiste: {' | '.join(dichas)}\n" if dichas else "")
+             + f"Semilla de variedad: {secrets.token_hex(3)}")
+    modelo_rapido = current_app.config.get("GEMINI_MODEL_RAPIDO") or "gemini-3.5-flash-lite"
+    payload = json.dumps({
+        "systemInstruction": {"parts": [{"text": CODI_PIENSA}]},
+        "contents": [{"role": "user", "parts": [{"text": texto}]}],
+        "generationConfig": {"temperature": 1.1, "maxOutputTokens": 200, "responseMimeType": "application/json",
+                             "thinkingConfig": {"thinkingLevel": "minimal"}},
+    }).encode()
+    try:
+        result, _ = generar(payload, api_key, modelo_rapido, timeout=12, respaldo=RESPALDO_RAPIDO)
+        crudo = "".join(p.get("text", "") for p in result["candidates"][0].get("content", {}).get("parts", []) if not p.get("thought"))
+        d = json.loads(crudo[crudo.find("{"): crudo.rfind("}") + 1])
+        frase = re.sub(r"\s+", " ", str(d.get("frase") or "")).strip()[:180]
+        if not frase:
+            raise ValueError("vacía")
+    except Exception:  # noqa: BLE001 — Codi nunca rompe la página
+        return api_error("Codi se quedó sin ideas por un momento.", 502)
+    animo = str(d.get("animo") or "feliz")
+    db.session.rollback()   # el contexto no guarda nada
+    return jsonify(frase=frase, animo=animo if animo in ANIMOS_CODI else "feliz")

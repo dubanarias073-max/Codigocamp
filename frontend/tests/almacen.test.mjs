@@ -285,3 +285,25 @@ test("modo equipo: ni una subida a medias ni la reconciliación suben el proyect
   assert.equal(a.proyecto.files["nube.txt"], "importante");
   assert.equal(a.proyecto.files["otro.py"], undefined);
 });
+
+test("antivirus: lo que el servidor bloquea se quita del proyecto y se avisa", async () => {
+  const srv = new Servidor(), ls = new Almacenamiento();
+  const fetchReal = srv.fetch;
+  srv.fetch = async (url, o) => {
+    const r = await fetchReal(url, o);
+    if (o.method !== "PUT") return r;
+    const datos = await r.json();
+    const malos = Object.keys(srv.proyecto.files).filter((k) => k.endsWith(".exe"));
+    for (const k of malos) delete srv.proyecto.files[k];
+    return { ...r, json: async () => ({ ...datos, bloqueados: malos.map((ruta) => ({ ruta, motivo: "los archivos .exe pueden instalar virus" })) }) };
+  };
+  const avisos = [];
+  const a = crear(srv, ls, { alBloqueados: (l) => avisos.push(...l) });
+  await a.iniciar();
+  a.proyecto.files["preuba.exe"] = "hola";
+  a.cambiar();
+  assert.equal(await a.guardarAhora(), true);
+  assert.equal(a.proyecto.files["preuba.exe"], undefined, "se quitó del editor");
+  assert.deepEqual(avisos.map((b) => b.ruta), ["preuba.exe"]);
+  assert.equal(srv.proyecto.files["preuba.exe"], undefined);
+});

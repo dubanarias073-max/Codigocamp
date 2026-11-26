@@ -14,10 +14,10 @@ SALVARRACHAS_CADA = 10          # cada 10 días seguidos de racha: +1 salvarrach
 PREMIO_SEMANA_PERFECTA = {"diamante": 250, "xp": 100, "salvarrachas": 1}
 PREMIO_MES_PERFECTO = {"diamante": 2000, "xp": 600, "vidas": 10, "salvarrachas": 3}
 MINUTOS_VIDA = 30
-META_MES = 60
+META_MES = 150   # puntos del desafío del mes = 30 encargos (5 puntos cada uno), como el de Duolingo
 PUNTOS_POR_DESAFIO = 5
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
-# Encargos de hoy: cada día salen 5 distintos de esta lista (cambian cada día y para cada persona; ver encargos_del_dia).
+# Encargos de hoy: cada día salen 7 distintos de esta lista (cambian cada día y para cada persona; ver encargos_del_dia).
 ENCARGOS = [
     {"clave": "xp20", "icono": "⭐", "titulo": "Gana 20 XP", "campo": "xp", "meta": 20, "premio": {"diamante": 8}},
     {"clave": "xp30", "icono": "⭐", "titulo": "Gana 30 XP", "campo": "xp", "meta": 30, "premio": {"diamante": 10}},
@@ -44,9 +44,36 @@ ENCARGOS = [
     {"clave": "combo", "icono": "⚡", "titulo": "Gana 40 XP y completa 2 niveles", "campo": "xp", "meta": 40, "y": {"campo": "niveles", "meta": 2}, "premio": {"diamante": 25}},
     {"clave": "estudioso", "icono": "🧠", "titulo": "Haz 1 lección en Aprende y 1 nivel de retos", "campo": "lecciones", "meta": 1, "y": {"campo": "niveles", "meta": 1}, "premio": {"diamante": 18}},
     {"clave": "maraton", "icono": "🔥", "titulo": "Maratón: completa 8 niveles", "campo": "niveles", "meta": 8, "premio": {"diamante": 45}},
+    # --- Más encargos (variados: premios con XP, vidas y salvarrachas, no solo diamantes) ---
+    {"clave": "xp15", "icono": "✨", "titulo": "Calentamiento: gana 15 XP", "campo": "xp", "meta": 15, "premio": {"diamante": 6, "xp": 5}},
+    {"clave": "xp60", "icono": "⭐", "titulo": "Gana 60 XP", "campo": "xp", "meta": 60, "premio": {"diamante": 18}},
+    {"clave": "xp100", "icono": "🌟", "titulo": "Gana 100 XP", "campo": "xp", "meta": 100, "premio": {"diamante": 25, "vidas": 1}},
+    {"clave": "xp150", "icono": "💫", "titulo": "Día brillante: gana 150 XP", "campo": "xp", "meta": 150, "premio": {"diamante": 35, "vidas": 2}},
+    {"clave": "xp200", "icono": "🚀", "titulo": "Despegue: gana 200 XP", "campo": "xp", "meta": 200, "premio": {"diamante": 50, "salvarrachas": 1}},
+    {"clave": "niveles4", "icono": "🎯", "titulo": "Completa 4 niveles", "campo": "niveles", "meta": 4, "premio": {"diamante": 25}},
+    {"clave": "niveles6", "icono": "🏹", "titulo": "Completa 6 niveles", "campo": "niveles", "meta": 6, "premio": {"diamante": 35, "vidas": 1}},
+    {"clave": "niveles10", "icono": "🏆", "titulo": "Superhéroe: completa 10 niveles", "campo": "niveles", "meta": 10, "premio": {"diamante": 60, "salvarrachas": 1}},
+    {"clave": "perfectos4", "icono": "💎", "titulo": "Perfección: 4 niveles sin fallos", "campo": "perfectos", "meta": 4, "premio": {"diamante": 32, "vidas": 1}},
+    {"clave": "perfectos5", "icono": "👑", "titulo": "Sin errores: 5 niveles perfectos", "campo": "perfectos", "meta": 5, "premio": {"diamante": 40, "xp": 20}},
+    {"clave": "lecciones4", "icono": "📚", "titulo": "Completa 4 lecciones en Aprende", "campo": "lecciones", "meta": 4, "premio": {"diamante": 25}},
+    {"clave": "lecciones8", "icono": "🎓", "titulo": "Biblioteca: 8 lecciones en Aprende", "campo": "lecciones", "meta": 8, "premio": {"diamante": 45, "vidas": 2}},
+    {"clave": "mensajes3", "icono": "💬", "titulo": "Envía 3 mensajes a tus amigos", "campo": "mensajes", "meta": 3, "premio": {"diamante": 10}},
+    {"clave": "mensajes10", "icono": "🗨️", "titulo": "Conversador: envía 10 mensajes", "campo": "mensajes", "meta": 10, "premio": {"diamante": 18, "xp": 10}},
+    {"clave": "ia2", "icono": "🤖", "titulo": "Hazle 2 preguntas a Codi", "campo": "ia", "meta": 2, "premio": {"diamante": 10}},
+    {"clave": "ia5", "icono": "🧠", "titulo": "Curioso: 5 preguntas al tutor de IA", "campo": "ia", "meta": 5, "premio": {"diamante": 18, "xp": 10}},
+    {"clave": "codigo3", "icono": "▶️", "titulo": "Ejecuta tu código 3 veces en Trabajo", "campo": "ejecuciones", "meta": 3, "premio": {"diamante": 12}},
+    {"clave": "codigo10", "icono": "🛠️", "titulo": "Constructor: ejecuta 10 veces en Trabajo", "campo": "ejecuciones", "meta": 10, "premio": {"diamante": 25, "xp": 15}},
+    {"clave": "combo_ia", "icono": "🤝", "titulo": "Pregúntale a la IA y completa 2 niveles", "campo": "ia", "meta": 1, "y": {"campo": "niveles", "meta": 2}, "premio": {"diamante": 20}},
+    {"clave": "combo_trabajo", "icono": "💻", "titulo": "Haz 1 lección y ejecuta tu código", "campo": "lecciones", "meta": 1, "y": {"campo": "ejecuciones", "meta": 1}, "premio": {"diamante": 18}},
+    {"clave": "combo_social", "icono": "👥", "titulo": "Escribe a un amigo y completa 1 nivel", "campo": "mensajes", "meta": 1, "y": {"campo": "niveles", "meta": 1}, "premio": {"diamante": 15}},
+    {"clave": "combo_perfecto", "icono": "🌈", "titulo": "Gana 60 XP con 2 niveles perfectos", "campo": "xp", "meta": 60, "y": {"campo": "perfectos", "meta": 2}, "premio": {"diamante": 35, "vidas": 1}},
+    {"clave": "combo_sabio", "icono": "🦉", "titulo": "Haz 2 lecciones y 1 nivel perfecto", "campo": "lecciones", "meta": 2, "y": {"campo": "perfectos", "meta": 1}, "premio": {"diamante": 28}},
+    {"clave": "combo_xp_aprende", "icono": "📖", "titulo": "Gana 50 XP y haz 3 lecciones", "campo": "xp", "meta": 50, "y": {"campo": "lecciones", "meta": 3}, "premio": {"diamante": 30}},
+    {"clave": "super_maraton", "icono": "🌋", "titulo": "Súper maratón: completa 12 niveles", "campo": "niveles", "meta": 12, "premio": {"diamante": 80, "salvarrachas": 1, "vidas": 3}},
+    {"clave": "xp300", "icono": "☄️", "titulo": "Leyenda del día: gana 300 XP", "campo": "xp", "meta": 300, "premio": {"diamante": 90, "salvarrachas": 1}},
 ]
 ENCARGOS_POR_CLAVE = {e["clave"]: e for e in ENCARGOS}
-ENCARGOS_POR_DIA = 5
+ENCARGOS_POR_DIA = 7
 # Compatibilidad (código y pruebas viejas): la lista de antes
 DAILY_CHALLENGES = [ENCARGOS_POR_CLAVE[k] for k in ("xp30", "niveles2", "perfecto", "xp50", "niveles3", "perfectos3")]
 PREMIO_MES = {"diamante": 150}

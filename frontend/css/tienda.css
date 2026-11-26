@@ -139,3 +139,30 @@
   .producto.rareza-epico, .producto.rareza-legendario, .producto::before, .producto .vista, .producto-rango, .producto h3, .destello-tienda { animation: none !important; }
   .producto.rareza-legendario:hover { transform: translateY(-5px); }
 }
+
+/* ===== Vista previa de los teclados de código ===== */
+.vista.cc-prev-teclado { display: grid; place-items: center; padding: 10px; }
+.cc-mini-teclado { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; width: 100%; max-width: 250px; padding: 8px; border-radius: 14px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.cc-mini-teclado i.esp { grid-column: span 4; font: 700 10px system-ui, sans-serif; }
+.cc-mini-teclado i.ent { grid-column: span 2; }
+.cc-mini-teclado i { display: grid; place-items: center; height: 28px; border-radius: 8px; font: 700 13px system-ui, sans-serif; font-style: normal; cursor: pointer; user-select: none; transition: transform .12s; }
+.vista.vista-teclado{height:auto;min-height:150px;padding:8px 6px;align-content:center;gap:4px}
+.vista-teclado .cc-prev-efecto{position:static}
+
+/* ===================== Rendimiento (celulares y equipos modestos) =====================
+   1) Las tarjetas que no se ven no animan ni se dibujan (tienda.js marca .fuera con IntersectionObserver).
+   2) Modo ligero (.tienda-ligera, lo pone tienda.js en celulares/equipos de 4 núcleos o menos): sin las animaciones que
+      obligan a redibujar en cada cuadro (sombras que laten, borde giratorio, texto brillante, destellos). Quedan solo las
+      que la tarjeta gráfica mueve sola (flotar y el brillo que cruza), así que se ve viva pero fluida. */
+.producto{content-visibility:auto;contain-intrinsic-size:auto 320px}
+.producto.fuera,.producto.fuera *,.producto.fuera::before,.producto.fuera::after{animation-play-state:paused!important}
+.tienda-ligera .producto.rareza-epico,.tienda-ligera .producto.rareza-legendario{animation:none!important;will-change:auto;transform-style:flat}
+.tienda-ligera .producto.rareza-epico{box-shadow:0 0 18px color-mix(in srgb,#a855f7 30%,transparent)}
+.tienda-ligera .producto.rareza-legendario{box-shadow:0 0 26px color-mix(in srgb,#f5b73b 42%,transparent)}
+.tienda-ligera .producto::before{animation:none!important}
+.tienda-ligera .producto .producto-rango,.tienda-ligera .producto h3{animation:none!important}
+.tienda-ligera .destello-tienda{display:none}
+.tienda-ligera .vista.cc-prev-matrix{animation-duration:3.2s}
+.tienda-ligera .producto.rareza-epico::after{display:none}
+.tienda-ligera .producto-icon,.tienda-ligera .vista-cursor img,.tienda-ligera .vista-avatar svg{filter:none}
+.tienda-ligera .cofre-fondo{backdrop-filter:none;background:rgba(5,8,20,.86)}

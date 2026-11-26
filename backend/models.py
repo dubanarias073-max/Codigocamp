@@ -260,6 +260,17 @@ class DailyChallenge(db.Model):
     creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
 
 
+class Medal(db.Model):
+    """Medallas del mes (como Duolingo): se ganan completando todas las experiencias de ese mes y se ven en el perfil."""
+    __tablename__ = "medallas"
+    __table_args__ = (db.UniqueConstraint("usuario_id", "clave", name="uq_medalla"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    clave = db.Column(db.String(20), nullable=False)      # «2026-11»
+    creada_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
 class MonthChallenge(db.Model):
     __tablename__ = "puntos_desafio"
     __table_args__ = (db.UniqueConstraint("usuario_id", "mes", name="uq_puntos_mes"),)
@@ -402,6 +413,7 @@ class EquippedCosmetics(db.Model):
     efecto = db.Column(db.String(30), nullable=True)
     dedo = db.Column(db.String(30), nullable=True)  # estela del dedo (celular)
     codi = db.Column(db.String(30), nullable=True)  # accesorio de Codi, la mascota
+    teclado = db.Column(db.String(30), nullable=True)  # estilo del teclado de código del celular (Trabajo)
 
 
 class OpenedChest(db.Model):
@@ -544,3 +556,139 @@ class Conector(db.Model):
     carpeta = db.Column(db.String(400), nullable=False, default="")
     creado = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
     ultimo = db.Column(db.DateTime(timezone=True), nullable=True)
+
+
+# ------------------------------------------------------------------ Panel de administrador y moderación ----
+class Incidente(db.Model):
+    """Algo que el escudo de CódigoCamp bloqueó a una persona (virus, comando peligroso, enlace malicioso…).
+    El administrador lo ve en su panel con la gravedad calculada y decide si ignorarlo, advertir o bloquear la cuenta."""
+    __tablename__ = "incidentes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE", name="fk_incidentes_usuario"), nullable=False, index=True)
+    tipo = db.Column(db.String(20), nullable=False)          # archivo | comando | enlace | manual
+    gravedad = db.Column(db.String(8), nullable=False)       # baja | media | alta | critica
+    puntos = db.Column(db.SmallInteger, nullable=False, default=0)
+    motivo = db.Column(db.String(300), nullable=False, default="")
+    evidencia = db.Column(db.String(400), nullable=False, default="")   # recorte corto (comando o enlace); nunca el archivo
+    origen = db.Column(db.String(60), nullable=False, default="")
+    ip = db.Column(db.String(45), nullable=False, default="")
+    estado = db.Column(db.String(12), nullable=False, default="pendiente")   # pendiente | ignorado | advertido | bloqueado
+    explicacion = db.Column(db.String(400), nullable=False, default="")   # por qué es una infracción (va en el correo)
+    correo_enviado = db.Column(db.Boolean, nullable=False, default=False)
+    # enviado | sin_smtp (solo se guardó como .eml porque falta configurar SMTP) | error | limite | pendiente
+    correo_estado = db.Column(db.String(12), nullable=False, default="pendiente")
+    correo_detalle = db.Column(db.String(300), nullable=False, default="")
+    creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, index=True)
+    revisado_en = db.Column(db.DateTime(timezone=True), nullable=True)
+
+
+class Bloqueo(db.Model):
+    """Cuenta bloqueada por el administrador (además, usuarios.activo queda en 0)."""
+    __tablename__ = "bloqueos"
+
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE", name="fk_bloqueos_usuario"), primary_key=True)
+    motivo = db.Column(db.String(300), nullable=False, default="")
+    creado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class MedallaEspecial(db.Model):
+    """Medallas creadas por el administrador (además de las del mes). Se entregan a mano o al comprar un artículo."""
+    __tablename__ = "medallas_especiales"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(50), nullable=False)
+    descripcion = db.Column(db.String(160), nullable=False, default="")
+    icono = db.Column(db.String(8), nullable=False, default="🏅")
+    color = db.Column(db.String(7), nullable=False, default="#c4ff3d")
+    diseno = db.Column(TextoJSON, nullable=True)   # forma, metal, centro (emoji o imagen/GIF), cinta, letrero, animación
+    activa = db.Column(db.Boolean, nullable=False, default=True)
+    creada_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class MedallaOtorgada(db.Model):
+    __tablename__ = "medallas_otorgadas"
+    __table_args__ = (db.UniqueConstraint("usuario_id", "medalla_id", name="uq_medalla_otorgada"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id", ondelete="CASCADE", name="fk_motorgada_usuario"), nullable=False, index=True)
+    medalla_id = db.Column(db.Integer, db.ForeignKey("medallas_especiales.id", ondelete="CASCADE", name="fk_motorgada_medalla"), nullable=False)
+    motivo = db.Column(db.String(160), nullable=False, default="")
+    creada_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    medalla = db.relationship("MedallaEspecial")
+
+
+class ArticuloExtra(db.Model):
+    """Qué da un artículo de la tienda creado desde el panel (los de fábrica tienen su lógica en rutas/tienda.py)."""
+    __tablename__ = "articulos_extra"
+
+    articulo_id = db.Column(db.Integer, db.ForeignKey("articulos_tienda.id", ondelete="CASCADE", name="fk_extra_articulo"), primary_key=True)
+    xp = db.Column(db.Integer, nullable=False, default=0)
+    vidas = db.Column(db.SmallInteger, nullable=False, default=0)
+    salvarrachas = db.Column(db.SmallInteger, nullable=False, default=0)
+    medalla_id = db.Column(db.Integer, db.ForeignKey("medallas_especiales.id", ondelete="SET NULL", name="fk_extra_medalla"), nullable=True)
+    permanente = db.Column(db.Boolean, nullable=False, default=False)   # solo se compra una vez
+    imagen = db.Column(db.String(90), nullable=True)                     # imagen subida en el panel (/api/admin-img/…)
+    vitrina = db.Column(db.JSON, nullable=True)                          # cómo se presenta en la tienda (3D, aura, brillo)
+
+
+# ------------------------------------------------------------------ Contenido editable desde el panel ----
+class AjusteArticulo(db.Model):
+    """Cambios del administrador a un artículo de la tienda (también a los «de fábrica» de constantes.py/cosmeticos.py).
+    Se aplican encima del código cada vez que la tienda se sincroniza, así no se pierden al reiniciar."""
+    __tablename__ = "ajustes_tienda"
+
+    clave = db.Column(db.String(40), primary_key=True)
+    precio = db.Column(db.Integer, nullable=True)
+    nombre = db.Column(db.String(60), nullable=True)
+    descripcion = db.Column(db.String(200), nullable=True)
+    rareza = db.Column(db.String(12), nullable=True)
+    oculto = db.Column(db.Boolean, nullable=False, default=False)   # «eliminado» de la tienda (quien lo tiene lo conserva)
+
+
+class CosmeticoAdmin(db.Model):
+    """Cosmético diseñado en el panel (fondo, tema, marco, puntero, efecto, rastro o teclado). Su aspecto va en «diseno»."""
+    __tablename__ = "cosmeticos_admin"
+
+    id = db.Column(db.Integer, primary_key=True)
+    clave = db.Column(db.String(40), unique=True, nullable=False)
+    tipo = db.Column(db.String(10), nullable=False)
+    nombre = db.Column(db.String(60), nullable=False)
+    descripcion = db.Column(db.String(200), nullable=False, default="")
+    precio = db.Column(db.Integer, nullable=False, default=100)
+    rareza = db.Column(db.String(12), nullable=False, default="comun")
+    diseno = db.Column(TextoJSON, nullable=False, default=dict)
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    actualizado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class CursoAdmin(db.Model):
+    """Datos extra de un curso: si lo creó el administrador y si editó sus textos (la sincronización no los pisa)."""
+    __tablename__ = "cursos_admin"
+
+    curso_id = db.Column(db.Integer, db.ForeignKey("cursos.id", ondelete="CASCADE", name="fk_cursoadmin_curso"), primary_key=True)
+    motor = db.Column(db.String(8), nullable=False, default="srv")   # cómo se ejecuta el código en Aprende
+    creado = db.Column(db.Boolean, nullable=False, default=False)
+    editado = db.Column(db.Boolean, nullable=False, default=False)
+
+
+class RetoAdmin(db.Model):
+    """Marca de un reto del código que el administrador editó u ocultó (sync-retos lo respeta)."""
+    __tablename__ = "retos_admin"
+
+    reto_id = db.Column(db.Integer, db.ForeignKey("retos.id", ondelete="CASCADE", name="fk_retoadmin_reto"), primary_key=True)
+    editado = db.Column(db.Boolean, nullable=False, default=False)
+    oculto = db.Column(db.Boolean, nullable=False, default=False)
+
+
+class LeccionAprende(db.Model):
+    """Lección de Aprende creada o editada en el panel. «reemplaza» = título de la lección original que sustituye."""
+    __tablename__ = "lecciones_aprende"
+
+    id = db.Column(db.Integer, primary_key=True)
+    curso_slug = db.Column(db.String(30), nullable=False, index=True)
+    posicion = db.Column(db.SmallInteger, nullable=True)        # dónde va (0 = primera); vacío = al final
+    reemplaza = db.Column(db.String(120), nullable=True)
+    oculta = db.Column(db.Boolean, nullable=False, default=False)
+    datos = db.Column(TextoJSON, nullable=False, default=dict)   # t, m, x, u, p, c, h, r, e, q, a, f (como lecciones/*.js)
+    actualizado_en = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)

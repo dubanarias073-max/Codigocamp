@@ -60,6 +60,7 @@ const DIBUJOS = {
   coleccion: '<path d="M4 8h16v12H4z"/><path d="M8 8V5a4 4 0 0 1 8 0v3M4 12h16"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
   cofre: '<path d="M3 10h18v10H3zM3 10a9 6 0 0 1 18 0"/><path d="M10 10v4h4v-4"/>',
+  teclado: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M6 13.5h.01M18 13.5h.01M9 14.5h6"/>',
   salvarrachas: '<path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/><path d="M12 7v9M8.2 9.3l7.6 4.4M15.8 9.3l-7.6 4.4"/>',
   candado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   camara: '<path d="M4 8h3l2-3h6l2 3h3v12H4z"/><circle cx="12" cy="13.5" r="3.5"/>',

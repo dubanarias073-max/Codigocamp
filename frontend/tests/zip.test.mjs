@@ -29,7 +29,8 @@ for (const comprimir of [true, false]) {
 test("rechaza lo que no es zip y marca los dañados", async () => {
   await assert.rejects(leerZip(enc.encode("hola, no soy un zip")), /No parece un archivo \.zip/);
   const zip = await crearZip([{ ruta: "a.txt", texto: "contenido original" }], { comprimir: false });
-  const i = dec.decode(zip).indexOf("contenido");
+  // Se busca en BYTES (latin1 = 1 carácter por byte): con UTF-8 la fecha del encabezado podía correr el índice
+  const i = Buffer.from(zip).toString("latin1").indexOf("contenido");
   zip[i] = "X".charCodeAt(0);
   const r = await leerZip(zip);
   assert.equal(r.archivos.length, 0);

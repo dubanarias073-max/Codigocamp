@@ -39,6 +39,14 @@ def chat(friendship_id):
             return api_error("Escribe un mensaje de hasta 300 caracteres o adjunta un archivo.")
         if too_many(f"chat:{current_user.id}", 20, 60):
             return api_error("Estás escribiendo muy rápido. Espera un momento.", 429)
+        # Enlaces peligrosos (phishing, virus): el mensaje no se envía y queda como infracción
+        from servicios.seguridad_enlaces import enlaces_en, revisar_enlace
+        for url in enlaces_en(text)[:5]:
+            r = revisar_enlace(url)
+            if r["nivel"] == "bloqueado":
+                from servicios.moderacion import registrar
+                registrar(current_user, "enlace", r.get("motivo", ""), evidencia=url[:400], origen="mensaje de chat")
+                return api_error(f"🛡️ No enviamos tu mensaje: el enlace es peligroso ({r.get('motivo', '')}). Te enviamos un correo con el detalle.", 403)
         mensaje = Message(amistad_id=friendship.id, autor_id=current_user.id, texto=text)
         db.session.add(mensaje)
         db.session.flush()

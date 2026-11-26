@@ -90,9 +90,9 @@ export class Almacen {
    * @param {()=>void} [o.alRemoto]    otra pestaña cambió el proyecto
    * @param {(info:object)=>Promise<"local"|"nube">} [o.resolverConflicto]
    */
-  constructor({ clave, alEstado = () => {}, alRemoto = () => {}, resolverConflicto = async () => "local",
+  constructor({ clave, alEstado = () => {}, alRemoto = () => {}, resolverConflicto = async () => "local", alBloqueados = () => {},
     fetchFn = (...a) => fetch(...a), storage = globalThis.localStorage, csrf = leerCsrf, retardo = 600, reintento = 3000 }) {
-    Object.assign(this, { clave, alEstado, alRemoto, resolverConflicto, fetchFn, storage, csrf, retardo, reintento });
+    Object.assign(this, { clave, alEstado, alRemoto, resolverConflicto, alBloqueados, fetchFn, storage, csrf, retardo, reintento });
     this.proyecto = proyectoNuevo();
     this.sucio = false;
     this.base = null;        // marca de la cuenta en la última sincronización
@@ -307,6 +307,15 @@ export class Almacen {
       try {
         const r = await this.#pedir("PUT", JSON.stringify(nube));
         this.base = r.actualizado ?? this.base;
+        // El antivirus de CódigoCamp no guardó algunos archivos (nombre peligroso, virus o código malicioso): se quitan aquí también
+        if (Array.isArray(r.bloqueados) && r.bloqueados.length) {
+          for (const b of r.bloqueados) {
+            delete nube.files?.[b.ruta];
+            if (nube.git?.committed) delete nube.git.committed[b.ruta];
+            for (const k of ["staged", "tracked"]) if (Array.isArray(nube.git?.[k])) nube.git[k] = nube.git[k].filter((x) => x !== b.ruta);
+          }
+          try { this.alBloqueados(r.bloqueados); } catch { /* la interfaz se actualiza sola en el próximo cambio */ }
+        }
         this.fallos = 0;
         if (equipo || this.modoEquipo) {   // lo que faltaba de la nube ya subió; lo del equipo nunca va a la nube
           this.sucio = false;

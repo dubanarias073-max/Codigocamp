@@ -52,10 +52,37 @@ export class DiscoConector {
     this.avisados = new Set();
   }
 
+  /** Todos los archivos de la carpeta. Con el Conector v10 solo viajan los cambios desde la última revisión: con
+   *  cientos de miles de archivos cada revisión pesa unos bytes (como el vigilante de archivos de VS Code). */
   async listar() {
-    const d = await this.fs("listar", { ignorar: [...CARPETAS_IGNORADAS] });
-    this.raizReal = typeof d.carpeta === "string" ? d.carpeta : null;   // la carpeta que el equipo listó de verdad (Conector nuevo)
-    return { archivos: d.archivos || [], carpetas: d.carpetas || [] };
+    const inicio = Date.now();
+    // Carpetas pesadas (node_modules, venv…) que abriste en el explorador: solo esas se leen por dentro
+    const pesadas = this.foto?.pesadas || new Set();
+    const abrir = [...(globalThis.__ccExpandidas || [])].filter((c) => [...pesadas].some((p) => c === p || c.startsWith(`${p}/`)) || (this.abiertas || new Set()).has(c));
+    this.abiertas = new Set(abrir);
+    const clave = abrir.sort().join("\n");
+    const mismo = clave === (this.claveAbrir || "");
+    this.claveAbrir = clave;
+    const d = await this.fs("listar", { ignorar: [...CARPETAS_IGNORADAS], abrir, ...(this.foto?.token && mismo ? { previo: this.foto.token } : {}) });
+    const raiz = typeof d.carpeta === "string" ? d.carpeta : null;
+    if (d.cambios && this.foto && this.foto.raiz === raiz) {
+      const f = this.foto;
+      for (const a of d.archivos || []) f.archivos.set(a.ruta, a);
+      for (const r of d.borrados || []) f.archivos.delete(r);
+      for (const c of d.carpetas_nuevas || []) f.carpetas.add(c);
+      for (const c of d.carpetas_borradas || []) f.carpetas.delete(c);
+      if ((d.archivos || []).length || (d.borrados || []).length || (d.carpetas_nuevas || []).length || (d.carpetas_borradas || []).length) f.lista = null;
+      f.token = d.token;
+    } else {
+      this.foto = { raiz, token: d.token || null, archivos: new Map((d.archivos || []).map((a) => [a.ruta, a])), carpetas: new Set(d.carpetas || []), lista: null };
+    }
+    this.foto.pesadas = new Set(d.pesadas || []);
+    this.raizReal = raiz;   // la carpeta que el equipo listó de verdad (Conector nuevo)
+    const f = this.foto;
+    f.lista ||= { archivos: [...f.archivos.values()], carpetas: [...f.carpetas].sort() };
+    this.incompleto = Boolean(d.incompleto);
+    this.finListar = Date.now(); this.duracionListar = this.finListar - inicio;
+    return f.lista;
   }
 
   /** Trae en pocos viajes los archivos que el Sincronizador va a leer ([{ ruta, tamano }]). */
@@ -65,24 +92,31 @@ export class DiscoConector {
     const info = new Map(lista.map((a) => [a.ruta, a]));
     const raiz = this.raizReal;   // sin ella (Conector viejo) no se usa la memoria: nunca se mezclan archivos de otra carpeta
     const clave = (ruta) => `${this.equipo?.id}|${unir(raiz, ruta)}`;
-    const pedir = async () => {
+    const enCurso = new Set();
+    const pedir = async () => {   // hasta 4 viajes a la vez: con cientos de miles de archivos, carga varias veces más rápido
       if (!lote.length) return;
-      const r = await this.fs("leer_varios", { rutas: lote });
+      const rutas = lote; lote = []; peso = 0;
+      const p = traer(rutas).finally(() => enCurso.delete(p));
+      enCurso.add(p);
+      if (enCurso.size >= 4) await Promise.race(enCurso);
+    };
+    const traer = async (rutas) => {
+      const r = await this.fs("leer_varios", { rutas });
       for (const [ruta, d] of Object.entries(r.archivos || {})) {
         this.precargados.set(ruta, d);
         const a = info.get(ruta);
         if (raiz && r.carpeta === raiz && a && d.b64 !== undefined && a.modificado !== undefined) recordar(clave(ruta), { tamano: a.tamano, modificado: a.modificado, b64: d.b64 });
       }
-      lote = []; peso = 0;
     };
     for (const a of lista) {
       const m = raiz ? MEMORIA.get(clave(a.ruta)) : null;
       if (m && m.tamano === a.tamano && m.modificado === a.modificado) { this.precargados.set(a.ruta, { b64: m.b64 }); continue; }
       if (a.tamano > 8 * 1024 * 1024) continue; // los grandes se piden solos
-      if (lote.length >= 300 || peso + a.tamano > 8 * 1024 * 1024) await pedir();
+      if (lote.length >= 2000 || peso + a.tamano > 12 * 1024 * 1024) await pedir();
       lote.push(a.ruta); peso += a.tamano;
     }
     await pedir();
+    await Promise.all(enCurso);
   }
 
   async leer(ruta) {
@@ -117,6 +151,12 @@ export class DiscoConector {
       if (r.fin || !b.length) break;
     }
     return new Blob(partes);
+  }
+
+  /** Un trozo de un archivo (para reproducir videos y audios enormes sin cargarlos enteros). */
+  async parte(ruta, desde, largo = 2 * 1024 * 1024) {
+    const r = await this.fs("leer_parte", { ruta, desde, largo });
+    return { bytes: base64ABytes(r.b64), total: r.total };
   }
 
   async escribir(ruta, datos) {

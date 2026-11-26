@@ -11,6 +11,8 @@ export { aplicarCosmeticos, conMarco };
 
 // Se pinta al instante lo último que la persona tenía puesto (fondo, puntero…); al llegar sus datos se actualiza.
 try { aplicarCosmeticos(cosmeticosGuardados()); } catch { /* sin almacenamiento */ }
+// Teclado de CódigoCamp (celular): si lo activaste en Configuración, reemplaza al del sistema en toda la página
+try { if (localStorage.getItem("cc_teclado_propio") === "1" && matchMedia("(pointer: coarse)").matches) import("/js/teclado-cc.js").then((m) => m.iniciarTecladoCC()).catch(() => {}); } catch { /* sin almacenamiento */ }
 
 // Guarda el curso elegido en el perfil: Inicio y Aprende usan siempre el mismo.
 export const elegirCurso = (slug) => api("/api/ajustes/", { curso: slug });
@@ -101,6 +103,17 @@ export async function iniciar(activa) {
   // Dentro de la app de Android: el widget queda conectado a esta sesión.
   if (window.CodigoCampApp) import("/js/appnativa.js").then((m) => m.sincronizarWidgetApp(api)).catch(() => {});
   aplicarCosmeticos(user.cosmeticos || {});
+  // Si el administrador te quita (o te regala) un cosmético, se actualiza al volver a la pestaña sin recargar
+  let ultimaRevision = Date.now(), cosmPuestos = JSON.stringify(user.cosmeticos || {});
+  document.addEventListener("visibilitychange", async () => {
+    if (document.hidden || Date.now() - ultimaRevision < 30000) return;
+    ultimaRevision = Date.now();
+    try {
+      const u = (await api("/api/auth/me/")).user;
+      const ahora = JSON.stringify(u?.cosmeticos || {});
+      if (u && ahora !== cosmPuestos) { cosmPuestos = ahora; aplicarCosmeticos(u.cosmeticos || {}); }
+    } catch { /* sin red */ }
+  });
   const [prog, mis] = await Promise.all([api("/api/progreso/"), api("/api/desafios/").catch(() => ({ hoy: [] }))]);
   const p = prog.perfil;
 

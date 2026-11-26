@@ -115,6 +115,16 @@ function imagenesParaJs(py, dir, scripts, imagenes) {
   return mapa;
 }
 
+// Como el aviso rojo de Vite: si una librería (react, vue…) no se pudo descargar o un módulo no carga, la vista previa
+// lo explica en vez de quedarse en blanco.
+const CAPA_ERRORES_MODULOS = `(function(){var hecho=false;function mostrar(t,d){if(hecho)return;hecho=true;var f=function(){var c=document.createElement("div");c.id="cc-capa-error";c.setAttribute("role","alert");c.style.cssText="position:fixed;inset:0;z-index:2147483647;display:flex;align-items:flex-start;justify-content:center;padding:24px;background:rgba(15,23,42,.72);font:14px/1.5 system-ui,sans-serif;overflow:auto";
+var b=document.createElement("div");b.style.cssText="max-width:640px;width:100%;padding:18px 20px;border-radius:14px;background:#1e1b2e;color:#fde2e2;border-top:5px solid #ef4444;box-shadow:0 20px 50px rgba(0,0,0,.5)";
+var h=document.createElement("b");h.textContent=t;h.style.cssText="display:block;font-size:16px;color:#fca5a5;margin-bottom:6px";var p=document.createElement("pre");p.textContent=d;p.style.cssText="white-space:pre-wrap;margin:0 0 10px;font:13px ui-monospace,Consolas,monospace;color:#fde2e2";
+var x=document.createElement("button");x.textContent="Cerrar";x.style.cssText="padding:6px 14px;border:0;border-radius:8px;background:#ef4444;color:#fff;font-weight:700;cursor:pointer";x.onclick=function(){c.remove()};b.appendChild(h);b.appendChild(p);b.appendChild(x);c.appendChild(b);(document.body||document.documentElement).appendChild(c)};document.body?f():addEventListener("DOMContentLoaded",f)}
+function red(m){return /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|esm\\.sh/i.test(m)}
+addEventListener("error",function(e){var t=e.target;if(t&&t.tagName==="SCRIPT"&&t.type==="module"){mostrar("No se pudo cargar "+(t.getAttribute("src")||"un script"),"Revisa que el archivo exista y que no tenga errores. Si usa librerías (react, vue…), se descargan de internet: revisa tu conexión.");return}var m=String(e.message||"");if(red(m))mostrar("No se pudo descargar una librería","Las librerías como react, vue o svelte se descargan de internet (esm.sh) al abrir la página.\\nRevisa tu conexión: algunas redes de colegio o empresa bloquean esm.sh.\\n\\n"+m)},true);
+addEventListener("unhandledrejection",function(e){var m=String(e.reason&&(e.reason.message||e.reason)||"");if(red(m))mostrar("No se pudo descargar una librería","Las librerías como react, vue o svelte se descargan de internet (esm.sh) al abrir la página.\\nRevisa tu conexión: algunas redes de colegio o empresa bloquean esm.sh.\\n\\n"+m)});})();`;
+
 const PUENTE_IMAGENES = `(function(M,D){if(!Object.keys(M).length)return;var R=function(ref){if(!ref||/^([a-z][a-z0-9+.-]*:|\\/\\/|#)/i.test(ref))return null;var p=(D?D.split("/"):[]),s=ref.split(/[?#]/)[0].split("/");if(ref.charAt(0)==="/")p=[];for(var i=0;i<s.length;i++){if(!s[i]||s[i]===".")continue;if(s[i]==="..")p.pop();else p.push(s[i])}return M[p.join("/")]||null};
 var F=function(el){if(!el||el.nodeType!==1)return;["src","poster"].forEach(function(a){var v=el.getAttribute&&el.getAttribute(a),u=R(v);if(u&&v!==u)el.setAttribute(a,u)});if(el.style&&el.style.backgroundImage){el.style.backgroundImage=el.style.backgroundImage.replace(/url\\(["']?([^"')]+)["']?\\)/g,function(t,r){var u=R(r);return u?"url("+u+")":t})}};
 new MutationObserver(function(ms){ms.forEach(function(m){if(m.type==="attributes")F(m.target);else m.addedNodes.forEach(function(n){F(n);if(n.querySelectorAll)n.querySelectorAll("[src],[poster],[style]").forEach(F)})})}).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:["src","poster","style"]});
@@ -183,7 +193,7 @@ export function construirVistaPrevia(py, rutaHtml, { imagenes = new Map(), modul
     html = reescribirAtributos(html);
   }
   const inicio = virtual ? scriptVirtual(virtual.url, virtual.almacen, { hijo: virtual.hijo }) : "";
-  const puente = `<script>${inicio}${PUENTE}${Object.keys(mapaJs).length ? `${PUENTE_IMAGENES}(${JSON.stringify(mapaJs).replace(/</g, "\\u003c")},${JSON.stringify(dir)});` : ""}${puenteDeProyecto(proxy)}</script>${mapaImport}`;
+  const puente = `<script>${inicio}${PUENTE}${modulos ? CAPA_ERRORES_MODULOS : ""}${Object.keys(mapaJs).length ? `${PUENTE_IMAGENES}(${JSON.stringify(mapaJs).replace(/</g, "\\u003c")},${JSON.stringify(dir)});` : ""}${puenteDeProyecto(proxy)}</script>${mapaImport}`;
   return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => `${m}${puente}`) : puente + html;
 }
 

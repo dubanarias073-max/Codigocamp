@@ -1,20 +1,29 @@
-"""Comandos que la terminal «Mi equipo» (Conector) NUNCA ejecuta, aunque la persona insista.
+"""Comandos peligrosos que CódigoCamp no deja correr EN SU SERVIDOR: órdenes de Docker y comandos escritos dentro de los
+programas que se ejecutan en el servidor (os.system("rm -rf /"), etc.; ver servicios/codigo_malicioso.py).
 
-Protege el computador o celular del estudiante (y a CódigoCamp) de: borrar el disco o el sistema, formatear,
-apagar o reiniciar, desactivar el antivirus o el firewall, secuestro de datos (borrar copias de seguridad), robar
-claves y contraseñas, dar control remoto del equipo a otro (reverse shell), minar criptomonedas, comandos ocultos
-(PowerShell codificado) e instalar scripts desde sitios peligrosos.
+Detecta: borrar el disco o el sistema, formatear, apagar o reiniciar, desactivar el antivirus o el firewall, secuestro
+de datos (borrar copias de seguridad), robar claves y contraseñas, control remoto (reverse shell), minar criptomonedas,
+comandos ocultos (PowerShell codificado) e instalar scripts desde sitios peligrosos.
 
-El mismo filtro se aplica dos veces: en el servidor (antes de enviar la orden) y dentro del propio Conector
-(codigocamp-conector.py), así que aunque alguien engañara al servidor, el equipo igual se niega.
-Ninguna orden bloqueada se guarda.
+En el equipo de la persona (Conector) NO se usa: ahí los comandos corren tal cual y ella es responsable
+(Términos, sección 7).
 """
 import re
 
 _R = lambda p: re.compile(p, re.I | re.S)   # noqa: E731
 
 RAIZ = r"(?:/|/\*|~|~/|~/\*|\$HOME|\$\{HOME\}|/(?:etc|usr|bin|sbin|boot|lib|lib64|var|opt|System|Library|Applications|Users|home|root|dev|proc|sys)(?:/\*?)?)"
+# Carpetas del sistema: tocarlas puede dejar el equipo sin arrancar.
+SISTEMA_WIN = (r"(?:%(?:SystemRoot|windir)%|\$env:(?:SystemRoot|windir)\b|[a-z]:[\\/]+windows(?=[\\/\s\"']|$)|\bsystem32\b|\bsyswow64\b|\bwinsxs\b|"
+               r"[a-z]:[\\/]+program\s*files|[a-z]:[\\/]+programdata\b|[a-z]:[\\/]+boot\b)")
+SISTEMA_NIX = r"(?:^|[\s\"'=])/(?:etc|usr|bin|sbin|boot|lib|lib64|System|Library|private/etc)(?:/|\s|$|[\"'])"
+VERBOS_WIN = (r"\b(?:del|erase|rd|rmdir|rm|ri|Remove-Item|move|mv|mi|Move-Item|ren|rename|rni|Rename-Item|takeown|icacls|cacls|attrib|"
+              r"copy|xcopy|robocopy|cp|Copy-Item|Set-Content|Add-Content|Out-File|Clear-Content|New-Item|mklink|sfc|bcdedit|reg\s+(?:add|delete))\b")
 REGLAS = [
+    (_R(rf"{VERBOS_WIN}[^\n|;&]*{SISTEMA_WIN}|>\s*[\"']?{SISTEMA_WIN}"), "toca carpetas del sistema de Windows (System32, Windows, Archivos de programa)"),
+    (_R(rf"(?:^|[;&|]\s*)(?:cd|chdir|pushd|sl|Set-Location|Push-Location|explorer(?:\.exe)?|start|ii|Invoke-Item)\b[^\n|;&]*{SISTEMA_WIN}"), "entra a carpetas del sistema de Windows (System32, Windows, Archivos de programa)"),
+    (_R(rf"\b(?:rm|mv|shred|truncate|chmod|chown|chattr|unlink|ln\s+-sf)\b[^\n|;&]*{SISTEMA_NIX}|>\s*/(?:etc|usr|bin|sbin|boot|lib|System|Library)/"), "modifica carpetas del sistema (/etc, /usr, /bin, /boot, /System…)"),
+    (_R(r"(?:^|[;&|]\s*)(?:cd|pushd)\s+[\"']?/(?:boot|System|sbin)(?:/|\s|$|[\"'])"), "entra a carpetas del sistema"),
     (_R(rf"\brm\s+(?:-[a-z]*\s+)*-[a-z]*r[a-z]*\s+(?:-[a-z-]+\s+)*(?:--no-preserve-root\s+)?[\"']?{RAIZ}[\"']?(?:\s|$|;|&|\|)"), "borra el sistema o tu carpeta personal completa"),
     (_R(r"--no-preserve-root"), "intenta borrar todo el disco"),
     (_R(r"\b(?:mkfs(?:\.\w+)?|wipefs|shred\s+.*?/dev/|fdisk\s+/dev/|parted\s+/dev/|sgdisk\s+-[zZ])"), "formatea o borra un disco"),
@@ -36,6 +45,15 @@ REGLAS = [
     (_R(r"\b(?:powershell|pwsh)(?:\.exe)?\b[^\n]*\s-(?:e|en|enc|enco|encod|encode|encoded|encodedcommand)\s+[A-Za-z0-9+/=]{16,}"), "ejecuta un comando oculto (codificado)"),
     (_R(r"\bcrontab\s+-r\b|\b(?:userdel|deluser)\s+\w|\bpasswd\s+(?:-d|--delete)\b|\bnet\s+user\s+\S+\s+/(?:delete|add)\b|\bnet\s+localgroup\s+administrators\b"), "cambia o borra usuarios del equipo"),
     (_R(r"\bhistory\s+-c\b.*\brm\b|\bwevtutil\s+cl\b|\bClear-EventLog\b"), "borra los registros del sistema para ocultar rastros"),
+    # Persistencia: el programa se instala para volver a arrancar solo
+    (_R(r"\breg(?:\.exe)?\s+add\s+[\"']?HK(?:CU|LM|EY_CURRENT_USER|EY_LOCAL_MACHINE)\\Software\\Microsoft\\Windows\\CurrentVersion\\Run(?:Once)?\b"
+        r"|\b(?:New|Set)-ItemProperty\b[^\n]*CurrentVersion\\Run\b|\bschtasks(?:\.exe)?\s+/create\b[^\n]*/sc\s+(?:onlogon|onstart|minute)"
+        r"|Start Menu\\Programs\\Startup\\[^\n]*\.(?:exe|bat|cmd|vbs|ps1|lnk)|@reboot\s+[^\n]*(?:curl|wget|nc\b|/tmp/|python|bash)"), "se instala para arrancar solo cada vez que se prende el equipo (persistencia)"),
+    # Herramientas de Windows usadas por virus para descargar y ejecutar programas sin que se note
+    (_R(r"\bcertutil(?:\.exe)?\b[^\n]*-(?:urlcache|decode|decodehex)\b|\bbitsadmin(?:\.exe)?\b[^\n]*/transfer\b|\bmshta(?:\.exe)?\s+[\"']?(?:https?:|javascript:|vbscript:)"
+        r"|\bregsvr32(?:\.exe)?\b[^\n]*/i:\s*https?:|\brundll32(?:\.exe)?\b[^\n]*javascript:|\bwmic\b[^\n]*process\s+call\s+create"), "usa herramientas de Windows para descargar o ejecutar programas a escondidas"),
+    (_R(r"\b(?:powershell|pwsh)(?:\.exe)?\b[^\n]*-w(?:indowstyle)?\s+hidden\b[^\n]*(?:-enc|iex|Invoke-Expression|DownloadString|DownloadFile|http)"), "ejecuta PowerShell oculto que descarga código"),
+    (_R(r"\b(?:curl|wget)\b[^\n]*https?://(?:\d{1,3}\.){3}\d{1,3}[^\n]*(?:&&|;)\s*(?:chmod\s+\+x|sh\s|bash\s|\./)"), "descarga un programa desde una dirección IP y lo ejecuta"),
 ]
 # Instalar desde internet con «| sh» solo desde instaladores oficiales conocidos
 INSTALADORES = ("sh.rustup.rs", "bun.sh", "deno.land", "get.docker.com", "astral.sh", "install.python-poetry.org", "get.pnpm.io",

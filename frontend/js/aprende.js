@@ -2,14 +2,14 @@
 import { iniciar, api, elegirCurso, aviso } from "/js/app.js";
 import { logo } from "/js/logos.js";
 import { LEE_ENTRADA } from "/js/trabajo/entradateclado.js";
-const SERVIDOR = new Set(['java', 'c', 'cpp', 'csharp', 'php', 'go', 'rust', 'swift', 'kotlin', 'ruby']);
+const SERVIDOR = new Set(['java', 'c', 'cpp', 'csharp', 'php', 'go', 'rust', 'swift', 'kotlin', 'ruby', 'lua', 'r']);
 const avisoEnLinea = new Set();
 
 /* ===== Editor de VS Code (Monaco) en Aprende: colores, autocompletado y atajos. Si no carga, queda el editor simple. ===== */
 const IDIOMA_MONACO = { html: 'html', css: 'css', javascript: 'javascript', python: 'python', sql: 'sql', bd: 'sql',
   typescript: 'typescript', java: 'java', c: 'c', cpp: 'cpp', csharp: 'csharp', php: 'php', go: 'go', rust: 'rust',
   swift: 'swift', kotlin: 'kotlin', ruby: 'ruby', terminal: 'shell', git: 'shell', docker: 'dockerfile', node: 'javascript',
-  github: 'yaml', nosql: 'javascript', react: 'typescript', reactnative: 'typescript' };
+  github: 'yaml', nosql: 'javascript', react: 'typescript', reactnative: 'typescript', lua: 'lua', r: 'r' };
 let editorMonaco = null;
 
 const { prog } = await iniciar("aprende");
@@ -41,6 +41,8 @@ const CONFIG = {
   nosql:      { k: "nosql", n: "NoSQL", c: "#22c55e", run: "srv" },
   react:      { k: "react", n: "React", c: "#61dafb", run: "react" },
   reactnative: { k: "reactnative", n: "React Native", c: "#38bdf8", run: "rn" },
+  lua:        { k: "lua", n: "Lua", c: "#818cf8", run: "srv" },
+  r:          { k: "r", n: "R", c: "#60a5fa", run: "srv" },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -58,7 +60,7 @@ cursos.forEach((curso) => {
   const clave = config.k || curso.slug;
   const color = /^#[\da-f]{6}$/i.test(curso.color || "") ? curso.color : config.c || "#4ade80";
   LEC[clave] = { n: curso.nombre || config.n || curso.slug, i: curso.sigla || config.k || curso.slug.toUpperCase(),
-    c: color, run: config.run || "srv", f: curso.slug, l: [] };
+    c: color, run: curso.motor || config.run || "srv", f: curso.slug, l: [] };   // motor: cursos creados en el panel
 });
 const hash = location.hash.slice(1);
 // Sin #lenguaje en la dirección, se abre el curso que elegiste (el mismo que ves en Inicio).
@@ -102,19 +104,33 @@ async function traerHechas(k) {
   } catch { /* sin conexión: queda lo guardado en este navegador */ }
 }
 
+/** Aplica lo del panel: oculta originales, reemplaza por título y pone las nuevas en su posición (o al final). */
+function mezclarLecciones(base, panel) {
+  const ocultas = new Set(panel.filter((x) => x.oculta && x.reemplaza).map((x) => x.reemplaza));
+  const reemplazos = new Map(panel.filter((x) => !x.oculta && x.reemplaza).map((x) => [x.reemplaza, x]));
+  const lista = base.filter((o) => !ocultas.has(o.t)).map((o) => reemplazos.get(o.t) || o);
+  for (const x of panel.filter((y) => !y.reemplaza && !y.oculta)) lista.splice(Math.min(x.posicion ?? lista.length, lista.length), 0, x);
+  return lista;
+}
+
 async function abrir(k, i = null) {
   lang = k; idx = i ?? 0;
   pintarLangs();
   const C = LEC[k];
   $('rutaTit').textContent = 'Lecciones de ' + C.n;
   if (!C.l.length) {
-    try {
-      C.l = (await import('/js/lecciones/' + C.f + '.js')).default.map((o) => [o.t, o.x, o.p, o.c, o.m, o.r, o.e, o.u, o.h, o.q, o.a, o.f]);
-    } catch {
+    // Lecciones del código (lecciones/<curso>.js) + las del panel de administrador (nuevas, reemplazos y ocultas)
+    const [base, panel] = await Promise.all([
+      import('/js/lecciones/' + C.f + '.js').then((m) => m.default).catch(() => null),
+      api(`/api/aprende/${encodeURIComponent(C.f)}/`).then((r) => r.lecciones || []).catch(() => []),
+    ]);
+    const lista = mezclarLecciones(base || [], panel);
+    if (!lista.length) {
       $('pasos').innerHTML = '';
-      $('teoria').textContent = 'No se pudieron cargar las lecciones de ' + C.n + '.';
+      $('teoria').textContent = base === null && !panel.length ? 'Todavía no hay lecciones de ' + C.n + '.' : 'No se pudieron cargar las lecciones de ' + C.n + '.';
       return;
     }
+    C.l = lista.map((o) => [o.t, o.x, o.p || [], o.c, o.m, o.r, o.e, o.u, o.h, o.q, o.a, o.f]);
     if (C.run === 'srv' && !SAL) { try { SAL = (await import('/js/lecciones/salidas.js')).default; } catch { SAL = {}; } }
     if (lang !== k) return;            // el usuario cambió de lenguaje mientras cargaba
   }

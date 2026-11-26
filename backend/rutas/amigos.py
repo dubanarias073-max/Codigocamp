@@ -32,6 +32,10 @@ def amigos():
                 Message.amistad_id == friendship.id, Message.id > desde, Message.leido.is_(False),
                 Message.autor_id != current_user.id,
             ).count()
+            op = other.profile
+            from models import Medal
+            item.update(nivel=op.nivel if op else 1, racha=op.racha_actual if op else 0,
+                        medallas=Medal.query.filter_by(usuario_id=other.id).count())
             item.update(no_leidos=unread, ultimo=("🚫 Mensaje eliminado" if last.borrado_en else last.texto[:60]) if last else "", orden=last.id if last else 0)
             friends.append(item)
         elif friendship.a_usuario_id == current_user.id:
@@ -216,4 +220,20 @@ def amigo_perfil(friendship_id):
         cursos=cursos[:12], lecciones=[{"nombre": n, "color": c, "hechas": k} for n, c, k in lecc[:12]],
         lecciones_total=sum(k for _, _, k in lecc), semana=semana,
         equipados=equipados, cosmeticos_total=propios,
+        **_logros_de(otro.id),
     )
+
+
+def _logros_de(usuario_id):
+    """Medallas del mes, cofres de logro abiertos y encargos superados (se ven en el perfil del chat)."""
+    from cosmeticos import COFRE_POR_CLAVE, COFRES
+    from models import DailyChallenge, OpenedChest
+    from servicios.medallas import medallas_de
+    abiertos = [c.clave for c in OpenedChest.query.filter_by(usuario_id=usuario_id).all() if c.clave in COFRE_POR_CLAVE]
+    orden = {"legendario": 0, "diamante": 1, "oro": 2, "plata": 3, "madera": 4}
+    mejores = sorted((COFRE_POR_CLAVE[k] for k in abiertos), key=lambda c: orden.get(c["cofre"], 9))[:8]
+    from servicios.medallas import medallas_desde
+    desde = medallas_desde()
+    return {"medallas": medallas_de(usuario_id), "medallas_desde": {"anio": desde.year, "mes": desde.month}, "logros_abiertos": len(abiertos), "logros_total": len(COFRES),
+            "logros": [{"nombre": c["nombre"], "cofre": c["cofre"], "texto": c["texto"]} for c in mejores],
+            "encargos_total": DailyChallenge.query.filter_by(usuario_id=usuario_id).count()}

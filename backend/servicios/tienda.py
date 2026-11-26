@@ -28,6 +28,13 @@ def asegurar_articulos():
     from cosmeticos import RETIRADOS
     for i in StoreItem.query.filter(StoreItem.clave.in_(list(RETIRADOS)), StoreItem.activo.is_(True)).all():
         i.activo = False   # se quitó de la tienda
+    # Los básicos (vida, recarga, salvarrachas, kit) también se crean si la base no los trae (antes solo venían del .sql)
+    basicos = [("vida", "Una vida", "Recupera una vida al instante.", "❤️"), ("vidas_llenas", "Recarga de vidas", "Rellena tus vidas hasta cinco.", "💖"),
+               ("salvarracha", "Salvarrachas", "Protege tu racha durante un día sin practicar. Máximo 2.", "🧊"), ("kit_experto", "Kit experto", "Tres vidas y una salvarracha.", "💎")]
+    for orden_b, (clave, nombre, desc, icono) in enumerate(basicos, start=1):
+        if clave not in existentes:
+            db.session.add(StoreItem(clave=clave, nombre=nombre, descripcion=desc, icono=icono, moneda="diamante",
+                                     precio=BASICOS_DIAMANTE[clave], categoria="diamante", orden=orden_b, activo=True))
     orden = 10
     for a in ARTICULOS_DIAMANTE:
         orden += 1
@@ -39,6 +46,9 @@ def asegurar_articulos():
         if c["clave"] not in existentes:
             db.session.add(StoreItem(clave=c["clave"], nombre=c["nombre"], descripcion=c["descripcion"], icono=c["tipo"],
                                      moneda="diamante", precio=c["precio"], categoria="diamante", orden=orden, activo=True))
+    db.session.flush()
+    from servicios.catalogo_admin import aplicar_ajustes
+    aplicar_ajustes()   # precios, nombres y ocultos que cambió el administrador en el panel
     try:
         db.session.commit()
         _ITEMS_LISTOS = True

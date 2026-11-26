@@ -1,7 +1,10 @@
 """Python con pip de verdad en el servidor, para los paquetes que el navegador (Pyodide) no puede instalar:
 los que traen código en C sin versión para el navegador (mysqlclient, psycopg2, opencv, tensorflow…).
 
-Cada usuario tiene su propio entorno virtual en PYTHON_VENVS_DIR (por defecto <tmp>/codigocamp_venvs/u<id>).
+Cada usuario tiene su propio entorno virtual en PYTHON_VENVS_DIR (por defecto almacen_archivos/python_venvs/u<id>).
+No va en la carpeta temporal del sistema: Windows la limpia sola y Linux la borra al reiniciar, y los paquetes
+«desaparecían» al rato. Además se guarda un registro (u<id>.paquetes.json) de lo instalado: si el entorno se borra
+o se daña, se reinstala solo antes de ejecutar.
 Trabajo instala ahí solo lo que falló en el navegador, y ejecuta en el servidor los programas que lo importan.
 Se apaga con PYTHON_SERVIDOR=0.
 """
@@ -16,7 +19,8 @@ import threading
 
 from servicios.ejecutor import ES_WINDOWS, _correr, _limpiar, CACHE
 
-VENVS = os.getenv("PYTHON_VENVS_DIR") or os.path.join(tempfile.gettempdir(), "codigocamp_venvs")
+_BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+VENVS = os.getenv("PYTHON_VENVS_DIR") or os.path.join(os.getenv("ALMACEN_ARCHIVOS") or os.path.join(_BACKEND, "almacen_archivos"), "python_venvs")
 TIEMPO_PIP = int(os.getenv("PYTHON_PIP_TIEMPO", "900"))     # segundos para un pip install (tensorflow tarda)
 TIEMPO_RUN = int(os.getenv("PYTHON_RUN_TIEMPO", "40"))      # segundos para ejecutar un programa
 MAX_PAQUETES = 40
@@ -46,6 +50,31 @@ def _candado(uid):
 
 def carpeta(uid):
     return os.path.join(VENVS, f"u{int(uid)}")
+
+
+def _registro(uid):
+    return os.path.join(VENVS, f"u{int(uid)}.paquetes.json")
+
+
+def registrados(uid):
+    """Paquetes que la persona instaló en el servidor (aunque el entorno se haya borrado)."""
+    try:
+        with open(_registro(uid), encoding="utf-8") as f:
+            datos = json.load(f)
+        return [p for p in datos if isinstance(p, str) and ESPEC.match(p)][:MAX_PAQUETES] if isinstance(datos, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def _guardar_registro(uid, especs):
+    os.makedirs(VENVS, exist_ok=True)
+    unicos = {}
+    for e in especs:
+        unicos[nombre_de(e)] = e
+    temporal = _registro(uid) + ".tmp"
+    with open(temporal, "w", encoding="utf-8") as f:
+        json.dump(list(unicos.values())[:MAX_PAQUETES], f)
+    os.replace(temporal, _registro(uid))
 
 
 def python_de(uid):
@@ -150,6 +179,7 @@ def instalar(uid, paquetes):
         malos = {f["paquete"] for f in fallidos}
         nombres = [nombre_de(p) for p in paquetes if p not in malos]
         info = _info(py, nombres)
+        _guardar_registro(uid, registrados(uid) + [p for p in paquetes if p not in malos])
     instalados = [{"paquete": n, "version": info.get(n, {}).get("version", ""), "modulos": info.get(n, {}).get("modulos", [])}
                   for n in nombres]
     return {"instalados": instalados, "fallidos": fallidos, "log": log[-4000:]}
@@ -159,6 +189,9 @@ def desinstalar(uid, nombres):
     nombres = [nombre_de(str(n)) for n in (nombres or [])][:MAX_PAQUETES]
     if not nombres or any(not ESPEC.match(n) for n in nombres):
         raise ValueError("Indica qué paquetes desinstalar.")
+    fuera = set(nombres)
+    if registrados(uid):
+        _guardar_registro(uid, [p for p in registrados(uid) if nombre_de(p) not in fuera])
     if not os.path.exists(python_de(uid)):
         return {"ok": True}
     with _candado(uid):
@@ -176,7 +209,28 @@ def lista(uid):
         return []
 
 
-def ejecutar(uid, ruta, archivos, entrada="", args=None):
+def _reparar(uid, extra=()):
+    """Si el entorno se borró o le faltan paquetes que la persona instaló, los reinstala. Devuelve un aviso o ""."""
+    especs = registrados(uid)
+    conocidos = {nombre_de(e) for e in especs}
+    especs += [e for e in (str(x).strip() for x in extra or ()) if ESPEC.match(e) and nombre_de(e) not in conocidos][:MAX_PAQUETES]
+    if not especs:
+        return ""
+    py = python_de(uid)
+    if os.path.exists(py):
+        info = _info(py, [nombre_de(e) for e in especs])
+        especs = [e for e in especs if not info.get(nombre_de(e), {}).get("version")]
+        if not especs:
+            return ""
+    r = instalar(uid, especs)
+    nombres = ", ".join(i["paquete"] for i in r["instalados"])
+    aviso = f"(Se reinstalaron en el servidor los paquetes que se habían perdido: {nombres})\n" if nombres else ""
+    if r["fallidos"]:
+        aviso += "".join(f"(No se pudo reinstalar {f['paquete']}: {f['motivo']})\n" for f in r["fallidos"])
+    return aviso
+
+
+def ejecutar(uid, ruta, archivos, entrada="", args=None, paquetes=None):
     """Ejecuta `ruta` (un .py del proyecto) con el Python del servidor y los paquetes del usuario."""
     if not activo():
         raise ValueError("La ejecución de Python en el servidor está desactivada (PYTHON_SERVIDOR=0).")
@@ -199,6 +253,11 @@ def ejecutar(uid, ruta, archivos, entrada="", args=None):
     if ruta not in limpios:
         raise ValueError("El archivo a ejecutar no está entre los archivos enviados.")
     args = [str(x)[:200] for x in (args or [])][:20]
+    aviso = ""
+    try:
+        aviso = _reparar(uid, paquetes if isinstance(paquetes, list) else ())
+    except (ValueError, RuntimeError, OSError) as e:
+        aviso = f"(No se pudieron reinstalar los paquetes del servidor: {e})\n"
     py = python_de(uid) if os.path.exists(python_de(uid)) else sys.executable
     with tempfile.TemporaryDirectory(prefix="cc_py_") as d:
         for r, c in limpios.items():
@@ -213,4 +272,4 @@ def ejecutar(uid, ruta, archivos, entrada="", args=None):
         texto = _limpiar(texto, d)
     if len(texto) > MAX_SALIDA:
         texto = texto[:MAX_SALIDA] + "\n… (salida recortada)"
-    return {"salida": texto, "error": codigo != 0, "donde": "servidor"}
+    return {"salida": aviso + texto, "error": codigo != 0, "donde": "servidor"}

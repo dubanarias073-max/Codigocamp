@@ -63,22 +63,6 @@ git clone https://github.com/dubanarias073-max/Codigocamp.git
 cd ~/Codigocamp
 ```
 
-### Opción 2: subir el ZIP desde tu PC
-
-En **PowerShell de tu PC** (con Citrix conectado):
-
-```powershell
-scp .\Codigocamp.zip sofianieto@10.12.19.82:~/
-```
-
-Luego, en la máquina virtual:
-
-```bash
-sudo apt install -y unzip
-cd ~ && unzip -o Codigocamp.zip && cd ~/Codigocamp
-```
-
-> ⚠️ `unzip -o` sobrescribe sin preguntar. Si ya existe `~/Codigocamp` con un `backend/.env` tuyo, cópialo antes: `cp ~/Codigocamp/backend/.env ~/codigocamp.env`.
 
 ---
 
@@ -217,6 +201,11 @@ GOOGLE_REDIRECT_URI="https://codigocamp.taila41f89.ts.net/auth/google/callback/,
 GEMINI_API_KEY="<TU_API_KEY_DE_GEMINI>"
 GEMINI_MODEL=gemini-3.5-flash-lite
 
+
+# --Panel administrador ---
+ADMIN_EMAIL="correo@gmail.com"
+ADMIN_CLAVE="clave"
+
 # --- Correo (Gmail con contraseña de aplicación) ---
 SMTP_PORT="587"
 SMTP_USERNAME="finanbot.sena@gmail.com"
@@ -255,6 +244,7 @@ chmod 600 .env
 ```bash
 flask --app app check-retos         # revisa el contenido
 flask --app app seed-retos          # carga los 23 cursos (tarda ~1 minuto)
+flask --app app sync-retos
 flask --app app probar-correo finanbot.sena@gmail.com
 flask --app app probar-ia
 ```
@@ -275,191 +265,9 @@ Debe responder `HTTP/1.1 200 OK`. Detén la prueba con `Ctrl+C`.
 
 ---
 
-## 5. Dejarlo encendido siempre (servicio de systemd)
 
-Así CódigoCamp sigue funcionando aunque cierres VS Code o la sesión SSH, y arranca solo si se reinicia la máquina.
 
-### 5.1 Crear el servicio
-
-```bash
-sudo nano /etc/systemd/system/codigocamp.service
-```
-
-> ⚠️ Usa exactamente el nombre `codigocamp.service`. Si escribes el nombre del servicio de otro proyecto, lo reemplazas.
-
-Pega esto:
-
-```ini
-[Unit]
-Description=CodigoCamp (Flask + Gunicorn)
-After=network-online.target docker.service
-Wants=network-online.target
-
-[Service]
-User=sofianieto
-WorkingDirectory=/home/sofianieto/Codigocamp/backend
-ExecStart=/home/sofianieto/Codigocamp/backend/venv/bin/gunicorn -w 1 --threads 8 --timeout 180 -b 127.0.0.1:5000 "app:create_app()"
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-> El servicio no necesita cargar el `.env`: CódigoCamp lo lee solo desde `backend/.env`.
->
-> **Un solo worker (`-w 1`)** es a propósito: los avisos de racha, los límites de intentos y las conexiones a bases de datos de Trabajo viven en la memoria del proceso. Los 8 hilos atienden a varias personas a la vez.
-
-### 5.2 Activarlo
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now codigocamp
-sudo systemctl status codigocamp      # debe decir "active (running)"
-```
-
-`daemon-reload` solo vuelve a leer los archivos de servicio. No reinicia los servicios de otros proyectos.
-
-Comandos del día a día:
-
-```bash
-sudo systemctl restart codigocamp     # después de cambiar el .env o el código
-sudo journalctl -u codigocamp -f      # ver los registros en vivo (Ctrl+C para salir)
-```
-
----
-
-## 6. Túnel público con Tailscale
-
-Un túnel de **Tailscale Funnel** usa el **nombre de la máquina** y solo puede abrir los puertos **443, 8443 y 10000**. Si la máquina ya publica otro proyecto en el `443`, hay dos formas de abrir el túnel de CódigoCamp:
-
-| | 6.1 Túnel rápido | 6.2 Túnel con nombre propio (recomendado) |
-|---|---|---|
-| Enlace | `https://<NOMBRE_DE_LA_MAQUINA>.taila41f89.ts.net:8443` | `https://codigocamp.taila41f89.ts.net` |
-| Dificultad | Un comando | Un contenedor de Docker |
-| ¿Afecta a otros túneles? | ⚠️ Solo si alguien ya usa el `8443` | No |
-| Desventaja | El enlace lleva el nombre de la máquina y `:8443` | Hay que crear una clave en la consola de Tailscale |
-
-Primero mira cómo está Tailscale en la máquina:
-
-```bash
-tailscale status | head -3          # nombre de esta máquina en Tailscale
-sudo tailscale funnel status        # qué puertos ya están publicados
-```
-
-> ⚠️ **Nunca ejecutes `sudo tailscale funnel reset` ni `sudo tailscale serve reset`.** Borran **todos** los túneles de la máquina, también los de otros proyectos.
-
-### 6.1 Túnel rápido: otro puerto en la misma máquina
-
-> ⚠️ Si `funnel status` ya muestra algo en `:8443`, **no sigas**: ese puerto es de otro proyecto y este comando lo reemplazaría. Usa `--https=10000` (y cambia `:8443` por `:10000` en el enlace) o el túnel 6.2.
-
-```bash
-sudo tailscale funnel --bg --https=8443 5000
-sudo tailscale funnel status
-```
-
-- `--bg` lo deja funcionando en segundo plano, también tras reiniciar.
-- Los túneles que ya estaban en otros puertos (por ejemplo, el `443`) no cambian.
-- Para quitar **solo** el de CódigoCamp: `sudo tailscale funnel --https=8443 off`.
-
-Abre `https://<NOMBRE_DE_LA_MAQUINA>.taila41f89.ts.net:8443` (con el nombre que mostró `tailscale status`).
-
-### 6.2 Túnel con nombre propio: `codigocamp.taila41f89.ts.net`
-
-La idea es crear una **segunda «máquina» de Tailscale** dentro de un contenedor de Docker, llamada `codigocamp`. Esa máquina publica `http://127.0.0.1:5000` con su propio nombre y su propio `443`, sin chocar con los túneles que ya existen.
-
-#### 6.2.1 Crear una clave de acceso en Tailscale
-
-1. Entra a <https://login.tailscale.com/admin/settings/keys> con la **misma cuenta** que usa la máquina virtual (la de `tailscale status`).
-2. Pulsa **Generate auth key…**.
-3. Deja **Reusable** y **Ephemeral** apagados y pulsa **Generate key**.
-4. Copia la clave (`tskey-auth-…`). Solo se muestra una vez.
-
-> ⚠️ Antes, revisa en **Machines** que no exista ya una máquina llamada `codigocamp`. Si existe, Tailscale le pondrá a la nueva `codigocamp-1` y el enlace cambiará.
-
-#### 6.2.2 Crear la configuración del túnel
-
-```bash
-mkdir -p ~/codigocamp-tunel
-cat > ~/codigocamp-tunel/serve.json <<'EOF'
-{
-  "TCP": { "443": { "HTTPS": true } },
-  "Web": {
-    "${TS_CERT_DOMAIN}:443": {
-      "Handlers": { "/": { "Proxy": "http://127.0.0.1:5000" } }
-    }
-  },
-  "AllowFunnel": { "${TS_CERT_DOMAIN}:443": true }
-}
-EOF
-```
-
-`${TS_CERT_DOMAIN}` se deja tal cual: el contenedor lo cambia solo por `codigocamp.taila41f89.ts.net`.
-
-#### 6.2.3 Levantar el contenedor del túnel
-
-```bash
-sudo docker run -d --name codigocamp-tunel --restart unless-stopped \
-  --network host \
-  -e TS_AUTHKEY='<tskey-auth-...>' \
-  -e TS_HOSTNAME=codigocamp \
-  -e TS_STATE_DIR=/var/lib/tailscale \
-  -e TS_USERSPACE=true \
-  -e TS_SERVE_CONFIG=/config/serve.json \
-  -e TS_TAILSCALED_EXTRA_ARGS="--port=41642" \
-  -v codigocamp-tunel-estado:/var/lib/tailscale \
-  -v ~/codigocamp-tunel:/config:ro \
-  tailscale/tailscale:latest
-```
-
-Qué hace cada parte:
-
-- `--network host`: el contenedor ve el `127.0.0.1:5000` de la máquina virtual, donde está CódigoCamp.
-- `TS_USERSPACE=true` y `--port=41642`: no choca con el Tailscale de la máquina, que usa la red del sistema y el puerto `41641`.
-- El volumen `codigocamp-tunel-estado` guarda la sesión. La clave solo se usa la primera vez.
-
-> ⚠️ Si otro contenedor de Tailscale ya usa el puerto `41642` (`sudo ss -lunp | grep 4164`), cambia a `--port=41643`.
-
-#### 6.2.4 Comprobar
-
-```bash
-sudo docker logs --tail 30 codigocamp-tunel
-sudo docker exec codigocamp-tunel tailscale --socket=/tmp/tailscaled.sock status
-sudo docker exec codigocamp-tunel tailscale --socket=/tmp/tailscaled.sock funnel status
-```
-
-Abre `https://codigocamp.taila41f89.ts.net` desde el celular, con datos móviles, para comprobar que funciona desde internet. La primera vez puede tardar uno o dos minutos mientras se crea el certificado HTTPS.
-
-#### 6.2.5 Dos ajustes en la consola de Tailscale
-
-1. **Que no se venza:** en **Machines → codigocamp → ⋯ → Disable key expiry**. Si no, el túnel se cae a los 180 días. Este ajuste es solo de esa máquina.
-2. **Si `funnel status` dice que Funnel no está permitido:** en **Access controls**, la regla de Funnel debe incluir esta máquina. Si la máquina virtual ya publica un túnel, lo normal es que ya exista una regla como esta:
-
-```json
-"nodeAttrs": [
-  { "target": ["autogroup:member"], "attr": ["funnel"] }
-]
-```
-
-> ⚠️ **Access controls aplica a toda la cuenta de Tailscale.** Agrega lo que falte sin borrar ni cambiar las reglas que ya están: si quitas una, otros túneles o máquinas pueden dejar de funcionar. Si el editor marca un error, no guardes.
-
-### 6.3 Registrar las direcciones en Google y en CódigoCamp
-
-1. En `backend/.env`, `APP_URL` y `GOOGLE_REDIRECT_URI` deben tener el túnel y `localhost` (sección 4.2). Luego reinicia: `sudo systemctl restart codigocamp`.
-2. Para «Iniciar sesión con Google», en <https://console.cloud.google.com/apis/credentials>, abre tu **ID de cliente de OAuth** y **agrega**:
-
-| Campo | Direcciones |
-|---|---|
-| Orígenes autorizados de JavaScript | `https://codigocamp.taila41f89.ts.net`<br>`http://localhost:5000` |
-| URI de redireccionamiento autorizados | `https://codigocamp.taila41f89.ts.net/auth/google/callback/`<br>`http://localhost:5000/auth/google/callback/` |
-
-Escríbelas exactamente así, con la barra `/` final en las de redirección. Con el túnel rápido (6.1), usa `https://<NOMBRE_DE_LA_MAQUINA>.taila41f89.ts.net:8443` en lugar de la del túnel. Google puede tardar unos minutos en aplicar los cambios.
-
-> ⚠️ Si ese ID de cliente también lo usa otro proyecto, **no borres ni edites sus direcciones**: solo agrega las de CódigoCamp con **+ Agregar URI**. Lo más limpio es crear un **ID de cliente nuevo** solo para CódigoCamp.
-
----
-
-## 7. Actualizar CódigoCamp
+## 5. Actualizar CódigoCamp
 
 ```bash
 cp ~/Codigocamp/backend/.env ~/codigocamp.env   # por si el ZIP o el pull lo pisan
@@ -479,7 +287,7 @@ Al arrancar, CódigoCamp crea solo las tablas y columnas nuevas de la base `codi
 
 ---
 
-## 8. Solución de problemas
+## 6. Solución de problemas
 
 | Mensaje o síntoma | Causa probable | Solución |
 |---|---|---|
@@ -502,26 +310,6 @@ Al arrancar, CódigoCamp crea solo las tablas y columnas nuevas de la base `codi
 | Sin internet en tu PC al usar Citrix | La VPN manda todo el tráfico por la red del SENA | Cierra sesión en Citrix al terminar |
 
 ---
-
-## 9. Resumen de comandos
-
-```bash
-# Estado de todo
-sudo systemctl status codigocamp
-sudo docker ps
-sudo tailscale funnel status
-sudo docker exec codigocamp-tunel tailscale --socket=/tmp/tailscaled.sock funnel status
-
-# Reiniciar CódigoCamp (tras cambiar .env o el código)
-sudo systemctl restart codigocamp
-
-# Registros en vivo
-sudo journalctl -u codigocamp -f
-
-# Entrar a la base
-sudo docker exec -it codigocamp-mysql mysql -u codigocamp -p codigocamp  
-sudo docker exec -it codigocamp-mysql mysql -u root -p'12345'             # root
-```
 
 > ⚠️ Comandos que **nunca** debes usar en esta máquina porque afectan a otros proyectos: `sudo docker system prune`, `sudo docker volume prune`, `sudo docker rm -f $(sudo docker ps -aq)`, `sudo tailscale funnel reset`, `sudo tailscale serve reset`.
 

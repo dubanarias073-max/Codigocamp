@@ -1,6 +1,6 @@
 // Service worker de CódigoCamp: hace que la app se pueda instalar, abre aunque falle la red (página «sin conexión»),
 // guarda en caché los archivos de la interfaz y actualiza el widget de racha (Windows 11).
-const VERSION = "cc-v31";
+const VERSION = "cc-v40";
 const BASE = ["/offline.html", "/img/codi/triste.svg", "/img/codi/saludo.svg", "/js/codi.js", "/js/temporada.js", "/js/escena-codi.js", "/js/prueba.js", "/js/trabajo/analisis.js", "/js/trabajo/analisis-local.js", "/js/trabajo/puertos.js", "/js/trabajo/servidores-dev.js", "/css/app.css", "/css/tema.css", "/js/app.js", "/js/auth.js", "/js/iconos.js", "/js/enlaces.js", "/js/iconos-ilustrados.js", "/js/escenas-tienda.js", "/js/mascota.js", "/js/trabajo/errores-salida.js", "/js/trabajo/conector.js", "/js/trabajo/equipo.js", "/js/trabajo/gitequipo.js", "/js/trabajo/office.js", "/js/trabajo/terminal-real.js", "/js/cosmeticos.js", "/js/carga.js", "/js/tema.js", "/js/i18n.js", "/js/pwa.js",
   "/img/app/icon-192.png", "/img/app/icon-512.png", "/img/logo-icon.png", "/img/favicon.png", "/manifest.webmanifest"];
 
@@ -11,11 +11,54 @@ self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
+/** Archivos de tu equipo (Conector) servidos por trozos: los videos enormes empiezan al instante y se pueden adelantar. */
+async function trozoDeEquipo(clientId, hash, desde, largo) {
+  const lista = [await self.clients.get(clientId), ...(await self.clients.matchAll({ type: "window" }))].filter(Boolean);
+  for (const c of lista) {
+    const r = await new Promise((ok) => {
+      const canal = new MessageChannel();
+      const espera = setTimeout(() => ok(null), 60000);
+      canal.port1.onmessage = (ev) => { clearTimeout(espera); ok(ev.data); };
+      c.postMessage({ tipo: "cc-equipo-parte", hash, desde, largo }, [canal.port2]);
+    });
+    if (r && !r.error) return r;
+  }
+  throw new Error("sin pestaña");
+}
+function respuestaEquipo(e, url) {
+  const hash = url.pathname.split("/")[2] || "";
+  const total = Number(url.searchParams.get("t")) || 0;
+  const tipo = url.searchParams.get("m") || "application/octet-stream";
+  const descarga = url.searchParams.get("d");
+  const rango = /bytes=(\d+)-(\d*)/.exec(e.request.headers.get("range") || "");
+  if (rango && !descarga) {
+    const desde = Number(rango[1]);
+    const pedido = rango[2] ? Number(rango[2]) - desde + 1 : 2 * 1024 * 1024;
+    return trozoDeEquipo(e.clientId, hash, desde, Math.min(pedido, 4 * 1024 * 1024)).then(({ bytes }) => new Response(bytes, {
+      status: 206,
+      headers: { "Content-Type": tipo, "Accept-Ranges": "bytes", "Content-Length": String(bytes.byteLength), "Content-Range": `bytes ${desde}-${desde + bytes.byteLength - 1}/${total}` },
+    }), () => new Response("", { status: 504 }));
+  }
+  // Sin rango (descargas): el archivo entero, trozo a trozo, sin cargarlo en memoria
+  let pos = 0;
+  const flujo = new ReadableStream({
+    async pull(ctl) {
+      if (pos >= total) { ctl.close(); return; }
+      try { const { bytes } = await trozoDeEquipo(e.clientId, hash, pos, 8 * 1024 * 1024); if (!bytes.byteLength) { ctl.close(); return; } pos += bytes.byteLength; ctl.enqueue(bytes); }
+      catch (err) { ctl.error(err); }
+    },
+  });
+  const h = { "Content-Type": tipo, "Content-Length": String(total), "Accept-Ranges": "bytes" };
+  if (descarga) h["Content-Disposition"] = `attachment; filename*=UTF-8''${encodeURIComponent(descarga)}`;
+  return Promise.resolve(new Response(flujo, { status: 200, headers: h }));
+}
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;               // CDN, GitHub… directo
+  if (url.pathname.startsWith("/__equipo/")) { e.respondWith(respuestaEquipo(e, url)); return; }
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) return; // datos y sesión: siempre red
   if (req.mode === "navigate") {
     // Páginas: red primero (siempre lo último); si no hay red, la copia guardada o la página sin conexión.

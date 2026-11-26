@@ -94,7 +94,8 @@ function configurar(m) {
   ts.typescriptDefaults.setCompilerOptions({ ...opciones, strict: true });
   ts.javascriptDefaults.setCompilerOptions(opciones);
   // Paquetes de npm (react, etc.): no hay node_modules, así que no se marcan como error «no se encuentra el módulo».
-  const ignorar = [2307, 2792, 7016];
+  // 2875/7026/2503: JSX sin los tipos de React instalados; 2580/2591: require/process sin @types/node (falsos positivos).
+  const ignorar = [2307, 2792, 7016, 2875, 7026, 2503, 2580, 2591, 2688];
   ts.typescriptDefaults.setDiagnosticsOptions({ diagnosticCodesToIgnore: ignorar });
   // En JavaScript se marcan nombres sin definir, constantes reasignadas, argumentos que faltan… pero no las quejas de
   // tipos de TypeScript (en JS confunden más de lo que ayudan) ni las de Node (require, process, module).
@@ -329,7 +330,7 @@ export class EditorMonaco {
         const linea = ed.getPosition()?.lineNumber ?? 0;
         const m = lista.find((x) => x.startLineNumber === linea) ?? lista[0];
         const error = m.severity === monaco.MarkerSeverity.Error;
-        nodo.classList.toggle("aviso", !error);
+        nodo.classList.toggle("advierte", !error);
         nodo.querySelector("span").textContent = `${error ? "⊗" : "⚠"} Línea ${m.startLineNumber}: ${m.message.split("\n")[0]}${lista.length > 1 ? `  (${lista.indexOf(m) + 1}/${lista.length})` : ""}`;
         const l = ed.getLayoutInfo();
         nodo.style.width = `${l.width - 26}px`;
@@ -382,18 +383,50 @@ export class EditorMonaco {
       sangria: () => ed.trigger("barra", "editor.action.indentLines"),
       comentar: () => ed.trigger("barra", "editor.action.commentLine"),
       ia: () => this.alAtajo("ia-menu"),
+      teclado: () => document.dispatchEvent(new CustomEvent("cc-teclado-alternar")),
     };
     const B = (id, ic, t) => `<button type="button" data-a="${id}" title="${t}" aria-label="${t}">${ic}<small>${t}</small></button>`;
+    // Teclas de programación que el teclado del celular esconde (como los editores de código para celular)
+    const SIMBOLOS = [["tab", "⇥", "Tab"], ["(", "( )"], ["{", "{ }"], ["[", "[ ]"], [";", ";"], ["\"", "\" \""], ["'", "' '"], ["<", "< >"], ["=", "="], [":", ":"],
+      [".", "."], [",", ","], ["/", "/"], ["_", "_"], ["-", "-"], ["+", "+"], ["*", "*"], ["!", "!"], ["&", "&"], ["|", "|"], ["#", "#"], ["$", "$"], ["`", "`"], ["\\", "\\"],
+      ["izq", "←"], ["der", "→"]];
+    const PARES = { "(": ")", "{": "}", "[": "]", "\"": "\"", "'": "'", "<": ">", "`": "`" };
+    const escribir = (k) => {
+      ed.focus();
+      if (k === "tab") { ed.trigger("simbolos", "tab", null); return; }
+      if (k === "izq" || k === "der") { ed.trigger("simbolos", k === "izq" ? "cursorLeft" : "cursorRight", null); return; }
+      const sel = ed.getSelection(), elegido = this.modelo.getValueInRange(sel), cierre = PARES[k];
+      if (cierre && k !== "<") {
+        ed.executeEdits("simbolos", [{ range: sel, text: k + elegido + cierre, forceMoveMarkers: true }]);
+        if (!elegido) { const p = ed.getPosition(); ed.setPosition({ lineNumber: p.lineNumber, column: p.column - 1 }); }
+      } else ed.executeEdits("simbolos", [{ range: sel, text: k, forceMoveMarkers: true }]);
+    };
+    const S = ([k, ic]) => `<button type="button" class="sim" data-s="${k.replace(/"/g, "&quot;")}" aria-label="${ic.replace(/"/g, "&quot;")}">${ic}</button>`;
     const nodo = document.createElement("div");
     nodo.className = "ed-tactil";
     nodo.setAttribute("role", "toolbar");
     nodo.setAttribute("aria-label", "Selección y acciones del código");
-    nodo.innerHTML = B("ia", "✨", "IA") + B("linea", "▤", "Línea") + B("arriba", "⤒", "+ arriba") + B("abajo", "⤓", "+ abajo") + B("menos", "⊖", "− línea")
+    nodo.dataset.modo = "simbolos";
+    nodo.innerHTML = '<button type="button" class="modo" data-cambiar title="Cambiar entre símbolos y edición" aria-label="Cambiar entre símbolos y edición">✂<small>Editar</small></button>'
+      + '<button type="button" class="modo" data-a="teclado" title="Teclado de CódigoCamp (con los diseños de la Tienda)" aria-label="Teclado de CódigoCamp">⌨<small>Teclado</small></button>'
+      + `<span class="grupo-sim">${SIMBOLOS.map(S).join("")}</span><span class="grupo-ed">` + B("ia", "✨", "IA") + B("linea", "▤", "Línea") + B("arriba", "⤒", "+ arriba") + B("abajo", "⤓", "+ abajo") + B("menos", "⊖", "− línea")
       + B("palabra", "ab", "Palabra") + B("todo", "⬚", "Todo") + B("copiar", "⧉", "Copiar") + B("cortar", "✂", "Cortar") + B("pegar", "📋", "Pegar")
-      + B("comentar", "//", "Comentar") + B("sangria", "⇥", "Sangría") + B("deshacer", "↶", "Deshacer") + B("rehacer", "↷", "Rehacer");
+      + B("comentar", "//", "Comentar") + B("sangria", "⇥", "Sangría") + B("deshacer", "↶", "Deshacer") + B("rehacer", "↷", "Rehacer") + "</span>";
     // pointerdown + preventDefault: el editor no pierde el foco ni se cierra el teclado
     nodo.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) e.preventDefault(); });
-    nodo.addEventListener("click", (e) => { const b = e.target.closest("button[data-a]"); if (b) acciones[b.dataset.a]?.(); });
+    nodo.addEventListener("click", (e) => {
+      const m = e.target.closest("[data-cambiar]");
+      if (m) {
+        const sim = nodo.dataset.modo !== "simbolos";
+        nodo.dataset.modo = sim ? "simbolos" : "edicion";
+        m.innerHTML = sim ? "✂<small>Editar</small>" : "⌨<small>Símbolos</small>";
+        nodo.scrollLeft = 0;
+        return;
+      }
+      const s = e.target.closest("button[data-s]");
+      if (s) { escribir(s.dataset.s); return; }
+      const b = e.target.closest("button[data-a]"); if (b) acciones[b.dataset.a]?.();
+    });
     const widget = { getId: () => "cc.barra.tactil", getDomNode: () => nodo, getPosition: () => null };
     ed.addOverlayWidget(widget);
     const ubicar = () => { const l = ed.getLayoutInfo(); nodo.style.top = `${Math.max(0, l.height - 54)}px`; nodo.style.width = `${l.width - 12}px`; };

@@ -38,6 +38,16 @@ export function soporteCarpeta({ win = globalThis, nav = globalThis.navigator } 
 }
 
 // --------------------------------------------------------------------------- utilidades ----
+/** Extensiones que nunca son texto editable: con el Conector se dejan en tu equipo y se leen solo cuando las abres. */
+const BINARIAS = new Set(("png jpg jpeg gif webp avif bmp ico tif tiff psd ai sketch fig xcf heic mp4 m4v mov webm ogv avi mkv wmv flv mp3 m4a wav ogg oga flac aac " +
+  "pdf doc docx xls xlsx ppt pptx odt ods odp rtf ttf otf woff woff2 eot zip rar 7z tar gz tgz bz2 xz zst iso dmg img exe msi dll so dylib bin dat " +
+  "o a lib obj pdb class jar war apk aab ipa wasm pyc pyo pyd node sqlite sqlite3 db mdb accdb blend fbx glb obj3d unitypackage ttc keystore jks").split(" "));
+export const esBinariaPorNombre = (ruta) => { const i = ruta.lastIndexOf("."); return i > 0 && BINARIAS.has(ruta.slice(i + 1).toLowerCase()); };
+const MIME_EXT = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", avif: "image/avif", bmp: "image/bmp", ico: "image/x-icon",
+  mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm", mp3: "audio/mpeg", m4a: "audio/mp4", wav: "audio/wav", ogg: "audio/ogg",
+  pdf: "application/pdf", ttf: "font/ttf", otf: "font/otf", woff: "font/woff", woff2: "font/woff2", zip: "application/zip" };
+const mimeDe = (ruta) => MIME_EXT[ruta.slice(ruta.lastIndexOf(".") + 1).toLowerCase()] || "application/octet-stream";
+
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 export async function sha256(bytes) { return hex(await crypto.subtle.digest("SHA-256", bytes)); }
 const enc = new TextEncoder();
@@ -145,8 +155,11 @@ export class Sincronizador {
    * @param {(evento:object)=>void} [o.alAviso]   conflictos, archivos que no caben, errores
    */
   constructor({ disco, proyecto, alCambiar = () => {}, subirArchivo = null, leerArchivo = null, guardarBase = () => {}, alAviso = () => {}, base = null, cache = null,
-    maxArchivo = LIMITES_ARCHIVO.porArchivo }) {
-    Object.assign(this, { disco, proyecto, alCambiar, subirArchivo, leerArchivo, guardarBase, alAviso, maxArchivo });
+    maxArchivo = LIMITES_ARCHIVO.porArchivo, registrarEquipo = null }) {
+    Object.assign(this, { disco, proyecto, alCambiar, subirArchivo, leerArchivo, guardarBase, alAviso, maxArchivo, registrarEquipo });
+    // Con el Conector (tu equipo): sin límites de la cuenta y los binarios no se leen ni se suben, se quedan en tu disco.
+    this.enEquipo = Boolean(disco?.esEquipo && registrarEquipo);
+    if (this.enEquipo) this.maxArchivo = Infinity;
     this.base = base ? { ...base } : null; // ruta -> valor (texto o marcador) en la última sincronización
     // ruta -> { tamano, modificado, valor?, omitir? }: así no se vuelve a leer (ni a calcular la huella de) lo que no cambió.
     this.cacheDisco = new Map(Object.entries(cache || {}).filter(([, c]) => c && typeof c === "object"));
@@ -167,8 +180,9 @@ export class Sincronizador {
     const omitidos = new Map();
     const vistos = new Set();
     // Discos lentos (la carpeta de otro equipo por el Conector) traen de una vez todo lo que hay que leer en esta vuelta.
+    const perezoso = (a) => this.enEquipo && (a.tamano > TEXTO_EDITABLE || esBinariaPorNombre(a.ruta));
     if (this.disco.precargar) {
-      const faltan = archivos.filter((a) => { const c = this.cacheDisco.get(a.ruta); return FS.rutaValida(a.ruta) && a.tamano <= this.maxArchivo && (!c || c.tamano !== a.tamano || c.modificado !== a.modificado); });
+      const faltan = archivos.filter((a) => { const c = this.cacheDisco.get(a.ruta); return FS.rutaValida(a.ruta) && a.tamano <= this.maxArchivo && !perezoso(a) && (!c || c.tamano !== a.tamano || c.modificado !== a.modificado); });
       if (faltan.length) await this.disco.precargar(faltan);
     }
     for (const a of archivos) {
@@ -177,7 +191,12 @@ export class Sincronizador {
       let c = this.cacheDisco.get(a.ruta);
       if (!c || c.tamano !== a.tamano || c.modificado !== a.modificado) {
         if (a.tamano > this.maxArchivo) c = { tamano: a.tamano, modificado: a.modificado, omitir: `pesa ${formatoBytes(a.tamano)} (máximo ${formatoBytes(this.maxArchivo)} por archivo)` };
-        else {
+        else if (perezoso(a)) {
+          // Imágenes, videos, programas, archivos enormes…: no se leen ni se suben. Su marcador sale del nombre, el tamaño y
+          // la fecha; los bytes se piden a tu equipo solo cuando abres el archivo.
+          const hash = await sha256(enc.encode(`equipo\0${this.disco.equipo?.id}\0${this.disco.raizReal || this.disco.carpeta}\0${a.ruta}\0${a.tamano}\0${a.modificado}`));
+          c = { tamano: a.tamano, modificado: a.modificado, valor: crearMarcador({ hash, tipo: esBinariaPorNombre(a.ruta) ? mimeDe(a.ruta) : "text/plain", tamano: a.tamano }), equipo: true };
+        } else {
           let entrada;
           try {
             if (a.tamano <= TEXTO_EDITABLE) entrada = await this.disco.leer(a.ruta);
@@ -188,6 +207,7 @@ export class Sincronizador {
         }
         this.cacheDisco.set(a.ruta, c);
       }
+      if (c.equipo && this.enEquipo) { const ruta = a.ruta; this.registrarEquipo(c.valor, () => this.disco.abrir(ruta), this.disco.parte ? (desde, largo) => this.disco.parte(ruta, desde, largo) : null); }
       if (c.omitir) omitidos.set(a.ruta, c.omitir); else salida.set(a.ruta, c);
     }
     for (const r of [...this.cacheDisco.keys()]) if (!vistos.has(r)) this.cacheDisco.delete(r);
@@ -228,10 +248,12 @@ export class Sincronizador {
     for (let c = FS.carpetaDe(ruta); c && !choca; c = FS.carpetaDe(c)) if (py.files[c] !== undefined) choca = true;
     let motivo = null;
     if (choca) motivo = "en el proyecto hay una carpeta o un archivo que choca con ese nombre";
+    else if (this.enEquipo) { /* tu equipo: sin límites de la cuenta */ }
     else if (cuenta > FS.LIMITES.archivos) motivo = `el proyecto admite ${FS.LIMITES.archivos} archivos`;
     else if (caracteres > FS.LIMITES.caracteres) motivo = "se llenaría el espacio de texto editable del proyecto (5 millones de caracteres)";
     let valor = d.valor;
-    if (!motivo && esMarcador(valor) && claveContenido(previo) !== claveContenido(valor)) {
+    if (!motivo && d.equipo && this.enEquipo) { /* se queda en tu equipo: no se sube a ningún lado */ }
+    else if (!motivo && esMarcador(valor) && claveContenido(previo) !== claveContenido(valor)) {
       if (!this.subirArchivo) motivo = "no se pueden subir archivos";
       else {
         try { valor = await this.subirArchivo(d.bytes ?? await this.disco.abrir(ruta), { nombre: ruta }); }
@@ -347,7 +369,32 @@ export class Sincronizador {
         }
       }
     }
-    const huboProyecto = res.alProyecto.length || res.borradosProyecto.length || res.conflictos.length;
+    // Carpetas (también las VACÍAS): las que creas o borras en la terminal del equipo aparecen o se van del explorador,
+    // y las que creas aquí se crean allá. Antes solo se veían las carpetas que tenían algún archivo.
+    let cambioCarpetas = false;
+    {
+      const enDisco = new Set(disco.carpetas);
+      const enPy = new Set(py.folders);
+      if (!this.baseCarpetas) this.baseCarpetas = new Set([...enDisco].filter((c) => enPy.has(c)));
+      const baseC = this.baseCarpetas;
+      for (const c of enDisco) {
+        if (baseC.has(c) || enPy.has(c) || enPy.size >= FS.LIMITES.carpetas) continue;
+        for (let x = c; x && !enPy.has(x); x = FS.carpetaDe(x)) enPy.add(x);
+        cambioCarpetas = true;
+      }
+      for (const c of baseC) {
+        if (enDisco.has(c) || !enPy.has(c)) continue;
+        const ocupada = Object.keys(py.files).some((r) => FS.dentroDe(r, c)) || [...enDisco].some((x) => FS.dentroDe(x, c));
+        if (!ocupada) { enPy.delete(c); for (const x of [...enPy]) if (FS.dentroDe(x, c) && !enDisco.has(x)) enPy.delete(x); cambioCarpetas = true; }
+      }
+      for (const c of [...enPy].sort()) {
+        if (enDisco.has(c) || baseC.has(c)) continue;
+        try { await this.disco.crearCarpeta(c); enDisco.add(c); } catch { /* sin permiso: se intenta en la próxima vuelta */ }
+      }
+      if (cambioCarpetas) py.folders = [...enPy].sort();
+      this.baseCarpetas = new Set([...enDisco].filter((c) => enPy.has(c)));
+    }
+    const huboProyecto = res.alProyecto.length || res.borradosProyecto.length || res.conflictos.length || cambioCarpetas;
     if (res.borradosProyecto.length) {
       // Quita del proyecto las carpetas que quedaron vacías por borrar en el computador (si tampoco existen allá).
       const enDisco = new Set(disco.carpetas);
@@ -365,7 +412,7 @@ export class Sincronizador {
     return o;
   }
 
-  desvincular() { this.base = null; this.cacheDisco.clear(); this.rechazados.clear(); }
+  desvincular() { this.base = null; this.baseCarpetas = null; this.cacheDisco.clear(); this.rechazados.clear(); }
 }
 
 // ------------------------------------------------------------------ recordar la carpeta ----

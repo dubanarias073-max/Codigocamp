@@ -21,6 +21,8 @@ export const LOGOS = {
   swift: `<defs><linearGradient id="lgSw" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffac45"/><stop offset="1" stop-color="#f05138"/></linearGradient></defs><rect x="3" y="3" width="42" height="42" rx="10" fill="url(#lgSw)"/><path d="M13 32c5 3 12 3 17-1 3-2 6-5 8-9-4 3-8 4-12 2 5-3 9-8 10-14-6 5-13 10-19 9z" fill="#fff"/>`,
   kotlin: `<defs><linearGradient id="lgKt" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#e44857"/><stop offset=".5" stop-color="#c711e1"/><stop offset="1" stop-color="#7f52ff"/></linearGradient></defs><polygon points="6,6 42,6 24,24 42,42 6,42" fill="url(#lgKt)"/>`,
   php: `<ellipse cx="24" cy="24" rx="21" ry="13" fill="#777bb3"/><text x="24" y="29" text-anchor="middle" font-size="13" font-weight="800" fill="#0f1224" font-family="Inter,Arial,sans-serif">php</text>`,
+  lua: `<circle cx="22" cy="26" r="17" fill="#000080"/><circle cx="29" cy="19" r="5" fill="#fff"/><circle cx="40" cy="8" r="5" fill="#000080"/><text x="21" y="33" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="11" fill="#fff">Lua</text>`,
+  r: `<ellipse cx="22" cy="21" rx="19" ry="13" fill="none" stroke="#9ca3af" stroke-width="5"/><path d="M17 12h13a7 7 0 0 1 0 14h-2l8 14h-7l-7-14h-1v14h-6z" fill="#276dc3"/><path d="M23 17v5h6a2.5 2.5 0 0 0 0-5z" fill="#fff"/>`,
   ruby: `<polygon points="14,7 34,7 43,18 24,43 5,18" fill="#cc342d"/><polygon points="14,7 24,18 34,7" fill="#fff" opacity=".35"/><polygon points="5,18 24,18 24,43" fill="#000" opacity=".18"/><polygon points="5,18 14,7 24,18" fill="#fff" opacity=".18"/>`,
   terminal: `<rect x="3" y="7" width="42" height="34" rx="6" fill="#0f172a"/><rect x="3" y="7" width="42" height="7" rx="3" fill="#1e293b"/><path d="M11 22l7 6-7 6" fill="none" stroke="#4ade80" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 35h14" stroke="#4ade80" stroke-width="3.2" stroke-linecap="round"/>`,
   git: `<rect x="6" y="6" width="36" height="36" rx="5" transform="rotate(45 24 24)" fill="#f05033"/><circle cx="19" cy="17" r="3.4" fill="#fff"/><circle cx="19" cy="31" r="3.4" fill="#fff"/><circle cx="30" cy="24" r="3.4" fill="#fff"/><path d="M19 17v14M19 18l11 6" stroke="#fff" stroke-width="2.6"/>`,
@@ -32,7 +34,7 @@ export const LOGOS = {
   node: `<polygon points="24,3 42,13.5 42,34.5 24,45 6,34.5 6,13.5" fill="#5fa04e"/><text x="24" y="30" text-anchor="middle" font-size="13" font-weight="800" fill="#fff" font-family="Inter,Arial,sans-serif">node</text>`,
 };
 
-const NOMBRES = { html: "HTML", css: "CSS", javascript: "JS", typescript: "TS", python: "PY", sql: "SQL", bd: "BD", java: "JV", c: "C", cpp: "C++", csharp: "C#", go: "GO", rust: "RS", swift: "SW", kotlin: "KT", php: "PHP", ruby: "RB", terminal: "$_", git: "GIT", docker: "DK", node: "NODE", github: "GH", nosql: "NoSQL", react: "RE", reactnative: "RN" };
+const NOMBRES = { html: "HTML", css: "CSS", javascript: "JS", typescript: "TS", python: "PY", sql: "SQL", bd: "BD", java: "JV", c: "C", cpp: "C++", csharp: "C#", go: "GO", rust: "RS", swift: "SW", kotlin: "KT", php: "PHP", ruby: "RB", lua: "LUA", r: "R", terminal: "$_", git: "GIT", docker: "DK", node: "NODE", github: "GH", nosql: "NoSQL", react: "RE", reactnative: "RN" };
 
 export function logo(slug, tam = 40) {
   const dentro = LOGOS[slug];

@@ -195,6 +195,42 @@ const SONIDOS = {
 };
 
 /** Suena un efecto. Devuelve false si está apagado o el navegador no deja (antes de tocar la página). */
+/* ===== Sonidos del Teclado de CódigoCamp =====
+ * tipo: "letra" | "espacio" | "borrar" | "enter" · estilo: el del teclado de la Tienda que tengas puesto.
+ * Cada teclado suena distinto: mecánico, madera, cristal, sintetizador neón, campanita de oro… */
+const ESTILO_TECLA = {
+  normal: (t, k) => tecla(t, { vol: k === "espacio" ? 0.05 : 0.035, agudo: k === "espacio" ? 2600 : k === "borrar" ? 3600 : 5200 }),
+  teclado_hacker: (t, k) => { tecla(t, { vol: 0.06, agudo: k === "espacio" ? 2200 : 4200 }); tecla(t + 0.012, { vol: 0.03, agudo: 6500 }); },   // mecánico «clicky»
+  teclado_madera: (t, k) => { tono(k === "espacio" ? 210 : 320 + Math.random() * 60, t, 0.07, { tipo: "triangle", vol: 0.08, ataque: 0.002 }); ruido(t, 0.012, { vol: 0.02, desde: 1500, hasta: 1800, q: 3 }); },
+  teclado_noche: (t, k) => tecla(t, { vol: 0.025, agudo: k === "espacio" ? 2000 : 3000 }),   // silencioso
+  teclado_pastel: (t, k) => tono(k === "espacio" ? 660 : 880 + Math.random() * 120, t, 0.06, { tipo: "sine", vol: 0.05, ataque: 0.003 }),   // «pop» suave
+  teclado_hielo: (t, k) => { tono(k === "espacio" ? 1400 : 2100 + Math.random() * 500, t, 0.09, { tipo: "sine", vol: 0.04, ataque: 0.002 }); tono(3300, t + 0.01, 0.05, { tipo: "sine", vol: 0.015 }); },   // cristal
+  teclado_retro: (t, k) => filtrado(k === "espacio" ? 220 : 440 + Math.random() * 40, t, 0.045, { tipo: "square", vol: 0.04, corte: 2200 }),   // computador de los 80
+  teclado_sakura: (t, k) => { tono(k === "espacio" ? 700 : 990 + Math.random() * 160, t, 0.07, { tipo: "sine", fin: 1300, vol: 0.045, ataque: 0.003 }); },   // «pop» de flor
+  teclado_oceano: (t, k) => { const f = k === "espacio" ? 300 : 420 + Math.random() * 200; tono(f, t, 0.08, { tipo: "sine", fin: f * 2.2, vol: 0.05, ataque: 0.004 }); },   // burbuja
+  teclado_dragon: (t, k) => { tono(k === "espacio" ? 70 : 110 + Math.random() * 25, t, 0.11, { tipo: "sawtooth", fin: 60, vol: 0.05, ataque: 0.002 }); ruido(t, 0.05, { vol: 0.03, desde: 900, hasta: 300, q: 1 }); },   // rugido grave
+  teclado_aurora: (t, k) => { const f = k === "espacio" ? 523 : [1047, 1175, 1319, 1568, 1760][Math.floor(Math.random() * 5)]; tono(f, t, 0.25, { tipo: "sine", vol: 0.035, ataque: 0.003 }); tono(f * 1.5, t + 0.03, 0.18, { tipo: "sine", vol: 0.015 }); },   // campanas de hielo
+  teclado_neon: (t, k) => filtrado(k === "espacio" ? 330 : 520 + Math.random() * 200, t, 0.08, { tipo: "sawtooth", fin: k === "borrar" ? 260 : 900, vol: 0.045, corte: 2600 }),   // sintetizador
+  teclado_lava: (t, k) => { tono(k === "espacio" ? 90 : 140 + Math.random() * 30, t, 0.09, { tipo: "triangle", vol: 0.09, ataque: 0.002 }); ruido(t, 0.03, { vol: 0.02, desde: 400, hasta: 200, q: 1 }); },   // grave
+  teclado_arcoiris: (t, k) => { const n = [523, 587, 659, 784, 880, 988, 1047][Math.floor(Math.random() * 7)]; tono(k === "espacio" ? 392 : n, t, 0.12, { tipo: "triangle", vol: 0.05, ataque: 0.003 }); },   // notas alegres
+  teclado_galaxia: (t, k) => { const f = k === "espacio" ? 330 : 660 + Math.random() * 330; tono(f, t, 0.18, { tipo: "sine", fin: f * 1.5, vol: 0.04, ataque: 0.004 }); tono(f * 2, t + 0.02, 0.12, { tipo: "sine", vol: 0.015 }); },   // destello espacial
+  teclado_oro: (t, k) => { const f = k === "espacio" ? 784 : 1568 + Math.random() * 300; tono(f, t, 0.22, { tipo: "sine", vol: 0.04, ataque: 0.002 }); tono(f * 2.01, t, 0.15, { tipo: "sine", vol: 0.018 }); },   // campanita
+};
+export function sonarTecla(tipo = "letra", estilo = "normal") {
+  if (!sonidoActivo()) return;
+  const c = prepararSonido();
+  if (!c) return;
+  const go = () => {
+    try {
+      const t = c.currentTime + 0.005;
+      if (tipo === "enter") { (ESTILO_TECLA[estilo] || ESTILO_TECLA.normal)(t, "espacio"); tono(estilo === "normal" ? 520 : 700, t + 0.03, 0.08, { tipo: "triangle", vol: 0.035 }); return; }
+      if (tipo === "borrar" && estilo === "normal") { tecla(t, { vol: 0.03, agudo: 3400 }); return; }
+      (ESTILO_TECLA[estilo] || ESTILO_TECLA.normal)(t, tipo);
+    } catch { /* nada */ }
+  };
+  if (c.state === "running") go(); else c.resume?.().then(go, () => {});
+}
+
 export function sonar(nombre, retraso = 0) {
   if (!sonidoActivo()) return false;
   const c = prepararSonido();

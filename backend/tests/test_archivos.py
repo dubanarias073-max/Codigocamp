@@ -76,7 +76,7 @@ class ArchivosAPITest(unittest.TestCase):
         self.assertEqual(WorkspaceFile.query.count(), len(casos))
 
     def test_el_antivirus_bloquea_programas_y_no_los_guarda(self):
-        for datos, nombre in [(EXE, "x.exe"), (EXE, "tarea.pdf"), (b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*", "nota.txt")]:
+        for datos, nombre in [(EXE, "x.exe"), (EXE, "tarea.pdf"), (b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$" + b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*", "nota.txt")]:
             r = self._subir(datos, nombre)
             self.assertEqual(r.status_code, 422, nombre)
             self.assertIn("🛡️", r.get_json()["error"])

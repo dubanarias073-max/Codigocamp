@@ -16,8 +16,8 @@ Seguridad:
   · Al abrirlo te pide el PIN, la huella o la contraseña con la que desbloqueas ESTE equipo (Windows Hello, la
     contraseña de tu usuario en macOS/Linux o la huella en Android). Sin eso no se conecta: aunque alguien tenga tu
     cuenta de CódigoCamp, no puede usar tu computador ni tu celular.
-  · Nunca ejecuta comandos que borren el disco o el sistema, apaguen el equipo, desactiven el antivirus, roben
-    contraseñas o den control remoto a otra persona (el servidor y este programa los bloquean por separado).
+  · Los comandos corren tal cual, como en la terminal de VS Code: CódigoCamp no los bloquea ni te advierte en tu propio
+    equipo. Revisa lo que ejecutas (sobre todo lo que copies de internet o te sugiera la IA).
   · Si nadie lo usa por 30 minutos se cierra solo.
   · Los comandos corren con TUS permisos en este equipo: ciérralo (Ctrl+C) cuando termines.
   · Este programa solo SALE hacia CódigoCamp (no abre puertos en tu equipo).
@@ -26,9 +26,9 @@ Seguridad:
     editor de escritorio): lo que guardas allá se escribe aquí y lo que cambias aquí (git, npm, otro editor) aparece
     allá. Nunca deja abrir carpetas del sistema (Windows, Archivos de programa, /etc, /usr…) ni las de contraseñas
     (.ssh, .gnupg, llaveros).
-  · Usa el antivirus de ESTE equipo (Microsoft Defender en Windows, ClamAV si lo tienes en Linux/macOS) para revisar
-    los programas y archivos que entran o salen de la carpeta y los ejecutables antes de correrlos. Si encuentra un
-    virus, el archivo no se guarda, no se envía y no se ejecuta. Nunca apaga ni cambia tu antivirus.
+  · Rápido como VS Code: no revisa ni sube tus archivos. De eso se encarga el antivirus de ESTE equipo en tiempo real
+    (Microsoft Defender u otro); si bloquea un archivo, CódigoCamp lo respeta. Nunca apaga ni cambia tu antivirus.
+  · Lo que haces en Trabajo con tu equipo se queda en tu equipo: CódigoCamp no guarda tus archivos en tu cuenta.
   · El token se guarda en ~/.codigocamp-conector.json; bórralo o usa «Desconectar» en Trabajo para olvidar este equipo.
 """
 import argparse
@@ -55,14 +55,29 @@ import urllib.request
 SERVIDOR = "%SERVIDOR%"   # al descargarlo desde CódigoCamp ya viene con la dirección correcta
 CONFIG = os.path.join(os.path.expanduser("~"), ".codigocamp-conector.json")
 WINDOWS = os.name == "nt"
-VERSION_CONECTOR = 6          # sube cuando el Conector aprende algo nuevo (Trabajo avisa si el tuyo es viejo)
+VERSION_CONECTOR = 13
+
+# Explorador de archivos del sistema con tkinter (se ejecuta aparte para no trabar el Conector).
+DIALOGO_TK = r"""
+import os, sys, tkinter as tk
+from tkinter import filedialog
+r = tk.Tk(); r.withdraw(); r.attributes("-topmost", True); r.update(); r.lift(); r.focus_force()
+ini = os.environ.get("CC_INICIO") or os.path.expanduser("~")
+if sys.argv[1] == "carpeta":
+    p = filedialog.askdirectory(parent=r, initialdir=ini, mustexist=True, title="Elige la carpeta que quieres abrir en CódigoCamp")
+else:
+    p = filedialog.askopenfilename(parent=r, initialdir=ini, title="Elige el archivo que quieres abrir en CódigoCamp")
+r.destroy()
+sys.stdout.buffer.write(os.path.normpath(p).encode("utf-8") if p else b"")
+"""          # sube cuando el Conector aprende algo nuevo (Trabajo avisa si el tuyo es viejo)
 CAPACIDADES = ["pty", "partes", "ws", "actualizar"]
+OCULTAS = {".git", ".hg", ".svn"}   # nunca se muestran (como VS Code)
 IGNORAR = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".next", ".dart_tool", "target"}
 MAX_TRAER = 2_000_000   # bytes por archivo al traer la carpeta a Trabajo
 INACTIVIDAD = 30 * 60   # se cierra solo tras 30 minutos sin órdenes
 MAX_LEER = 30_000_000   # bytes por archivo en una sola lectura; los más grandes viajan por partes (leer_parte)
 PARTE = 8 * 1024 * 1024  # tamaño de cada parte de un archivo grande (hasta 1 GB por archivo, como en CódigoCamp)
-MAX_LISTAR = 5000       # archivos que se listan de la carpeta abierta
+MAX_LISTAR = 1_000_000  # archivos que se listan de la carpeta abierta (como VS Code: tu disco es el límite)
 # Lo que el antivirus revisa sí o sí (aunque sea texto): programas, scripts e instaladores
 EJECUTABLES = {".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".pif", ".ps1", ".psm1", ".vbs", ".vbe", ".wsf", ".hta", ".jar", ".apk",
                ".dll", ".sys", ".lnk", ".sh", ".command", ".app", ".dmg", ".pkg", ".deb", ".rpm", ".appimage", ".run", ".bin", ".elf",
@@ -70,14 +85,9 @@ EJECUTABLES = {".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".pif", ".ps1", "
 GIT_PERMITIDOS = {"status", "add", "restore", "commit", "switch", "branch", "init", "log", "show", "diff", "rev-parse", "stash",
                   "checkout", "remote", "config", "reset", "merge", "fetch", "tag", "ls-files"}
 
-# Filtro de comandos peligrosos (el mismo de backend/servicios/comandos_peligrosos.py; CódigoCamp lo copia aquí al descargar)
-REVISAR_COMANDO = None  # %FILTRO%
-if REVISAR_COMANDO is None:   # copia sin filtro incluido (por ejemplo, el archivo del repositorio): se busca el del backend
-    try:
-        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "backend"))
-        from servicios.comandos_peligrosos import revisar_comando as REVISAR_COMANDO   # noqa: N812
-    except Exception:
-        REVISAR_COMANDO = None
+# En TU equipo los comandos se ejecutan tal cual (como en la terminal de VS Code): tú eres responsable de lo que corres
+# aquí (Términos, sección 7). El escudo de CódigoCamp protege el SERVIDOR, no frena tu terminal.
+REVISAR_COMANDO = None
 
 V, R, A, G, N = ("", "", "", "", "") if WINDOWS and not os.environ.get("WT_SESSION") else ("\033[32m", "\033[31m", "\033[33m", "\033[90m", "\033[0m")
 
@@ -670,6 +680,7 @@ class Agente:
         self.ws = None              # canal WebSocket (si el servidor lo permite); si no, peticiones HTTP
         self.activo = True
         self.ultima_orden = time.time()
+        self._lock_dialogo = threading.Lock()   # el explorador de archivos del sistema, de a uno
         self.av = Antivirus()
         self.infectados = set()     # rutas relativas que el antivirus marcó (no se listan ni se envían)
 
@@ -719,11 +730,6 @@ class Agente:
             self.salida(o["id"], f"🛡️ Este equipo bloqueó el comando porque {motivo}.\n", True, 126)
             return
         self.ultima_orden = time.time()
-        amenaza = self.revisar_programa(linea, cwd)
-        if amenaza:
-            print(f"{R}[virus]{N} {amenaza}")
-            self.salida(o["id"], f"🛡️ El antivirus de este equipo encontró «{amenaza}» en el programa que ibas a ejecutar. No se ejecutó.\n", True, 126)
-            return
         print(f"{G}[{time.strftime('%H:%M:%S')}]{N} {V}${N} {linea.splitlines()[0][:120] if linea else ''}")
         env = dict(os.environ, FORCE_COLOR="1", PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", COLUMNS=str(o.get("columnas") or 100), TERM="xterm-256color")
         try:
@@ -799,7 +805,7 @@ class Agente:
         for parte in partes:
             for linea in t.linea.agregar(parte):
                 motivo = REVISAR_COMANDO(linea) if REVISAR_COMANDO and linea.strip() else None
-                amenaza = None if motivo else (self.revisar_programa(linea, self.carpeta) if linea.strip() else None)
+                amenaza = None   # los programas los revisa el antivirus de tu equipo en tiempo real (sin demoras aquí)
                 if motivo or amenaza:
                     print(f"{R}[bloqueado]{N} {linea[:120]}")
                     t.escribir(b"\x1b" if WINDOWS else b"\x15")   # borra la línea escrita en la shell
@@ -901,8 +907,8 @@ class Agente:
 
     # ------------------------------------------------------- carpeta abierta en Trabajo (como un editor) ----
     def guardar_revisado(self, destino, datos, rel):
-        """Escribe el archivo; si es un programa o binario, el antivirus del equipo lo revisa antes de dejarlo."""
-        if not (revisar_ext(destino) or not es_texto(datos)) or not self.av.escaner:
+        """Escribe el archivo directo, como VS Code. El antivirus de tu equipo lo revisa solo (en tiempo real)."""
+        if True:
             with open(destino, "wb") as f:
                 f.write(datos)
             return
@@ -924,7 +930,8 @@ class Agente:
     def fs(self, o):
         accion = str(o.get("accion", ""))
         metodo = getattr(self, "fs_" + accion, None) if accion in {"listar", "leer", "escribir", "carpeta", "borrar", "explorar",
-                                                                    "nueva", "raiz", "git", "antivirus", "leer_varios", "servicios", "leer_parte", "escribir_parte"} else None
+                                                                    "nueva", "raiz", "git", "antivirus", "leer_varios", "servicios", "leer_parte", "escribir_parte",
+                                                                    "elegir_nativo", "mostrar", "http"} else None
         if accion not in {"listar", "antivirus", "servicios"}:   # revisar la carpeta cada pocos segundos no cuenta como «usarlo»
             self.ultima_orden = time.time()
 
@@ -950,28 +957,60 @@ class Agente:
         return destino
 
     def fs_listar(self, o):
+        """Todos los archivos de la carpeta (como VS Code: sin límite práctico). Con «previo» solo manda lo que cambió
+        desde la última vez: con cientos de miles de archivos, cada revisión pesa unos pocos bytes."""
+        # Como VS Code: .git no se muestra; node_modules, venv, __pycache__… SÍ se muestran, pero su contenido solo se lee
+        # cuando abres esa carpeta en el explorador («abrir»). Así no se cargan miles de archivos que no vas a tocar.
         ignorar = set(o.get("ignorar") or IGNORAR)
-        archivos, carpetas = [], []
-        for raiz, dirs, nombres in os.walk(self.carpeta):
-            dirs[:] = sorted(d for d in dirs if d not in ignorar and not os.path.islink(os.path.join(raiz, d)))
-            rel_dir = os.path.relpath(raiz, self.carpeta).replace(os.sep, "/")
-            if rel_dir != ".":
-                carpetas.append(rel_dir)
-            for nombre in nombres:
-                if nombre.endswith((".ccrevision", ".ccparcial")):
-                    continue
-                ruta = os.path.join(raiz, nombre)
-                rel = nombre if rel_dir == "." else f"{rel_dir}/{nombre}"
-                if rel in self.infectados:
-                    continue
+        abrir = {str(x) for x in (o.get("abrir") or [])[:500]}
+        archivos, carpetas, pesadas = {}, [], []
+        incompleto = False
+        pila = [("", self.carpeta, False)]
+        while pila and not incompleto:
+            rel_dir, ruta_dir, dentro_pesada = pila.pop()
+            try:
+                entradas = list(os.scandir(ruta_dir))
+            except OSError:
+                continue
+            for e in entradas:
                 try:
-                    st = os.stat(ruta)
+                    if e.is_dir(follow_symlinks=False):
+                        if e.name in OCULTAS:
+                            continue
+                        rel = f"{rel_dir}/{e.name}" if rel_dir else e.name
+                        carpetas.append(rel)
+                        pesada = dentro_pesada or e.name in ignorar
+                        if pesada and rel not in abrir:
+                            pesadas.append(rel)     # se ve, pero no se entra hasta que la abras
+                            continue
+                        pila.append((rel, e.path, pesada))
+                    elif e.is_file(follow_symlinks=True):
+                        if e.name.endswith((".ccrevision", ".ccparcial")):
+                            continue
+                        rel = f"{rel_dir}/{e.name}" if rel_dir else e.name
+                        if rel in self.infectados:
+                            continue
+                        st = e.stat()
+                        archivos[rel] = (st.st_size, _ms(st))
+                        if len(archivos) >= MAX_LISTAR:
+                            incompleto = True
+                            break
                 except OSError:
                     continue
-                archivos.append({"ruta": rel, "tamano": st.st_size, "modificado": _ms(st)})
-                if len(archivos) >= MAX_LISTAR:
-                    return {"archivos": archivos, "carpetas": carpetas, "incompleto": True, "carpeta": self.carpeta}
-        return {"archivos": archivos, "carpetas": carpetas, "carpeta": self.carpeta}
+        carpetas.sort()
+        previo = getattr(self, "_foto", None)
+        token = f"{time.time_ns():x}"
+        self._foto = {"token": token, "carpeta": self.carpeta, "archivos": archivos, "carpetas": set(carpetas)}
+        extra = {"pesadas": pesadas, **({"incompleto": True} if incompleto else {})}
+        if previo and o.get("previo") and o.get("previo") == previo["token"] and previo["carpeta"] == self.carpeta:
+            viejos = previo["archivos"]
+            cambiados = [{"ruta": r, "tamano": v[0], "modificado": v[1]} for r, v in archivos.items() if viejos.get(r) != v]
+            borrados = [r for r in viejos if r not in archivos]
+            return {"cambios": True, "token": token, "archivos": cambiados, "borrados": borrados,
+                    "carpetas_nuevas": sorted(set(carpetas) - previo["carpetas"]), "carpetas_borradas": sorted(previo["carpetas"] - set(carpetas)),
+                    "carpeta": self.carpeta, **extra}
+        return {"archivos": [{"ruta": r, "tamano": v[0], "modificado": v[1]} for r, v in archivos.items()], "carpetas": carpetas,
+                "token": token, "carpeta": self.carpeta, **extra}
 
     def _leer_bytes(self, ruta, rel):
         try:
@@ -995,7 +1034,7 @@ class Agente:
         if not revisar:   # leer_varios los revisa todos juntos
             return {"b64": base64.b64encode(datos).decode(), "tamano": st.st_size, "modificado": _ms(st),
                     "_revisar": bool(revisar_ext(ruta) or not es_texto(datos)), "_ruta": ruta}
-        if (revisar_ext(ruta) or not es_texto(datos)) and not self.av.en_tiempo_real:
+        if False:   # sin revisiones extra: el antivirus de tu equipo ya revisa en tiempo real
             amenaza = self.av.revisar(ruta)
             if amenaza:
                 self.infectados.add(rel)
@@ -1007,11 +1046,10 @@ class Agente:
         """Varios archivos de una vez. Los binarios y ejecutables se revisan con el antivirus TODOS JUNTOS (antes era un
         programa por archivo: abrir una carpeta con imágenes tardaba minutos)."""
         archivos, total, por_revisar = {}, 0, {}
-        for rel in [str(r) for r in (o.get("rutas") or [])][:500]:
+        for rel in [str(r) for r in (o.get("rutas") or [])][:5000]:
             try:
                 d = self.fs_leer({"ruta": rel}, revisar=False)
-                if d.pop("_revisar") and not self.av.en_tiempo_real:
-                    por_revisar[d["_ruta"]] = rel
+                d.pop("_revisar")   # sin revisiones extra (el antivirus de tu equipo trabaja en tiempo real)
                 d.pop("_ruta")
                 total += d["tamano"]
                 archivos[rel] = d
@@ -1019,7 +1057,7 @@ class Agente:
                 archivos[rel] = {"error": str(e), **e.extra}
             except OSError:
                 archivos[rel] = {"error": "No se pudo leer (¿está abierto en otro programa?)."}
-            if total > 12_000_000:
+            if total > 16_000_000:
                 break
         for ruta, amenaza in self.av.revisar_varios(list(por_revisar)).items():
             rel = por_revisar[ruta]
@@ -1034,14 +1072,15 @@ class Agente:
         rel = str(o.get("ruta"))
         desde = max(0, int(o.get("desde") or 0))
         st = os.stat(ruta)
-        if desde == 0 and not self.av.en_tiempo_real:
+        if False:
             amenaza = self.av.revisar(ruta)
             if amenaza:
                 self.infectados.add(rel)
                 raise ErrorFs(f"🛡️ El antivirus de este equipo encontró «{amenaza}» en «{rel}». No se envió a CódigoCamp.", virus=True)
+        largo = PARTE if not o.get("largo") else max(64 * 1024, min(PARTE, int(o.get("largo"))))   # videos: trozos chicos para empezar ya
         with open(ruta, "rb") as f:
             f.seek(desde)
-            datos = f.read(PARTE)
+            datos = f.read(largo)
         return {"b64": base64.b64encode(datos).decode(), "desde": desde, "total": st.st_size, "modificado": _ms(st), "fin": desde + len(datos) >= st.st_size}
 
     def fs_escribir_parte(self, o):
@@ -1059,8 +1098,8 @@ class Agente:
             f.truncate()
         if not o.get("fin"):
             return {"recibido": os.path.getsize(temporal)}
-        amenaza = self.av.revisar(temporal) if os.path.exists(temporal) else "eliminado por el antivirus"
-        if amenaza or not os.path.exists(temporal):
+        amenaza = None if os.path.exists(temporal) else "eliminado por el antivirus de tu equipo"
+        if amenaza:
             try:
                 os.remove(temporal)
             except OSError:
@@ -1125,7 +1164,8 @@ class Agente:
         ruta = os.path.realpath(str(o.get("ruta") or "") or self.carpeta)
         if not os.path.isdir(ruta) or not permitida(ruta):
             ruta = os.path.realpath(os.path.expanduser("~"))
-        carpetas = []
+        carpetas, archivos = [], []
+        con_archivos = bool(o.get("archivos"))
         try:
             for e in sorted(os.scandir(ruta), key=lambda x: x.name.lower()):
                 if e.name.startswith(".") or e.name.startswith("$") or e.name in {"node_modules", "__pycache__", "AppData", "Library"}:
@@ -1133,13 +1173,149 @@ class Agente:
                 try:
                     if e.is_dir() and permitida(e.path):
                         carpetas.append(e.name)
+                    elif con_archivos and len(archivos) < 1000 and e.is_file() and permitida(e.path):
+                        # Archivos de contraseñas, llaves y del sistema nunca se muestran
+                        if not re.search(r"(?i)(\.(pem|key|p12|pfx|kdbx|keychain|wallet)$|^(id_rsa|id_ed25519|shadow|passwd|login data|cookies)$)", e.name):
+                            archivos.append({"n": e.name, "t": e.stat().st_size})
                 except OSError:
                     pass
         except PermissionError:
             pass
         padre = os.path.dirname(ruta)
-        return {"ruta": ruta, "padre": padre if padre != ruta and permitida(padre) else None, "carpetas": carpetas[:1000],
+        return {"ruta": ruta, "padre": padre if padre != ruta and permitida(padre) else None, "carpetas": carpetas[:1000], "archivos": archivos,
                 "elegible": elegible(ruta), "actual": self.carpeta, "separador": os.sep, "raices": self._raices()}
+
+    # ---- Explorador de archivos REAL del equipo (como «Abrir carpeta» de VS Code) -------------------------------
+    def _dialogo_tk(self, tipo, env):
+        """Explorador del sistema con tkinter (viene con Python): en Windows es el mismo «Abrir» moderno del Explorador
+        y abre en menos de un segundo. Devuelve la ruta, "" si se canceló o None si tkinter no está disponible."""
+        if getattr(sys, "frozen", False) or not sys.executable:
+            return None
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        try:
+            r = subprocess.run([sys.executable, "-I", "-c", DIALOGO_TK, tipo], capture_output=True, timeout=900, env=env, creationflags=flags)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if r.returncode:
+            return None
+        return r.stdout.decode("utf-8", "replace").strip()
+
+    def _dialogo_nativo(self, tipo, inicio):
+        """Abre el selector de carpetas/archivos del sistema EN la pantalla del equipo y devuelve la ruta elegida
+        ("" si se canceló). Windows: el del Explorador; macOS: Finder; Linux: zenity o kdialog."""
+        sistema = platform.system()
+        env = dict(os.environ, CC_INICIO=inicio or os.path.expanduser("~"))
+        if sistema == "Windows":
+            ruta = self._dialogo_tk(tipo, env)   # rápido y moderno; si no hay tkinter, PowerShell
+            if ruta is not None:
+                return ruta
+            if tipo == "carpeta":
+                ps = ("Add-Type -AssemblyName System.Windows.Forms;"
+                      "$d=New-Object System.Windows.Forms.FolderBrowserDialog;"
+                      "$d.Description='Elige la carpeta que quieres abrir en CodigoCamp';$d.ShowNewFolderButton=$true;$d.SelectedPath=$env:CC_INICIO;")
+                elegir = "if($d.ShowDialog($w) -eq 'OK'){[Console]::OutputEncoding=[Text.Encoding]::UTF8;Write-Output $d.SelectedPath}"
+            else:
+                ps = ("Add-Type -AssemblyName System.Windows.Forms;"
+                      "$d=New-Object System.Windows.Forms.OpenFileDialog;$d.Title='Elige el archivo que quieres abrir en CodigoCamp';"
+                      "$d.InitialDirectory=$env:CC_INICIO;$d.Filter='Todos los archivos (*.*)|*.*';")
+                elegir = "if($d.ShowDialog($w) -eq 'OK'){[Console]::OutputEncoding=[Text.Encoding]::UTF8;Write-Output $d.FileName}"
+            # Una ventana invisible «siempre encima» como dueña: el diálogo aparece delante del navegador
+            ps += "$w=New-Object System.Windows.Forms.Form -Property @{TopMost=$true};" + elegir
+            cmd = ["powershell", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-Command", ps]
+        elif sistema == "Darwin":
+            que = "choose folder" if tipo == "carpeta" else "choose file"
+            script = (f'set p to POSIX path of ({que} with prompt "Elige qué abrir en CódigoCamp" '
+                      f'default location (POSIX file (system attribute "CC_INICIO")))\nreturn p')
+            cmd = ["osascript", "-e", 'tell application "System Events" to activate', "-e", script]
+        else:
+            if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+                raise ErrorFs("Este equipo no tiene pantalla (o el Conector corre sin escritorio): usa el explorador de CódigoCamp.", sin_nativo=True)
+            inicio_dir = (inicio or os.path.expanduser("~")).rstrip("/") + "/"
+            if shutil.which("zenity"):
+                cmd = ["zenity", "--file-selection", "--title=Elige qué abrir en CódigoCamp", f"--filename={inicio_dir}"] + (["--directory"] if tipo == "carpeta" else [])
+            elif shutil.which("kdialog"):
+                cmd = ["kdialog", "--getexistingdirectory" if tipo == "carpeta" else "--getopenfilename", inicio_dir]
+            else:
+                ruta = self._dialogo_tk(tipo, env)
+                if ruta is not None:
+                    return ruta
+                raise ErrorFs("Para abrir el explorador de archivos de Linux instala zenity (sudo apt install zenity). Mientras, usa el explorador de CódigoCamp.", sin_nativo=True)
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=900, env=env)
+        except FileNotFoundError:
+            raise ErrorFs("No se encontró el explorador de archivos del sistema: usa el explorador de CódigoCamp.", sin_nativo=True)
+        except subprocess.TimeoutExpired:
+            return ""
+        salida = r.stdout.decode("utf-8", "replace").strip().splitlines()
+        return salida[-1].strip() if salida else ""
+
+    def fs_elegir_nativo(self, o):
+        tipo = "archivo" if o.get("que") == "archivo" else "carpeta"
+        with self._lock_dialogo:   # un solo explorador abierto a la vez
+            ruta = self._dialogo_nativo(tipo, self.carpeta)
+        if not ruta:
+            return {"cancelado": True}
+        ruta = os.path.realpath(ruta)
+        carpeta = ruta if tipo == "carpeta" else os.path.dirname(ruta)
+        if not permitida(carpeta):
+            raise ErrorFs("🔒 Esa carpeta es del sistema o de contraseñas: CódigoCamp no la abre. Elige la carpeta de tu proyecto.")
+        return {"ruta": ruta, "carpeta": carpeta, "archivo": os.path.basename(ruta) if tipo == "archivo" else None,
+                "elegible": elegible(carpeta)}
+
+    def fs_http(self, o):
+        """Cliente HTTP de Trabajo: hace la petición DESDE este equipo (para llegar a tu API en localhost o en tu red).
+        Es lo mismo que si escribieras curl en tu terminal; la respuesta vuelve a Trabajo (máx. 8 MB)."""
+        url = str(o.get("url") or "")
+        if not re.match(r"^https?://", url, re.I):
+            raise ErrorFs("La dirección debe empezar con http:// o https://")
+        metodo = str(o.get("metodo") or "GET").upper()
+        if metodo not in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}:
+            raise ErrorFs("Método no válido.")
+        cuerpo = base64.b64decode(o["cuerpo_b64"]) if o.get("cuerpo_b64") else None
+        req = urllib.request.Request(url, data=cuerpo if cuerpo or metodo in {"POST", "PUT", "PATCH"} else None, method=metodo)
+        for par in (o.get("cabeceras") or [])[:100]:
+            if isinstance(par, (list, tuple)) and len(par) == 2 and "\n" not in str(par[0]) + str(par[1]):
+                req.add_header(str(par[0])[:200], str(par[1])[:8000])
+        if not req.has_header("User-agent"):
+            req.add_header("User-Agent", "CodigoCamp-Trabajo/1.0")
+        ctx = None
+        if url.lower().startswith("https") and o.get("verificar") is False:
+            import ssl
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        inicio = time.monotonic()
+        try:
+            r = urllib.request.urlopen(req, timeout=30, context=ctx)
+        except urllib.error.HTTPError as e:   # 4xx / 5xx también son respuestas
+            r = e
+        except urllib.error.URLError as e:
+            motivo = getattr(e, "reason", e)
+            raise ErrorFs(f"No se pudo conectar con {urllib.parse.urlsplit(url).netloc}: {motivo}. ¿Está encendido tu servidor?")
+        except (socket.timeout, TimeoutError):
+            raise ErrorFs("Tu servidor no respondió en 30 segundos.")
+        with r:
+            datos = r.read(8 * 1024 * 1024 + 1)
+            return {"status": r.status if hasattr(r, "status") else r.code, "razon": getattr(r, "reason", "") or "",
+                    "cabeceras": [[k, v] for k, v in r.headers.items()][:200], "cuerpo_b64": base64.b64encode(datos[:8 * 1024 * 1024]).decode(),
+                    "truncado": len(datos) > 8 * 1024 * 1024, "ms": round((time.monotonic() - inicio) * 1000), "url": r.geturl() if hasattr(r, "geturl") else url}
+
+    def fs_mostrar(self, o):
+        """Abre la carpeta actual (o una subcarpeta) en el explorador de archivos real del equipo."""
+        ruta = os.path.realpath(os.path.join(self.carpeta, str(o.get("ruta") or "")))
+        if not (ruta == self.carpeta or ruta.startswith(self.carpeta.rstrip(os.sep) + os.sep)) or not os.path.exists(ruta):
+            raise ErrorFs("Esa ruta no está en la carpeta abierta.")
+        sistema = platform.system()
+        if sistema == "Windows":
+            subprocess.Popen(["explorer", ruta] if os.path.isdir(ruta) else ["explorer", "/select,", ruta])
+        elif sistema == "Darwin":
+            subprocess.Popen(["open", ruta] if os.path.isdir(ruta) else ["open", "-R", ruta])
+        else:
+            abrir_con = shutil.which("xdg-open")
+            if not abrir_con or not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+                raise ErrorFs("Este equipo no tiene explorador de archivos gráfico.")
+            subprocess.Popen([abrir_con, ruta if os.path.isdir(ruta) else os.path.dirname(ruta)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return {"ok": True}
 
     def fs_nueva(self, o):
         base = os.path.realpath(str(o.get("ruta") or ""))

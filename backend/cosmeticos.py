@@ -4,7 +4,7 @@ El aspecto de cada cosmético vive en frontend/js/cosmeticos.js; aquí solo su c
 Los «exclusivos» no se venden: solo salen de los cofres.
 """
 
-TIPOS = ("fondo", "cursor", "tema", "marco", "efecto", "dedo", "codi")
+TIPOS = ("fondo", "cursor", "tema", "marco", "efecto", "dedo", "codi", "teclado")
 
 COSMETICOS = [
     # ---- Fondos de página
@@ -56,6 +56,22 @@ COSMETICOS = [
     {"clave": "efecto_monedas", "tipo": "efecto", "nombre": "Lluvia de monedas", "precio": 650, "rareza": "epico", "descripcion": "Cada clic hace saltar monedas de oro."},
     {"clave": "efecto_rayos", "tipo": "efecto", "nombre": "Descarga eléctrica", "precio": 800, "rareza": "epico", "descripcion": "Chispas eléctricas en cada clic."},
     {"clave": "efecto_fuegos", "tipo": "efecto", "nombre": "Fuegos artificiales", "precio": 2000, "rareza": "legendario", "descripcion": "Cada clic es un fuego artificial de colores."},
+    # ---- Teclados de código del celular (la barra de símbolos { } ( ) ; y las teclas de la terminal en Trabajo)
+    {"clave": "teclado_pastel", "tipo": "teclado", "nombre": "Teclado pastel", "precio": 70, "rareza": "comun", "descripcion": "Teclas suaves en rosa, menta y lavanda."},
+    {"clave": "teclado_madera", "tipo": "teclado", "nombre": "Teclado de madera", "precio": 90, "rareza": "comun", "descripcion": "Teclas cálidas con vetas de madera."},
+    {"clave": "teclado_noche", "tipo": "teclado", "nombre": "Teclado modo noche", "precio": 90, "rareza": "comun", "descripcion": "Teclas oscuras con letras claras: descansa la vista."},
+    {"clave": "teclado_hacker", "tipo": "teclado", "nombre": "Teclado hacker", "precio": 220, "rareza": "raro", "descripcion": "Verde terminal sobre negro, como en las películas."},
+    {"clave": "teclado_hielo", "tipo": "teclado", "nombre": "Teclado de hielo", "precio": 260, "rareza": "raro", "descripcion": "Teclas de cristal azul con borde escarchado."},
+    {"clave": "teclado_retro", "tipo": "teclado", "nombre": "Teclado retro", "precio": 300, "rareza": "raro", "descripcion": "Teclas beige y naranja de computador de los 80."},
+    {"clave": "teclado_sakura", "tipo": "teclado", "nombre": "Teclado sakura", "precio": 280, "rareza": "raro", "descripcion": "Pétalos de cerezo sobre un cielo rosa. Suena como un «pop» suave."},
+    {"clave": "teclado_oceano", "tipo": "teclado", "nombre": "Teclado océano", "precio": 320, "rareza": "raro", "descripcion": "Teclas de agua con burbujas y olas al fondo. Suena a burbujas."},
+    {"clave": "teclado_neon", "tipo": "teclado", "nombre": "Teclado neón", "precio": 520, "rareza": "epico", "descripcion": "Cada tecla brilla en cian y rosa, y late al tocarla. Animado."},
+    {"clave": "teclado_lava", "tipo": "teclado", "nombre": "Teclado de lava", "precio": 650, "rareza": "epico", "descripcion": "Magma que fluye dentro de las teclas. Animado."},
+    {"clave": "teclado_dragon", "tipo": "teclado", "nombre": "Teclado dragón", "precio": 720, "rareza": "epico", "descripcion": "Escamas esmeralda con fuego que corre por las teclas. Animado y con rugido grave."},
+    {"clave": "teclado_arcoiris", "tipo": "teclado", "nombre": "Teclado arcoíris", "precio": 1600, "rareza": "legendario", "descripcion": "Una ola de colores recorre todas las teclas sin parar. Animado."},
+    {"clave": "teclado_galaxia", "tipo": "teclado", "nombre": "Teclado galaxia", "precio": 2400, "rareza": "legendario", "descripcion": "Teclas de nebulosa con estrellas que titilan y un brillo al tocarlas. Animado."},
+    {"clave": "teclado_aurora", "tipo": "teclado", "nombre": "Teclado aurora boreal", "precio": 2800, "rareza": "legendario", "descripcion": "Luces del norte que ondulan en el fondo y teclas de cristal que brillan. Suena a campanas de hielo. Animado."},
+    {"clave": "teclado_oro", "tipo": "teclado", "nombre": "Teclado de oro", "precio": 3200, "rareza": "legendario", "descripcion": "Oro pulido con un destello que cruza las teclas. El más caro. Animado."},
     # ---- Accesorios de Codi (la mascota los lleva puestos en toda la página)
     {"clave": "codi_bigote", "tipo": "codi", "nombre": "Bigote elegante", "precio": 60, "rareza": "comun", "descripcion": "Codi se pone serio... o eso intenta."},
     {"clave": "codi_flor", "tipo": "codi", "nombre": "Flor en la cabeza", "precio": 70, "rareza": "comun", "descripcion": "Una flor rosada para un Codi tierno."},
@@ -287,5 +303,30 @@ COFRES = [
     {"clave": "c19_sabio", "nombre": "Sabio", "cofre": "legendario", "medida": "lecciones", "meta": 100, "texto": "Completa 100 lecciones", "premio": {"diamante": 1200, "cosmetico": "cursor_sabio"}},
     {"clave": "c20_mito", "nombre": "Mito", "cofre": "legendario", "medida": "xp", "meta": 5000, "texto": "Gana 5000 XP", "premio": {"diamante": 2000, "cosmetico": "dedo_mito"}},
     {"clave": "c21_cien_dias", "nombre": "Cien días", "cofre": "legendario", "medida": "racha", "meta": 100, "texto": "Practica 100 días seguidos", "premio": {"diamante": 3000, "salvarrachas": 5, "cosmetico": "tema_mito"}},
+    # --- Más cofres de logro (IA, Trabajo, chats, niveles perfectos, medallas, cursos y nivel) ---
+    {"clave": "c22_curioso", "nombre": "Curioso", "cofre": "madera", "medida": "ia", "meta": 5, "texto": "Hazle 5 preguntas al tutor de IA", "premio": {"diamante": 80, "cosmetico": "codi_gafas_nerd"}},
+    {"clave": "c23_investigador", "nombre": "Investigador", "cofre": "plata", "medida": "ia", "meta": 50, "texto": "Hazle 50 preguntas al tutor de IA", "premio": {"diamante": 250, "cosmetico": "codi_audifonos"}},
+    {"clave": "c24_primer_programa", "nombre": "Primer programa", "cofre": "madera", "medida": "ejecuciones", "meta": 1, "texto": "Ejecuta tu código en Trabajo", "premio": {"diamante": 60, "cosmetico": "teclado_madera"}},
+    {"clave": "c25_programador", "nombre": "Programador", "cofre": "plata", "medida": "ejecuciones", "meta": 50, "texto": "Ejecuta tu código 50 veces en Trabajo", "premio": {"diamante": 250, "cosmetico": "teclado_hacker"}},
+    {"clave": "c26_ingeniero", "nombre": "Ingeniero", "cofre": "oro", "medida": "ejecuciones", "meta": 300, "texto": "Ejecuta tu código 300 veces en Trabajo", "premio": {"diamante": 500, "cosmetico": "fondo_circuito"}},
+    {"clave": "c27_charlatan", "nombre": "Charlatán", "cofre": "madera", "medida": "mensajes", "meta": 20, "texto": "Envía 20 mensajes en Chats", "premio": {"diamante": 90, "cosmetico": "efecto_corazones"}},
+    {"clave": "c28_alma_fiesta", "nombre": "Alma de la fiesta", "cofre": "oro", "medida": "mensajes", "meta": 200, "texto": "Envía 200 mensajes en Chats", "premio": {"diamante": 400, "cosmetico": "efecto_confeti"}},
+    {"clave": "c29_preciso", "nombre": "Preciso", "cofre": "plata", "medida": "perfectos", "meta": 10, "texto": "Termina 10 niveles sin fallos", "premio": {"diamante": 200, "vidas": 5}},
+    {"clave": "c30_cirujano", "nombre": "Cirujano del código", "cofre": "oro", "medida": "perfectos", "meta": 50, "texto": "Termina 50 niveles sin fallos", "premio": {"diamante": 500, "cosmetico": "cursor_rayo"}},
+    {"clave": "c31_impecable", "nombre": "Impecable", "cofre": "legendario", "medida": "perfectos", "meta": 200, "texto": "Termina 200 niveles sin fallos", "premio": {"diamante": 1500, "cosmetico": "marco_diamante"}},
+    {"clave": "c32_primera_medalla", "nombre": "Primera medalla", "cofre": "oro", "medida": "medallas", "meta": 1, "texto": "Gana tu primera medalla del mes", "premio": {"diamante": 400, "cosmetico": "marco_oro"}},
+    {"clave": "c33_coleccionista", "nombre": "Coleccionista", "cofre": "diamante", "medida": "medallas", "meta": 3, "texto": "Gana 3 medallas del mes", "premio": {"diamante": 800, "cosmetico": "codi_corona"}},
+    {"clave": "c34_vitrina", "nombre": "Vitrina de oro", "cofre": "legendario", "medida": "medallas", "meta": 6, "texto": "Gana 6 medallas del mes", "premio": {"diamante": 1500, "cosmetico": "teclado_oro"}},
+    {"clave": "c35_anio_completo", "nombre": "Año completo", "cofre": "legendario", "medida": "medallas", "meta": 12, "texto": "Gana 12 medallas del mes", "premio": {"diamante": 4000, "salvarrachas": 5, "cosmetico": "fondo_agujero_negro"}},
+    {"clave": "c36_politglota", "nombre": "Políglota", "cofre": "plata", "medida": "cursos", "meta": 2, "texto": "Practica 2 lenguajes distintos", "premio": {"diamante": 200, "cosmetico": "tema_neon"}},
+    {"clave": "c37_multilenguaje", "nombre": "Multilenguaje", "cofre": "oro", "medida": "cursos", "meta": 5, "texto": "Practica 5 lenguajes distintos", "premio": {"diamante": 500, "cosmetico": "codi_mago"}},
+    {"clave": "c38_enciclopedia", "nombre": "Enciclopedia", "cofre": "legendario", "medida": "cursos", "meta": 10, "texto": "Practica 10 lenguajes distintos", "premio": {"diamante": 1500, "cosmetico": "codi_birrete"}},
+    {"clave": "c39_nivel5", "nombre": "Nivel 5", "cofre": "madera", "medida": "nivel", "meta": 5, "texto": "Llega al nivel 5", "premio": {"diamante": 100, "cosmetico": "cursor_cohete"}},
+    {"clave": "c40_nivel20", "nombre": "Nivel 20", "cofre": "oro", "medida": "nivel", "meta": 20, "texto": "Llega al nivel 20", "premio": {"diamante": 500, "cosmetico": "tema_cyberpunk"}},
+    {"clave": "c41_nivel50", "nombre": "Nivel 50", "cofre": "legendario", "medida": "nivel", "meta": 50, "texto": "Llega al nivel 50", "premio": {"diamante": 2000, "cosmetico": "codi_astronauta"}},
+    {"clave": "c42_cien_encargos", "nombre": "Cien encargos", "cofre": "legendario", "medida": "desafios", "meta": 100, "texto": "Supera 100 encargos diarios", "premio": {"diamante": 1200, "cosmetico": "efecto_fuegos"}},
+    {"clave": "c43_trescientos", "nombre": "Trescientos niveles", "cofre": "legendario", "medida": "niveles", "meta": 300, "texto": "Supera 300 niveles de retos", "premio": {"diamante": 2500, "cosmetico": "teclado_galaxia"}},
+    {"clave": "c44_mitad_anio", "nombre": "Medio año", "cofre": "legendario", "medida": "racha", "meta": 180, "texto": "Practica 180 días seguidos", "premio": {"diamante": 5000, "salvarrachas": 5, "cosmetico": "fondo_hiperespacio"}},
+    {"clave": "c45_xp10000", "nombre": "Titán", "cofre": "legendario", "medida": "xp", "meta": 10000, "texto": "Gana 10 000 XP", "premio": {"diamante": 4000, "cosmetico": "marco_plasma"}},
 ]
 COFRE_POR_CLAVE = {c["clave"]: c for c in COFRES}

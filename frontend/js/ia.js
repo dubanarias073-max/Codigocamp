@@ -4,6 +4,7 @@ import { sonar } from "/js/sonidos.js";
 import { codiSVG } from "/js/codi.js";
 import { CSS_ADJUNTOS, crearAdjuntador } from "/js/adjuntar.js";
 import { formato } from "/js/formato-ia.js";
+import { apiEnVivo } from "/js/auth.js";
 const { user, prog } = await iniciar("ia");
 document.head.insertAdjacentHTML("beforeend", `<style>${CSS_ADJUNTOS}</style>`);
 const $ = (id) => document.getElementById(id);
@@ -12,6 +13,7 @@ const MAX = 12000;
 const TACTIL = matchMedia("(pointer: coarse)").matches;   // en el celular Enter hace salto de línea; se envía con la flecha
 const scroll = $("scroll");
 const abajo = () => { scroll.scrollTop = scroll.scrollHeight; };
+const estaAbajo = () => scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 120;
 // Alto de la barra de abajo del celular, para que la conversación ocupe justo el resto de la pantalla.
 { const inf = $("inf"); const medir = () => document.documentElement.style.setProperty("--alto-inf", `${inf.offsetHeight || 0}px`); new ResizeObserver(medir).observe(inf); medir(); }
 const ICO_COPIAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>';
@@ -47,6 +49,16 @@ function pintarHistorial() {
   $("log").replaceChildren();
   mensajes.forEach((m) => burbuja(m.rol, m.texto, (m.archivos || []).map((n) => ({ nombre: n }))));
   vacia(!mensajes.length);
+  const ult = mensajes.at(-1);
+  if (actual && ult?.rol === "yo") {   // quedó sin respuesta (se cortó la conexión): se puede reintentar
+    const b = burbuja("tutor", "Esta pregunta se quedó sin respuesta.");
+    b.classList.add("error");
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "btn ghost ia-reintentar"; btn.textContent = "↻ Responder ahora";
+    btn.style.cssText = "display:flex;width:max-content;margin-top:8px;padding:6px 14px;font-size:14px";
+    btn.onclick = () => { if (enviando) return; btn.remove(); b.classList.remove("error"); b.textContent = ""; b.closest(".msg").classList.add("pensando"); preguntar(ult.texto === "(archivos)" ? "" : ult.texto, { reintento: true, espera: b }); };
+    b.append(btn);
+  }
   $("tituloConv").textContent = actual?.titulo || "Conversación nueva";
   $("cabBtns").hidden = !actual;
   $("masConv").hidden = !actual;
@@ -171,6 +183,97 @@ $("nueva").onclick = nuevaConv;
 $("q").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey && !TACTIL && !e.isComposing) { e.preventDefault(); $("f").requestSubmit(); } };
 adj = crearAdjuntador({ boton: $("clip"), entrada: $("archivosIa"), bandeja: $("bandeja"), zona: $("ia"), destino: "ia" });
 new MutationObserver(actualizar).observe($("bandeja"), { childList: true });
+/** Pone la conversación como actual en cuanto el servidor la guarda (aunque la respuesta todavía no llegue). */
+function fijarConversacion(conv) {
+  const nueva = !actual || actual.id !== conv.id;
+  actual = { id: conv.id, titulo: conv.titulo, fijada: actual?.fijada || false };
+  if (nueva) history.replaceState(null, "", `?c=${actual.id}`);
+  $("tituloConv").textContent = actual.titulo; $("cabBtns").hidden = false; $("masConv").hidden = false;
+  if (nueva) cargarLista();
+}
+/** Busca en el servidor la respuesta a «pregunta» (el servidor la termina y la guarda aunque la conexión se corte). */
+async function buscarRespuesta(convId, pregunta) {
+  try {
+    const { conversacion } = await api(`/api/ia/conversaciones/${convId}`);
+    const ult = conversacion.mensajes.at(-1), penult = conversacion.mensajes.at(-2);
+    if (ult?.rol === "tutor" && penult?.rol === "yo" && penult.texto === (pregunta || "(archivos)")) return conversacion;
+  } catch { /* sin red */ }
+  return null;
+}
+/** Crea la conversación ANTES de preguntar: así un fallo o un reintento nunca abre conversaciones repetidas. */
+async function asegurarConversacion(t) {
+  if (actual) return actual;
+  try {
+    const { conversacion } = await api("/api/ia/conversaciones/", { titulo: t || "Archivos adjuntos" });
+    fijarConversacion(conversacion);
+    return actual;
+  } catch (x) {
+    if (x.estado === 401 || x.estado === 403) return null;   // sin cuenta: se usa el historial de esta página
+    throw x;
+  }
+}
+function mostrarError(espera, mensaje, reintentar) {
+  const msg = espera.closest(".msg");
+  msg.classList.remove("pensando");
+  espera.textContent = mensaje; espera.classList.add("error");
+  msg.querySelector(".ia-reintentar")?.remove();
+  const btn = document.createElement("button");
+  btn.type = "button"; btn.className = "btn ghost ia-reintentar"; btn.textContent = "↻ Reintentar";
+  btn.style.cssText = "display:flex;width:max-content;margin-top:8px;padding:6px 14px;font-size:14px";
+  btn.onclick = () => { if (enviando) return; btn.remove(); espera.classList.remove("error"); espera.textContent = ""; msg.classList.add("pensando"); reintentar(); };
+  espera.append(btn);
+}
+async function preguntar(t, { reintento = false, adjuntos = [], archivos = [], espera = null } = {}) {
+  if (enviando) return;
+  if (!espera) $("log").querySelectorAll(".ia-reintentar").forEach((b) => b.remove());   // una pregunta nueva deja atrás los «Reintentar» viejos
+  espera ??= burbuja("tutor", adjuntos.length ? "Revisando tus archivos…" : "", [], { pensando: true });
+  enviando = true; actualizar();
+  let conv = null;
+  try {
+    conv = await asegurarConversacion(t);
+    let pinta = 0;
+    const datos = { mensaje: t, adjuntos, reintento, contexto: { pagina: "IA" }, ...(conv ? { conversacion_id: conv.id } : { historial: mensajes.slice(-16) }) };
+    const r = await apiEnVivo("/api/tutor/", datos, (parcial) => {
+      espera.closest(".msg").classList.remove("pensando");
+      cancelAnimationFrame(pinta);
+      pinta = requestAnimationFrame(() => { const cerca = estaAbajo(); formato(espera, parcial); if (cerca) abajo(); });
+    }, (ev) => fijarConversacion(ev.conv));
+    cancelAnimationFrame(pinta);
+    if (r.desafios_completados?.length) import("/js/cofres.js").then((m) => m.avisarPremios(r.desafios_completados)).catch(() => {});
+    espera.closest(".msg").classList.remove("pensando");
+    formato(espera, r.respuesta);
+    sonar("ia");
+    if (!reintento) mensajes.push({ rol: "yo", texto: t || "(archivos)", archivos: archivos.map((a) => a.nombre) });
+    mensajes.push({ rol: "tutor", texto: r.respuesta });
+    if (r.conversacion) fijarConversacion(r.conversacion);
+  } catch (x) {
+    // Errores «de verdad» (límite, cuota, pregunta muy larga): se explican. Si solo se cortó la conexión, el servidor
+    // sigue y guarda la respuesta: se busca un momento antes de mostrar nada en rojo.
+    // Con respuesta del servidor (estado o error explicado) es definitivo; sin ella (red caída, respuesta cortada) se recupera.
+    const definitivo = Boolean(x.servidor || (x.estado && x.datos?.error));
+    let recuperada = null;
+    if (conv && !definitivo) {
+      const aviso_ = espera.closest(".msg").classList.contains("pensando");
+      if (aviso_) espera.querySelector(".ia-espera")?.replaceChildren(document.createTextNode("Se cortó la conexión, recuperando la respuesta…"));
+      for (const pausa of [1500, 3500, 7000, 12000]) {
+        await new Promise((ok) => setTimeout(ok, pausa));
+        if (!actual || actual.id !== conv.id) break;
+        recuperada = await buscarRespuesta(conv.id, t);
+        if (recuperada) break;
+      }
+    }
+    if (recuperada) {
+      espera.closest(".msg").classList.remove("pensando");
+      formato(espera, recuperada.mensajes.at(-1).texto);
+      mensajes = recuperada.mensajes;
+    } else {
+      enviando = false;
+      mostrarError(espera, x.message, () => preguntar(t, { reintento: Boolean(conv), adjuntos, archivos, espera }));
+    }
+  }
+  enviando = false; actualizar(); abajo();
+  if (!TACTIL) $("q").focus();
+}
 $("f").onsubmit = async (e) => {
   e.preventDefault();
   const t = $("q").value.trim();
@@ -184,28 +287,8 @@ $("f").onsubmit = async (e) => {
   burbuja("yo", t || "(archivos)", adj.adjuntos());
   adj.limpiar();
   sonar("enviar");
-  const espera = burbuja("tutor", adjuntos.length ? "Revisando tus archivos…" : "", [], { pensando: true });
-  try {
-    const r = await api("/api/tutor/", { mensaje: t, adjuntos, ...(actual ? { conversacion_id: actual.id } : { guardar: true }), contexto: { pagina: "IA" } });
-    if (r.desafios_completados?.length) import("/js/cofres.js").then((m) => m.avisarPremios(r.desafios_completados)).catch(() => {});
-    espera.closest(".msg").classList.remove("pensando");
-    formato(espera, r.respuesta);
-    sonar("ia");
-    mensajes.push({ rol: "yo", texto: t || "(archivos)", archivos: archivos.map((a) => a.nombre) }, { rol: "tutor", texto: r.respuesta });
-    if (r.conversacion) {
-      const nueva = !actual;
-      actual = { id: r.conversacion.id, titulo: r.conversacion.titulo, fijada: actual?.fijada || false };
-      if (nueva) history.replaceState(null, "", `?c=${actual.id}`);
-      $("tituloConv").textContent = actual.titulo; $("cabBtns").hidden = false; $("masConv").hidden = false;
-      cargarLista();
-    }
-  } catch (x) {
-    espera.closest(".msg").classList.remove("pensando");
-    espera.textContent = x.message; espera.classList.add("error");
-    $("q").value = t;                 // no pierdes lo que escribiste
-  }
-  enviando = false; actualizar(); abajo();
-  if (!TACTIL) $("q").focus();
+  enviando = false;   // preguntar() lo vuelve a poner mientras espera la respuesta
+  await preguntar(t, { adjuntos, archivos });
 };
 actualizar();
 

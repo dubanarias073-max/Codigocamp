@@ -28,6 +28,21 @@ def titulo_de(texto):
     return (t[:57].rstrip() + "…") if len(t) > 58 else (t or "Archivos adjuntos")
 
 
+def guardar_pregunta(conv, pregunta, archivos):
+    """Se guarda APENAS llega (antes de pedir la respuesta): si la conexión se corta, la conversación no se pierde."""
+    if not conv.mensajes and conv.titulo in ("", "Conversación nueva"):
+        conv.titulo = titulo_de(pregunta)
+    db.session.add(AIMessage(conversacion=conv, rol="yo", texto=pregunta or "(archivos)", archivos=list(archivos)[:20]))
+    conv.actualizada = utcnow()
+    db.session.commit()
+
+
+def guardar_respuesta(conv, respuesta):
+    db.session.add(AIMessage(conversacion=conv, rol="tutor", texto=respuesta))
+    conv.actualizada = utcnow()
+    db.session.commit()
+
+
 def guardar_intercambio(conv, pregunta, archivos, respuesta):
     """Guarda la pregunta y la respuesta; la primera pregunta pone el título (como Claude)."""
     if not conv.mensajes and conv.titulo in ("", "Conversación nueva"):
@@ -57,6 +72,11 @@ def crear():
     data = json_body()
     if isinstance(data, tuple):
         return data
+    # Conversaciones que quedaron vacías hace rato (se creó pero la pregunta nunca llegó): se borran
+    from datetime import timedelta
+    for v in AIConversation.query.filter_by(usuario_id=current_user.id).filter(~AIConversation.mensajes.any(),
+                                                                                AIConversation.creada < utcnow() - timedelta(minutes=10)).all():
+        db.session.delete(v)
     if AIConversation.query.filter_by(usuario_id=current_user.id).count() >= MAX_CONVERSACIONES:
         return api_error(f"Tienes {MAX_CONVERSACIONES} conversaciones. Borra algunas para crear más.")
     c = AIConversation(usuario_id=current_user.id, titulo=titulo_de(data.get("titulo")) if data.get("titulo") else "Conversación nueva")

@@ -238,8 +238,13 @@ export function avisarPremios(desafios = []) {
   const uno = desafios[0];
   d.innerHTML = `<span class="ap-ic" aria-hidden="true">🎁</span><div class="ap-tx"><b></b><small></small></div>
     <button type="button" class="btn pri sm" data-a="abrir">Abrir</button><button type="button" class="ap-x" data-a="luego" aria-label="Luego" title="Luego">✕</button>`;
-  d.querySelector("b").textContent = desafios.length > 1 ? `¡${desafios.length} encargos cumplidos!` : (uno.encabezado || "¡Encargo cumplido!");
-  d.querySelector("small").textContent = desafios.length > 1 ? "Tus premios ya están en tu cuenta" : `${uno.titulo || ""} · el premio ya está en tu cuenta`;
+  const medalla = desafios.find((x) => x.medalla);
+  if (medalla) {   // ¡medalla del mes! se muestra primero, con su dibujo
+    import("/js/medallas.js").then(({ svgMedalla, estilosMedallas }) => { estilosMedallas(); const ic = d.querySelector(".ap-ic"); ic.classList.add("medalla-nueva"); ic.innerHTML = svgMedalla(medalla.medalla.numero, { anio: Number(String(medalla.medalla.clave).slice(0, 4)), tam: 40 }); }).catch(() => {});
+    import("/js/mascota.js").then((m) => m.codiReacciona?.("celebra", `¡Medalla de ${medalla.encabezado?.replace("🏅 Medalla de ", "") || "este mes"}! 🏅`, 5000)).catch(() => {});
+  }
+  d.querySelector("b").textContent = medalla ? medalla.encabezado : desafios.length > 1 ? `¡${desafios.length} premios ganados!` : (uno.encabezado || "¡Encargo cumplido!");
+  d.querySelector("small").textContent = medalla ? `${medalla.titulo} Ya está en tu perfil.` : desafios.length > 1 ? "Tus premios ya están en tu cuenta" : `${uno.titulo || ""} · el premio ya está en tu cuenta`;
   document.body.appendChild(d);
   import("/js/sonidos.js").then((m) => m.sonar("premio")).catch(() => {});
   const quitar = () => { d.classList.add("sale"); setTimeout(() => d.remove(), 300); };

@@ -9,7 +9,8 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 export class VisorArchivo {
   /** @param {{ ruta: string, texto: string, url: (marcador:string, o?:object)=>string|null }} o */
-  constructor({ ruta, texto, url }) {
+  constructor({ ruta, texto, url, preparar = null }) {
+    this.preparar = preparar;   // archivos de tu equipo: se leen del disco la primera vez que los abres
     this.esImagen = true; // «no es texto editable» (trabajo.js usa esta marca)
     this.ruta = ruta;
     this.ext = extension(ruta);
@@ -37,6 +38,28 @@ export class VisorArchivo {
     const m = leerMarcador(this.texto);
     if (!m) { this.raiz.innerHTML = '<p class="visor-error">Este archivo ya no es un archivo guardado en la cuenta. Ciérralo y vuelve a abrirlo.</p>'; return; }
     const nombre = nombreBase(this.ruta);
+    const kAntes = OFFICE[this.ext] ? "documento" : clase(m.tipo);
+    const visible = ["imagen", "video", "audio", "pdf", "documento"].includes(kAntes) || /^text\/|json/.test(m.tipo);
+    if (this.url(this.texto) === null && this.preparar && !visible) {
+      // Programas, comprimidos, binarios…: como en VS Code, no se cargan; se muestran sus datos y se pueden descargar.
+      const tipoC = m.tipo.split("/")[1].replace(/^x-/, "").toUpperCase();
+      this.raiz.innerHTML = `<div class="visor-generico"><b>${esc(nombre)}</b><span>Archivo binario (${esc(tipoC)}) en tu equipo. No se puede ver como texto, pero puedes ejecutarlo o usarlo desde la terminal.</span></div>
+        <div class="visor-info"><span>${esc(tipoC)} · ${formatoBytes(m.tamano)}</span><button type="button" class="btn sm" data-bajar>Descargar</button></div>`;
+      this.raiz.querySelector("[data-bajar]").onclick = async (e) => {
+        e.target.disabled = true; e.target.textContent = "Preparando…";
+        try { await this.preparar(this.texto); const a = document.createElement("a"); a.href = this.url(this.texto); a.download = nombre; a.click(); }
+        catch (x) { e.target.textContent = x.message || "No se pudo"; return; }
+        e.target.disabled = false; e.target.textContent = "Descargar";
+      };
+      return;
+    }
+    if (this.url(this.texto) === null && this.preparar) {
+      this.raiz.innerHTML = `<p class="visor-cargando">Abriendo «${esc(nombre)}» desde tu equipo…</p>`;
+      const texto = this.texto;
+      this.preparar(texto).then(() => { if (this.texto === texto) this.#pintar(); },
+        (e) => { if (this.texto === texto) this.raiz.innerHTML = `<p class="visor-error">No se pudo abrir desde tu equipo: ${esc(e.message || "error")}</p>`; });
+      return;
+    }
     const src = esc(this.url(this.texto));
     const descarga = esc(this.url(this.texto, { descargar: true, nombre }));
     const tipoCorto = m.tipo.split("/")[1].replace(/^x-/, "").toUpperCase();
@@ -50,7 +73,7 @@ export class VisorArchivo {
       pdf: `<iframe class="visor-pdf" title="${esc(nombre)}" src="${src}"></iframe>`,
     }[k] ?? (/^text\/|json/.test(m.tipo)
       ? `<pre class="visor-texto" aria-label="Contenido de ${esc(nombre)} (solo lectura)">Cargando…</pre>`
-      : `<div class="visor-generico"><b>${esc(nombre)}</b><span>Este tipo de archivo no se puede ver aquí, pero está guardado en tu cuenta.</span></div>`);
+      : `<div class="visor-generico"><b>${esc(nombre)}</b><span>Este tipo de archivo no se puede ver aquí${this.preparar ? "" : ", pero está guardado en tu cuenta"}.</span></div>`);
     this.raiz.innerHTML = `${medio}
       <div class="visor-info"><span class="visor-medidas">${k === "imagen" || k === "video" ? "…" : esc(tipoCorto)}</span><span>${esc(tipoCorto)} · ${formatoBytes(m.tamano)}</span>
       ${etiqueta ? `<span>En HTML: <code>${esc(etiqueta)}</code></span>` : ""}

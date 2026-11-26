@@ -124,3 +124,19 @@ class AntivirusEquilibradoTest(unittest.TestCase):
             self.assertEqual(r(bueno, consultar_externos=False)["nivel"], "seguro", bueno)
         for malo in ("https://login-microsoftonline.com.evil.ru/", "https://free-robux-generator.tk", "javascript:alert(1)", "https://g00gle.com"):
             self.assertEqual(r(malo, consultar_externos=False)["nivel"], "bloqueado", malo)
+
+
+class CarpetasDelSistemaTest(unittest.TestCase):
+    """Con el Conector, CódigoCamp solo frena comandos destructivos y la entrada a carpetas del sistema."""
+    def test_bloquea_system32_y_carpetas_del_sistema(self):
+        from servicios.comandos_peligrosos import revisar_comando as r
+        for c in ["del /s /q C:\\Windows\\System32", "rd /s /q C:\\Windows", "cd C:\\Windows\\System32", "cd %SystemRoot%",
+                  "copy x.dll C:\\Windows\\System32", "echo 1 > C:\\Windows\\System32\\drivers\\etc\\hosts", "explorer C:\\Windows\\System32",
+                  "rm /etc/passwd", "sudo mv x /bin/ls", "sudo chmod 777 /etc/sudoers", "rm -rf /boot/grub"]:
+            self.assertTrue(r(c), c)
+
+    def test_no_molesta_el_trabajo_normal(self):
+        from servicios.comandos_peligrosos import revisar_comando as r
+        for c in ["cd C:\\Users\\Cris\\proyectos", "rm -rf node_modules", "cat /etc/hosts", "ls /usr/bin", "cd /etc", "npm install",
+                  "copy a.txt b.txt", "cd windows-app", "mv src/a.js src/b.js", "chmod +x run.sh", "python main.py"]:
+            self.assertIsNone(r(c), c)

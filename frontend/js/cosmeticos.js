@@ -1,5 +1,5 @@
 import { escenaArticulo } from "/js/escenas-tienda.js";
-import { ACCESORIOS_CODI, codiSVG, ponerAccesorioCodi } from "/js/codi.js";
+import { ACCESORIOS_CODI, codiSVG, ponerAccesorioCodi, redibujarCodis } from "/js/codi.js";
 // Cosméticos de la tienda y los cofres: cómo se ve cada fondo, puntero, tema, marco, efecto y rastro, y cómo se aplican
 // en todas las páginas. Todo es original (CSS, SVG y canvas), sin imágenes externas.
 const svg = (cuerpo, w = 32, h = 32) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 32 32">${cuerpo}</svg>`)}`;
@@ -52,6 +52,8 @@ export function juegoCursor(clave) {
   const k = CURSORES[clave];
   if (!k) return null;
   const [r, b, extra] = k.c;
+  if (k.partes) return k.partes;   // diseñado en el panel: cada parte por separado (null = la del sistema)
+  if (k.img) return { normal: { url: k.img, x: k.x, y: k.y }, mano: { url: k.img, x: k.x, y: k.y }, texto: { url: svg(TEXTO(r, b, "")), x: 16, y: 16 } };
   const def = k.def ?? "";
   return {
     normal: { url: svg(def + k.svg), x: k.x, y: k.y },
@@ -187,6 +189,84 @@ export const FONDOS = {
 };
 
 // -------------------------------------------------------------------------------------- marcos ----
+/* ===== Diseños del Teclado de CódigoCamp en el celular (teclado completo, barra de símbolos y teclas de la terminal) =====
+ * bg/fg/borde: colores de las teclas · anim: animación de los épicos y legendarios. */
+export const TECLADOS = {
+  // fondo: el fondo del teclado (arte en CSS) · chispa: color de las chispas al tocar (épicos y legendarios)
+  teclado_pastel: { bg: "linear-gradient(160deg,#fff1f8,#ede9fe)", fg: "#7e22ce", borde: "#f5d0fe", enter: "#c084fc",
+    fondo: "radial-gradient(60px 26px at 15% 30%,#fff 60%,transparent 62%),radial-gradient(80px 30px at 70% 18%,#fff 60%,transparent 62%),radial-gradient(70px 26px at 88% 80%,#fff 60%,transparent 62%),linear-gradient(180deg,#fbcfe8,#c4b5fd)" },
+  teclado_madera: { bg: "linear-gradient(180deg,#fef3c7,#fde68a)", fg: "#78350f", borde: "#b45309", enter: "#92400e", sombra: "0 3px 0 #92400e",
+    fondo: "repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 2px,transparent 2px 90px),repeating-linear-gradient(178deg,#a16207 0 3px,#92400e 3px 7px,#a16207 7px 12px,#854d0e 12px 15px)" },
+  teclado_noche: { bg: "#1e293b", fg: "#e2e8f0", borde: "#334155", enter: "#6366f1",
+    fondo: "radial-gradient(1.5px 1.5px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#cbd5e1,transparent),radial-gradient(1.5px 1.5px at 60% 30%,#fff,transparent),radial-gradient(1px 1px at 85% 60%,#e2e8f0,transparent),radial-gradient(22px 22px at 88% 18%,#fef9c3 45%,transparent 50%),linear-gradient(180deg,#020617,#1e1b4b)" },
+  teclado_hacker: { bg: "rgba(0,20,6,.85)", fg: "#4ade80", borde: "#166534", enter: "#16a34a", sombra: "0 0 8px rgba(74,222,128,.35)",
+    fondo: "repeating-linear-gradient(0deg,rgba(74,222,128,.07) 0 1px,transparent 1px 4px),repeating-linear-gradient(90deg,rgba(74,222,128,.12) 0 2px,transparent 2px 22px),#000", anim: "lluvia" },
+  teclado_hielo: { bg: "linear-gradient(160deg,rgba(255,255,255,.95),rgba(186,230,253,.8))", fg: "#075985", borde: "#7dd3fc", enter: "#0ea5e9", sombra: "inset 0 1px 0 #fff,0 2px 6px rgba(14,165,233,.25)",
+    fondo: "conic-gradient(from 30deg at 20% 30%,transparent 0 80deg,rgba(255,255,255,.5) 80deg 84deg,transparent 84deg),conic-gradient(from 200deg at 75% 60%,transparent 0 60deg,rgba(255,255,255,.45) 60deg 64deg,transparent 64deg),linear-gradient(180deg,#e0f2fe,#7dd3fc)" },
+  teclado_retro: { bg: "#efe6cf", fg: "#7c2d12", borde: "#c2410c", enter: "#ea580c", sombra: "inset 0 -4px 0 #cbbd9a",
+    fondo: "linear-gradient(180deg,transparent 0 70%,#ea580c 70% 74%,transparent 74% 78%,#f59e0b 78% 82%,transparent 82% 86%,#facc15 86% 90%,transparent 90%),#d6c8a4" },
+  teclado_sakura: { bg: "linear-gradient(160deg,#fff,#ffe4ef)", fg: "#be185d", borde: "#f9a8d4", enter: "#ec4899", sombra: "0 2px 0 #f9a8d4",
+    fondo: "radial-gradient(7px 5px at 12% 22%,#fbcfe8 70%,transparent 75%),radial-gradient(6px 4px at 34% 70%,#f9a8d4 70%,transparent 75%),radial-gradient(8px 5px at 58% 18%,#fce7f3 70%,transparent 75%),radial-gradient(6px 4px at 80% 62%,#fbcfe8 70%,transparent 75%),radial-gradient(7px 5px at 93% 28%,#f9a8d4 70%,transparent 75%),linear-gradient(180deg,#fdf2f8,#f9a8d4)" },
+  teclado_oceano: { bg: "linear-gradient(180deg,rgba(255,255,255,.85),rgba(165,243,252,.75))", fg: "#155e75", borde: "#67e8f9", enter: "#0891b2", sombra: "inset 0 1px 0 #fff,0 2px 4px rgba(8,145,178,.3)",
+    fondo: "radial-gradient(5px 5px at 15% 30%,rgba(255,255,255,.7) 40%,transparent 60%),radial-gradient(4px 4px at 45% 75%,rgba(255,255,255,.6) 40%,transparent 60%),radial-gradient(6px 6px at 78% 40%,rgba(255,255,255,.6) 40%,transparent 60%),repeating-radial-gradient(120% 40% at 50% 120%,#0e7490 0 12px,#0891b2 12px 24px),#0c4a6e" },
+  teclado_neon: { bg: "rgba(15,7,32,.85)", fg: "#67e8f9", borde: "#f0abfc", enter: "#d946ef", chispa: ["#22d3ee", "#f0abfc", "#a78bfa"], anim: "neon",
+    fondo: "linear-gradient(180deg,transparent 55%,rgba(217,70,239,.35)),repeating-linear-gradient(90deg,rgba(34,211,238,.35) 0 1px,transparent 1px 34px),repeating-linear-gradient(0deg,rgba(217,70,239,.3) 0 1px,transparent 1px 26px),radial-gradient(120% 60% at 50% 110%,#7e22ce,#0b0418)", fondoAnim: "grid" },
+  teclado_lava: { bg: "linear-gradient(120deg,#7f1d1d,#ea580c,#facc15,#ea580c,#7f1d1d)", fg: "#fff7ed", borde: "#450a0a", enter: "#facc15", chispa: ["#facc15", "#f97316", "#ef4444"], anim: "flujo",
+    fondo: "radial-gradient(40px 30px at 20% 80%,#f97316,transparent 70%),radial-gradient(60px 40px at 70% 90%,#facc15,transparent 70%),radial-gradient(50px 30px at 90% 30%,#ef4444,transparent 70%),linear-gradient(180deg,#1c0a05,#450a0a)", fondoAnim: "lava" },
+  teclado_dragon: { bg: "linear-gradient(135deg,#064e3b,#059669 40%,#f97316 60%,#064e3b)", fg: "#ecfdf5", borde: "#fbbf24", enter: "#f97316", chispa: ["#f97316", "#fbbf24", "#34d399"], anim: "flujo",
+    fondo: "radial-gradient(18px 10px at 10% 20%,rgba(16,185,129,.5),transparent 70%),radial-gradient(18px 10px at 30% 20%,rgba(16,185,129,.5),transparent 70%),radial-gradient(60px 40px at 25% 95%,#f97316,transparent 70%),radial-gradient(70px 40px at 80% 100%,#facc15,transparent 70%),repeating-radial-gradient(circle at 50% 0,#022c22 0 10px,#064e3b 10px 20px)", fondoAnim: "lava" },
+  teclado_arcoiris: { bg: "linear-gradient(90deg,#ef4444,#f97316,#facc15,#22c55e,#06b6d4,#6366f1,#d946ef,#ef4444)", fg: "#fff", borde: "rgba(255,255,255,.7)", enter: "#fff", chispa: ["#ef4444", "#facc15", "#22c55e", "#06b6d4", "#d946ef"], anim: "arcoiris",
+    fondo: "linear-gradient(115deg,rgba(239,68,68,.55),rgba(250,204,21,.5),rgba(34,197,94,.5),rgba(6,182,212,.55),rgba(99,102,241,.55),rgba(217,70,239,.55),rgba(239,68,68,.55)),#111", fondoAnim: "aurora" },
+  teclado_galaxia: { bg: "radial-gradient(circle at 30% 30%,#a78bfa,#4c1d95 45%,#0f0a2a)", fg: "#f5f3ff", borde: "#c4b5fd", enter: "#f0abfc", chispa: ["#fff", "#c4b5fd", "#f0abfc", "#67e8f9"], anim: "galaxia",
+    fondo: "radial-gradient(1.5px 1.5px at 8% 20%,#fff,transparent),radial-gradient(1px 1px at 22% 65%,#e9d5ff,transparent),radial-gradient(2px 2px at 41% 32%,#fff,transparent),radial-gradient(1px 1px at 57% 80%,#c4b5fd,transparent),radial-gradient(1.5px 1.5px at 73% 15%,#fff,transparent),radial-gradient(1px 1px at 92% 55%,#f0abfc,transparent),radial-gradient(70% 90% at 25% 40%,rgba(168,85,247,.55),transparent 70%),radial-gradient(60% 80% at 80% 70%,rgba(34,211,238,.35),transparent 70%),#07041a", fondoAnim: "nebulosa" },
+  teclado_aurora: { bg: "linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,.06))", fg: "#ecfeff", borde: "rgba(167,243,208,.8)", enter: "#34d399", sombra: "inset 0 1px 0 rgba(255,255,255,.5),0 0 10px rgba(52,211,153,.35)", chispa: ["#34d399", "#22d3ee", "#a78bfa", "#fff"], anim: "galaxia",
+    fondo: "radial-gradient(1.5px 1.5px at 10% 15%,#fff,transparent),radial-gradient(1px 1px at 55% 10%,#fff,transparent),radial-gradient(1.5px 1.5px at 88% 22%,#fff,transparent),linear-gradient(100deg,transparent 10%,rgba(52,211,153,.6) 30%,rgba(34,211,238,.45) 45%,transparent 55%,rgba(167,139,250,.55) 75%,transparent 90%),linear-gradient(180deg,#020617,#0f172a 60%,#064e3b)", fondoAnim: "aurora" },
+  teclado_oro: { bg: "linear-gradient(135deg,#78350f,#f59e0b 30%,#fde68a 50%,#d97706 70%,#78350f)", fg: "#451a03", borde: "#fde68a", enter: "#fef3c7", chispa: ["#fde68a", "#facc15", "#fff7ed"], anim: "oro",
+    fondo: "radial-gradient(1.5px 1.5px at 12% 30%,#fff7ed,transparent),radial-gradient(2px 2px at 48% 70%,#fde68a,transparent),radial-gradient(1.5px 1.5px at 82% 25%,#fff,transparent),linear-gradient(120deg,transparent 35%,rgba(255,255,255,.35) 50%,transparent 65%),linear-gradient(180deg,#1c1204,#422006)", fondoAnim: "destello" },
+};
+const SEL_TECLAS = ".ed-tactil button,.term-teclas button,.cc-mini-teclado i,.cc-teclado .cct-fila button,.cc-teclado .cct-flechas button";
+export function cssTeclado(clave, ambito = "html[data-teclado]") {
+  const t = TECLADOS[clave];
+  if (!t) return "";
+  const sel = SEL_TECLAS.split(",").map((x) => `${ambito} ${x}`).join(",");
+  const caja = `${ambito} :is(.ed-tactil,.term-teclas,.cc-mini-teclado,.cc-teclado)`;
+  let css = `${sel}{background:${t.bg}!important;color:${t.fg}!important;border:1.5px solid ${t.borde}!important;box-shadow:${t.sombra || "0 2px 0 rgba(0,0,0,.25)"}!important;text-shadow:none}
+${caja}{background:${t.fondo}!important;background-size:cover!important;--tk-chispa:${(t.chispa || [t.borde])[0]};--tk-enter:${t.enter || t.borde}}
+${ambito} :is(.cc-teclado .cct-fila button[data-k="⏎"],.cc-mini-teclado i.ent){background:${t.enter || t.borde}!important;color:${t.enter && /^#f|^#e|#fff/i.test(t.enter) ? "#111" : "#fff"}!important}
+${ambito} :is(.ed-tactil,.term-teclas) button small{color:inherit!important;opacity:.85}
+${sel.split(",").map((x) => `${x}:active`).join(",")}{filter:brightness(1.25);transform:scale(.92)}`;
+  const anim = {
+    neon: `${sel}{animation:cc-tk-neon 2.4s ease-in-out infinite;text-shadow:0 0 6px #22d3ee!important}`,
+    flujo: `${sel}{background-size:300% 100%!important;animation:cc-tk-flujo 5s linear infinite}`,
+    arcoiris: `${sel}{background-size:800% 100%!important;animation:cc-tk-arco 6s linear infinite;text-shadow:0 1px 2px rgba(0,0,0,.45)!important}`,
+    galaxia: `${sel}{background-size:180% 180%!important;animation:cc-tk-galaxia 7s ease-in-out infinite}`,
+    oro: `${sel}{background-size:250% 100%!important;animation:cc-tk-oro 3.2s ease-in-out infinite}`,
+    lluvia: "",
+  }[t.anim] || "";
+  // El fondo del teclado también se mueve en los épicos y legendarios
+  const fondoAnim = {
+    grid: `${caja}{background-size:100% 100%,34px 100%,100% 26px,100% 100%!important;animation:cc-tkf-grid 2.5s linear infinite}`,
+    lava: `${caja}{background-size:200% 200%!important;animation:cc-tkf-lava 6s ease-in-out infinite alternate}`,
+    aurora: `${caja}{background-size:400% 100%!important;animation:cc-tkf-aurora 9s linear infinite}`,
+    nebulosa: `${caja}{background-size:100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,180% 180%,180% 180%,100% 100%!important;animation:cc-tkf-nebulosa 12s ease-in-out infinite alternate}`,
+    destello: `${caja}{background-size:100% 100%,100% 100%,100% 100%,300% 100%,100% 100%!important;animation:cc-tkf-destello 4s ease-in-out infinite}`,
+  }[t.fondoAnim] || (t.anim === "lluvia" ? `${caja}{background-size:100% 4px,22px 100%,100% 100%!important;animation:cc-tkf-lluvia 1.2s linear infinite}` : "");
+  // Cada tecla empieza su animación un poco después que la anterior: parece una ola
+  const ola = t.anim ? Array.from({ length: 14 }, (_, i) => `${ambito} :is(.ed-tactil,.term-teclas,.cc-mini-teclado,.cc-teclado .cct-fila) :is(button,i):nth-child(14n+${i + 1}){animation-delay:-${(i * 0.18).toFixed(2)}s}`).join("\n") : "";
+  return `${css}\n${anim}\n${fondoAnim}\n${ola}
+@keyframes cc-tk-neon{0%,100%{box-shadow:0 0 4px #22d3ee,0 0 0 #f0abfc}50%{box-shadow:0 0 12px #f0abfc,0 0 4px #22d3ee}}
+@keyframes cc-tk-flujo{to{background-position:300% 0}}@keyframes cc-tk-arco{to{background-position:800% 0}}
+@keyframes cc-tk-galaxia{0%,100%{background-position:0 0}50%{background-position:100% 100%}}
+@keyframes cc-tk-oro{0%,100%{background-position:0 0}50%{background-position:100% 0}}
+@keyframes cc-tkf-grid{to{background-position:0 0,0 0,0 26px,0 0}}@keyframes cc-tkf-lava{to{background-position:100% 100%}}
+@keyframes cc-tkf-aurora{to{background-position:400% 0}}@keyframes cc-tkf-nebulosa{to{background-position:0 0,0 0,0 0,0 0,0 0,0 0,100% 60%,0 40%,0 0}}
+@keyframes cc-tkf-destello{0%,100%{background-position:0 0,0 0,0 0,150% 0,0 0}50%{background-position:0 0,0 0,0 0,-50% 0,0 0}}
+@keyframes cc-tkf-lluvia{to{background-position:0 4px,0 0,0 0}}
+@media (prefers-reduced-motion:reduce){${sel},${caja}{animation:none!important}}`;
+}
+/** Colores de las chispas al tocar una tecla (solo épicos y legendarios) o null. */
+export const chispasTeclado = (clave) => TECLADOS[clave]?.chispa || null;
+
 export const MARCOS = {
   marco_neon: "box-shadow:0 0 0 3px #22d3ee,0 0 14px 4px rgba(34,211,238,.7)",
   marco_arcoiris: "background:conic-gradient(#f43f5e,#f59e0b,#84cc16,#22d3ee,#6366f1,#d946ef,#f43f5e) ;animation:cc-rot 4s linear infinite",
@@ -241,7 +321,7 @@ ${cuadrosGuarida()}
 #cc-fondo canvas{width:100%;height:100%;display:block}
 html.cc-con-fondo body{background:transparent!important}
 #cc-fondo::after{content:"";position:absolute;inset:0;background:var(--cc-velo,transparent)}
-html.cc-con-fondo :is(.area-editor,.editores,.editor-dividido,.ed-monaco,.monaco-editor,.aula .ed-monaco,.aula #ed){background:var(--cc-panel-solido)!important}
+html.cc-con-fondo :is(.area-editor,.editores,.editor-dividido,.ed-monaco,.monaco-editor,.cliente-http,.vhttp,.vbd,.aula .ed-monaco,.aula #ed){background:var(--cc-panel-solido)!important}
 html.cc-con-fondo .pantalla-reto{background-color:transparent}
 html.cc-con-fondo .trabajo-pagina :is(.panel-inf,#terminalPanel,.explorador,.asistente,.editor-tarjeta,.ide-estado,.term,.problemas,.puertos){background-color:color-mix(in srgb,var(--cc-panel-solido) 95%,transparent)!important}
 html.cc-con-fondo .r-pie{background:color-mix(in srgb,var(--cc-bg-solido) 62%,transparent)!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
@@ -249,6 +329,8 @@ html.cc-con-fondo .r-pie.bien{background:color-mix(in srgb,var(--acc) 28%,color-
 html.cc-con-fondo .r-pie.mal{background:color-mix(in srgb,var(--rojo,#ef4444) 26%,color-mix(in srgb,var(--cc-bg-solido) 55%,transparent))!important}
 html.cc-con-fondo .r-enunciado h1,html.cc-con-fondo .pantalla-reto .tarjeta{-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 html.cc-con-fondo :is(.tarjeta,.lado,.inf,.cab,header,nav,aside,.ruta,.teoria,.explorador,.asistente,.editor-tarjeta,.ide-barra,.ide-estado,.lab,.panel,.chat,.pe-cab,.r-pie){-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3)}
+@media (pointer:coarse){html.cc-con-fondo :is(.tarjeta,.lado,.inf,.cab,header,nav,aside,.ruta,.teoria,.explorador,.asistente,.editor-tarjeta,.ide-barra,.ide-estado,.lab,.panel,.chat,.pe-cab,.r-pie,.r-enunciado h1){-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html.cc-con-fondo :is(.tarjeta,.lado,.inf,.cab,aside,.ruta,.teoria,.lab,.panel,.chat,.pe-cab){background-color:color-mix(in srgb,var(--cc-panel-solido) 86%,transparent)!important}}
 html.cc-con-fondo :is(dialog,[role=dialog],[role=menu],[role=listbox],.ide-dialogo,.ide-menu,.ide-avisos,.ide-aviso,.modal,.menu,.toast,.aviso,select option){--panel:var(--cc-panel-solido)!important;--panel2:var(--cc-panel2-solido)!important;--surf:var(--cc-surf-solido)!important;--bg:var(--cc-bg-solido)!important}
 .cc-marco{position:relative;display:inline-grid;place-items:center;border-radius:50%;padding:4px;isolation:isolate}
 .cc-marco::before{content:"";position:absolute;inset:0;border-radius:50%;z-index:-1}
@@ -277,21 +359,37 @@ function animarCanvas(tipo, caja) {
   caja.appendChild(c);
   const ctx = c.getContext("2d");
   let ancho, alto, cols, gotas, brasas, copos, estrellas, meteoros = [], giro = 0, vivo = true, ultimo = 0;
+  // Resolución del lienzo: en celulares la pantalla es 3x y dibujar a 3x en cada cuadro los trababa. Un fondo animado se ve
+  // igual a 1x-1.5x (el lienzo se estira con CSS) y cuesta hasta 9 veces menos. También menos partículas en celulares.
+  const tactil = matchMedia("(pointer: coarse)").matches;
+  const devicePixelRatio = Math.min(globalThis.devicePixelRatio || 1, tactil ? 1 : 1.5);   // eslint-disable-line no-shadow
   const dpr = devicePixelRatio;
+  const n = (k) => Math.round(k * (tactil ? 0.55 : 1));
+  c.style.cssText += ";width:100%;height:100%";
+  let anchoPrevio = 0, altoPrevio = 0;
   const tamano = () => {
-    ancho = c.width = innerWidth * devicePixelRatio; alto = c.height = innerHeight * devicePixelRatio;
+    // En el celular la barra del navegador aparece/desaparece al hacer scroll (cambia el alto): no se reinicia todo por eso
+    if (anchoPrevio === innerWidth && Math.abs(altoPrevio - innerHeight) < 160 && ancho) return;
+    anchoPrevio = innerWidth; altoPrevio = innerHeight;
+    ancho = c.width = Math.round(innerWidth * devicePixelRatio); alto = c.height = Math.round(innerHeight * devicePixelRatio);
     cols = Math.ceil(ancho / (16 * devicePixelRatio)); gotas = Array.from({ length: cols }, () => Math.random() * -alto / 16);
-    copos = Array.from({ length: 140 }, () => ({ x: Math.random() * ancho, y: Math.random() * alto, r: (1 + Math.random() * 3) * devicePixelRatio, v: (.3 + Math.random() * 1.1) * devicePixelRatio, f: Math.random() * 6 }));
-    estrellas = Array.from({ length: 260 }, () => ({ x: (Math.random() - .5) * ancho, y: (Math.random() - .5) * alto, z: Math.random() * ancho }));
-    brasas = Array.from({ length: 70 }, () => ({ x: Math.random() * ancho, y: alto + Math.random() * alto, v: .4 + Math.random() * 1.4, r: (1 + Math.random() * 2.5) * devicePixelRatio, f: Math.random() * 6 }));
+    copos = Array.from({ length: n(140) }, () => ({ x: Math.random() * ancho, y: Math.random() * alto, r: (1 + Math.random() * 3) * devicePixelRatio, v: (.3 + Math.random() * 1.1) * devicePixelRatio, f: Math.random() * 6 }));
+    estrellas = Array.from({ length: n(260) }, () => ({ x: (Math.random() - .5) * ancho, y: (Math.random() - .5) * alto, z: Math.random() * ancho }));
+    brasas = Array.from({ length: n(70) }, () => ({ x: Math.random() * ancho, y: alto + Math.random() * alto, v: .4 + Math.random() * 1.4, r: (1 + Math.random() * 2.5) * devicePixelRatio, f: Math.random() * 6 }));
   };
   tamano();
-  addEventListener("resize", tamano);
+  let esperaTamano = 0;
+  const alCambiar = () => { clearTimeout(esperaTamano); esperaTamano = setTimeout(tamano, 200); };
+  addEventListener("resize", alCambiar);
+  // En el celular el fondo se queda quieto MIENTRAS desplazas la página (y sigue al soltar): así el scroll va fluido.
+  let quietoHasta = 0;
+  const desplazando = () => { quietoHasta = performance.now() + 220; };
+  if (tactil) addEventListener("scroll", desplazando, { passive: true, capture: true });
   const letras = "01<>/{}[]=+;:()アイウエオカキクケコ$#&*";
   const paso = (t) => {
     if (!vivo) return;
     requestAnimationFrame(paso);
-    if (t - ultimo < (tipo === "matrix" ? 60 : 33) || document.hidden) return;
+    if (t - ultimo < (tipo === "matrix" ? 60 : tactil ? 40 : 33) || document.hidden || t < quietoHasta) return;
     ultimo = t;
     if (tipo === "matrix") {
       const fs = 16 * devicePixelRatio;
@@ -395,7 +493,7 @@ function animarCanvas(tipo, caja) {
     }
   };
   if (!reducido()) requestAnimationFrame(paso);
-  pararCanvas = () => { vivo = false; removeEventListener("resize", tamano); c.remove(); pararCanvas = null; };
+  pararCanvas = () => { vivo = false; clearTimeout(esperaTamano); removeEventListener("resize", alCambiar); removeEventListener("scroll", desplazando, { capture: true }); c.remove(); pararCanvas = null; };
 }
 
 // ---- efectos al hacer clic / mover el mouse
@@ -594,9 +692,12 @@ export function seguirDedo(zona, clave) {
   return quitar;
 }
 let quitarDedo = null;
+let dedoActual = null;
 function activarDedo(clave) {
   quitarDedo?.();
   quitarDedo = null;
+  DEDOS[dedoActual]?.quitar?.();
+  dedoActual = clave;
   // El rastro lo eligió la persona: se muestra aunque el celular tenga «quitar animaciones» (eso apagaba el rastro sin
   // explicación). Solo se apaga con «Menos movimiento» de Configuración de CódigoCamp.
   let menos = false;
@@ -624,7 +725,7 @@ function activarEfecto(clave) {
 }
 
 /** HTML de una foto o avatar con su marco: <span class="cc-marco" data-marco="…">contenido</span> */
-export const conMarco = (contenido, marco) => (marco && MARCOS[marco] ? `<span class="cc-marco" data-marco="${marco}">${contenido}</span>` : contenido);
+export const conMarco = (contenido, marco) => (marco && MARCOS[marco] ? `<span class="cc-marco" data-marco="${marco}">${contenido}${insigniaHTML(marco)}</span>` : contenido);
 
 /** Aplica en la página lo que la persona tiene puesto. opciones.fondo=false para no tocar el fondo (p. ej. en Trabajo). */
 export function aplicarCosmeticos(eq = {}, { fondo = true } = {}) {
@@ -634,7 +735,7 @@ export function aplicarCosmeticos(eq = {}, { fondo = true } = {}) {
   ponerAccesorioCodi(eq.codi);   // Codi se pone (o se quita) su accesorio en toda la página
   // Tema de color
   const t = TEMAS[eq.tema];
-  estilo("cc-cosm-tema", t ? `:root,:root body,:root[data-tema] body{--acc:${t.acc}!important;--acc2:${t.acc2}!important;--cy:${t.cy}!important}` : "");
+  estilo("cc-cosm-tema", t ? `:root,:root body,:root[data-tema] body{--acc:${t.acc}!important;--acc2:${t.acc2}!important;--cy:${t.cy}!important}${extraTema(t)}` : "");
   // Temas legendarios: los botones principales y las barras de progreso llevan un degradado que se mueve
   const leg = TEMAS_LEGENDARIOS.has(eq.tema);
   document.documentElement.classList.toggle("cc-tema-legendario", leg);
@@ -645,10 +746,11 @@ html.cc-tema-legendario :is(.nav a.on,.menu a.on,.lateral a[aria-current])::befo
 @media (prefers-reduced-motion:reduce){html.cc-tema-legendario *{animation:none!important}}` : "");
   // Puntero
   const j = juegoCursor(eq.cursor);
-  const c = (v, respaldo) => `url("${v.url}") ${v.x} ${v.y},${respaldo}!important`;
-  estilo("cc-cosm-cursor", j ? `html,body{cursor:${c(j.normal, "auto")}}
-a,a *,button,button *,[role=button],[role=tab],[role=menuitem],label,select,summary,.bj,.nav-i,.inf-i,[onclick],[data-t],input[type=checkbox],input[type=radio],input[type=submit],input[type=button]{cursor:${c(j.mano, "pointer")}}
-input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):not([type=range]):not([type=color]),textarea,[contenteditable=true],[contenteditable=""],.monaco-editor .view-lines,.monaco-editor .view-line,.ed-ta,.xterm{cursor:${c(j.texto, "text")}}` : "");
+  const c = (v, respaldo) => (v ? `url("${v.url}") ${v.x} ${v.y},${respaldo}!important` : null);
+  const regla = (sel, v, respaldo) => (c(v, respaldo) ? `${sel}{cursor:${c(v, respaldo)}}` : "");
+  estilo("cc-cosm-cursor", j ? [regla("html,body", j.normal, "auto"),
+    regla("a,a *,button,button *,[role=button],[role=tab],[role=menuitem],label,select,summary,.bj,.nav-i,.inf-i,[onclick],[data-t],input[type=checkbox],input[type=radio],input[type=submit],input[type=button]", j.mano, "pointer"),
+    regla('input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):not([type=range]):not([type=color]),textarea,[contenteditable=true],[contenteditable=""],.monaco-editor .view-lines,.monaco-editor .view-line,.ed-ta,.xterm', j.texto, "text")].join("\n") : "");
   // Fondo
   pararCanvas?.();
   document.getElementById("cc-fondo")?.remove();
@@ -659,6 +761,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button
     caja.id = "cc-fondo";
     caja.setAttribute("aria-hidden", "true");
     caja.style.cssText = f.css;
+    if (f.capas) caja.innerHTML = f.capas;   // imagen/GIF que se mueve, stickers animados y velo (fondos del panel)
     document.body.prepend(caja);
     html.classList.add("cc-con-fondo");
     if (f.oscuro) html.classList.add("cc-fondo-oscuro");
@@ -666,6 +769,9 @@ input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button
     if (f.canvas) animarCanvas(f.canvas, caja);
     if (reducido()) caja.style.animation = "none";
   }
+  // Teclado de código del celular (Trabajo)
+  if (TECLADOS[eq.teclado]) html.dataset.teclado = eq.teclado; else delete html.dataset.teclado;
+  estilo("cc-cosm-teclado", cssTeclado(eq.teclado));
   // Efecto (clic) y estela del dedo (celular)
   activarEfecto(eq.efecto);
   activarDedo(eq.dedo);
@@ -723,13 +829,16 @@ export function cosmeticosGuardados() { try { return JSON.parse(localStorage.get
 export function vistaPrevia(el, clave, tipo) {
   if (tipo === "fondo" && FONDOS[clave]) {
     el.style.cssText += `;${FONDOS[clave].css}`;
+    if (FONDOS[clave].capas) { el.style.position = "relative"; el.style.overflow = "hidden"; el.insertAdjacentHTML("afterbegin", FONDOS[clave].capas); }
     if (FONDOS[clave].canvas === "matrix") el.style.backgroundImage = `repeating-linear-gradient(90deg,transparent 0 10px,rgba(34,197,94,.0) 10px 12px),linear-gradient(rgba(34,197,94,.0),rgba(34,197,94,.0))`;
     if (FONDOS[clave].canvas) el.classList.add(`cc-prev-${FONDOS[clave].canvas}`);
   } else if (tipo === "cursor" && CURSORES[clave]) {
     // Los 3 del juego: pasa el mouse por cada uno para probarlo
     const j = juegoCursor(clave);
     el.classList.add("cc-prev-cursores");
-    el.innerHTML = [["normal", "Normal"], ["mano", "Enlaces"], ["texto", "Texto"]].map(([k, t]) => `<span class="cc-prev-cur" data-k="${k}" style="cursor:url('${j[k].url}') ${j[k].x} ${j[k].y},auto"><img src="${j[k].url}" alt="" width="40" height="40"><small>${t}</small></span>`).join("");
+    el.innerHTML = [["normal", "Normal", "auto"], ["mano", "Enlaces", "pointer"], ["texto", "Texto", "text"]].map(([k, t, sis]) => (j[k]
+      ? `<span class="cc-prev-cur" data-k="${k}" style="cursor:url('${j[k].url}') ${j[k].x} ${j[k].y},${sis}"><img src="${j[k].url}" alt="" width="40" height="40" style="object-fit:contain"><small>${t}</small></span>`
+      : `<span class="cc-prev-cur" data-k="${k}" style="cursor:${sis}"><span style="display:grid;place-items:center;width:40px;height:40px;font-size:20px;opacity:.75" title="La normal del equipo">💻</span><small>${t}</small></span>`)).join("");
   } else if (tipo === "tema" && TEMAS[clave]) {
     const t = TEMAS[clave];
     const escena = escenaArticulo(clave, "tema", { tema: t });
@@ -737,13 +846,23 @@ export function vistaPrevia(el, clave, tipo) {
     else { el.innerHTML = `<span style="background:${t.acc}"></span><span style="background:${t.acc2}"></span><span style="background:${t.cy}"></span>`; el.classList.add("cc-prev-tema"); }
   } else if (tipo === "marco" && MARCOS[clave]) {
     estilo("cc-cosmeticos-base", CSS_BASE);
-    el.innerHTML = `<span class="cc-marco" data-marco="${clave}"><span class="cc-prev-cara cc-prev-inicial">A</span></span>`;
+    el.innerHTML = `<span class="cc-marco" data-marco="${clave}"><span class="cc-prev-cara cc-prev-inicial">A</span>${insigniaHTML(clave)}</span>`;
   } else if (tipo === "dedo" && DEDOS[clave]) {
     el.innerHTML = `${escenaArticulo(clave, "dedo") || ""}<span class="cc-prev-efecto">${matchMedia("(pointer: coarse)").matches ? "Toca y desliza el dedo aquí" : "Mueve el mouse aquí"}</span>`;
     el.classList.add("cc-prev-escena");
-    el.style.touchAction = "none";   // dentro de la tarjeta, deslizar dibuja (no mueve la página)
+    // Deslizar de lado dibuja; hacia arriba o abajo mueve la página (antes la página se «trababa» al pasar el dedo por
+    // encima de una tarjeta de rastros). El rastro se sigue dibujando mientras la página se desplaza.
+    el.style.touchAction = "pan-y";
     el.__quitarDedo?.();
     el.__quitarDedo = seguirDedo(el, clave);
+  } else if (tipo === "teclado" && TECLADOS[clave]) {
+    // Mini teclado de código: se prueba tocando las teclas
+    const id = `tk-${clave}`;
+    estilo(`cc-prev-${id}`, cssTeclado(clave, `#${id}`));
+    el.id = id;
+    el.classList.add("cc-prev-teclado");
+    el.innerHTML = `<span class="cc-mini-teclado">${["q", "w", "e", "r", "t", "y", "a", "s", "d", "f", "g", "h", "{ }", "z", "x", "c", "v", "⌫"].map((k) => `<i>${k}</i>`).join("")}<i class="esp">CódigoCamp</i><i class="ent">⏎</i></span><small class="cc-prev-efecto">🔊 Toca para escucharlo</small>`;
+    el.onpointerdown = (e) => { const k = e.target.closest("i"); if (!k) return; k.style.transform = "scale(.85)"; setTimeout(() => { k.style.transform = ""; }, 140); import("/js/sonidos.js").then((m) => m.sonarTecla(k.classList.contains("esp") ? "espacio" : k.classList.contains("ent") ? "enter" : k.textContent === "⌫" ? "borrar" : "letra", clave)).catch(() => {}); };
   } else if (tipo === "codi" && ACCESORIOS_CODI[clave]) {
     el.classList.add("cc-prev-codi");
     el.innerHTML = codiSVG("saludo", { tam: 118, accesorio: clave }).replace("<svg ", "<svg data-fijo ");
@@ -752,4 +871,318 @@ export function vistaPrevia(el, clave, tipo) {
     el.classList.add("cc-prev-escena");
     el.onpointerdown = (e) => { const fn = EFECTOS[clave]; if (fn) fn(e.clientX, e.clientY); else for (let i = 0; i < 6; i++) particula(e.clientX, e.clientY, { color: "#facc15", tam: 9, dx: (Math.random() - .5) * 40, dy: 20 + Math.random() * 20, dur: 700, forma: "estrella" }); };
   }
+}
+
+/* ===================== Cosméticos diseñados en el panel de administrador =====================
+ * El panel guarda un «diseño» (colores, estilo, imagen, animación, emoji…) y aquí se convierte en el mismo formato que
+ * usan los de fábrica (FONDOS, TEMAS, MARCOS, CURSORES, EFECTOS, DEDOS, TECLADOS). Así todo lo demás (tienda, perfil,
+ * vistas previas, aplicar) funciona igual. El servidor ya filtró el diseño (solo colores #hex y valores conocidos). */
+const DE_PANEL = new Set();
+const hexA = (c, a) => `${c}${Math.round(a * 255).toString(16).padStart(2, "0")}`;
+const escXml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+// Capas que se ponen encima del fondo: [imagen, tamaño, repetir]
+const CAPAS = {
+  vineta: () => [["radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.6))", "100% 100%", "no-repeat"]],
+  rejilla: (c) => [[`linear-gradient(${hexA(c, .16)} 1px,transparent 1px)`, "34px 34px", "repeat"], [`linear-gradient(90deg,${hexA(c, .16)} 1px,transparent 1px)`, "34px 34px", "repeat"]],
+  estrellas: () => [["radial-gradient(1.5px 1.5px at 20px 30px,#fff,transparent),radial-gradient(1px 1px at 80px 70px,#fff,transparent),radial-gradient(1.5px 1.5px at 50px 112px,#e0f2fe,transparent),radial-gradient(1px 1px at 112px 18px,#fff,transparent)", "130px 130px", "repeat"]],
+  escaneo: () => [["repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0 1px,transparent 1px 3px)", "100% 100%", "repeat"]],
+  brillo: (c) => [[`radial-gradient(70% 45% at 50% 0,${hexA(c, .55)},transparent 70%)`, "100% 100%", "no-repeat"]],
+};
+function cssFondoPanel(d) {
+  const c = d.colores?.length ? d.colores : ["#0f172a", "#1e3a8a"];
+  const anima = d.animacion === "aurora" || d.estilo === "aurora";
+  let base;
+  if (d.estilo === "imagen" && d.imagen) base = [[`url("${d.imagen}")`, "cover", "no-repeat"]];
+  else if (d.estilo === "radial") base = [[`radial-gradient(circle at 50% 30%,${c.join(",")})`, anima ? "200% 200%" : "100% 100%", "no-repeat"]];
+  else if (d.estilo === "diagonal") base = [[`linear-gradient(135deg,${c.join(",")})`, anima ? "200% 200%" : "100% 100%", "no-repeat"]];
+  else if (d.estilo === "aurora") base = c.slice(1).map((x, i) => [`radial-gradient(60% 50% at ${[20, 80, 50][i % 3]}% ${[20, 30, 85][i % 3]}%,${hexA(x, .45)},transparent 70%)`, "200% 200%", "no-repeat"]);
+  else base = [[`linear-gradient(180deg,${c.join(",")})`, anima ? "200% 200%" : "100% 100%", "no-repeat"]];
+  const capas = [...(CAPAS[d.capa]?.(c.at(-1) || "#ffffff") || [])];
+  if (d.oscurecer > 0) capas.push([`linear-gradient(rgba(0,0,0,${(d.oscurecer / 100).toFixed(2)}),rgba(0,0,0,${(d.oscurecer / 100).toFixed(2)}))`, "100% 100%", "no-repeat"]);
+  const todas = [...capas, ...base];
+  let css = `background-color:${c[0]};background-image:${todas.map((x) => x[0]).join(",")};background-size:${todas.map((x) => x[1]).join(",")};background-repeat:${todas.map((x) => x[2]).join(",")};background-position:center`;
+  if (anima) css += ";animation:cc-aurora 18s ease-in-out infinite alternate";
+  return css;
+}
+/** Fondos del panel con imagen/GIF o stickers: se dibujan como capas dentro del fondo (imagen que se mueve, stickers
+ * animados y encima el velo de las capas decorativas). Devuelve { css, html } (html vacío si no hace falta). */
+const urlOk = (u) => /^\/api\/admin-img\/[a-f0-9]{16,64}\.(?:png|jpe?g|webp|gif)$/.test(u || "");
+function fondoPanel(d) {
+  const conImagen = d.estilo === "imagen" && urlOk(d.imagen);
+  const stickers = (d.stickers || []).filter((x) => urlOk(x.imagen));
+  const lluvia = d.lluvia && d.lluvia !== "ninguna" && String(d.lluvia_emojis || "").trim();
+  if (!conImagen && !stickers.length && !lluvia) return { css: cssFondoPanel(d), html: "" };
+  const c = d.colores?.length ? d.colores : ["#0f172a"];
+  const base = conImagen ? `background:${c[0]}` : cssFondoPanel({ ...d, capa: "ninguna", oscurecer: 0 });
+  let html = "";
+  if (conImagen) {
+    const modo = d.modo === "mosaico" ? `0 0/${d.mosaico || 160}px auto repeat` : d.modo === "centrar" ? "center/contain no-repeat" : "center/cover no-repeat";
+    const borde = d.desenfoque ? -d.desenfoque * 2 : 0;
+    // En pantallas verticales (celular) una imagen horizontal con «cubrir» se agrandaba y recortaba muchísimo.
+    // Por defecto se ve completa y la misma imagen, difuminada, rellena los bordes (como los fondos del teléfono).
+    const completa = d.modo !== "mosaico" && d.movil !== "recortar";
+    if (completa) html += `<div class="ccf ccf-relleno" style="background:url('${d.imagen}') center/cover no-repeat"></div>`;
+    html += `<div class="ccf ccf-img ccf-m-${d.movimiento || "ninguno"}${completa ? " ccf-mov-completa" : ""}" style="inset:${borde}px;background:url('${d.imagen}') ${modo};${d.desenfoque ? `filter:blur(${d.desenfoque}px);` : ""}"></div>`;
+  }
+  html += stickers.map((x, i) => `<img class="ccf-sticker ccf-a-${x.anim || "ninguna"}" src="${x.imagen}" alt="" draggable="false" style="left:${x.x}%;top:${x.y}%;width:${x.tam}%;--tam-m:${Math.min(90, Math.round(x.tam * 1.6))};opacity:${(x.opacidad ?? 100) / 100};--g:${x.girar || 0}deg;animation-delay:-${(i * 0.7).toFixed(1)}s">`).join("");
+  if (lluvia) {   // emojis o palabras que caen, suben, flotan o giran en remolino (posiciones fijas por semilla: no salta al recargar)
+    const lista = String(d.lluvia_emojis).trim().split(/\s+/).slice(0, 8);
+    let semilla = 7;
+    const azar = () => { semilla = (semilla * 9301 + 49297) % 233280; return semilla / 233280; };
+    html += `<div class="ccf ccf-lluvia ccf-ll-${d.lluvia}">${Array.from({ length: d.lluvia_cantidad || 18 }, (_, i) => {
+      const t = lista[i % lista.length];
+      return `<span style="left:${(azar() * 100).toFixed(1)}%;top:${(azar() * 100).toFixed(1)}%;font-size:${(20 + azar() * 30).toFixed(0)}px;animation-duration:${(7 + azar() * 9).toFixed(1)}s;animation-delay:-${(azar() * 14).toFixed(1)}s">${escXml(t).replace(/"/g, "")}</span>`;
+    }).join("")}</div>`;
+  }
+  const capas = [...(CAPAS[d.capa]?.(c.at(-1) || "#ffffff") || [])];
+  if (d.oscurecer > 0) capas.push([`linear-gradient(rgba(0,0,0,${(d.oscurecer / 100).toFixed(2)}),rgba(0,0,0,${(d.oscurecer / 100).toFixed(2)}))`, "100% 100%", "no-repeat"]);
+  if (capas.length) html += `<div class="ccf" style="background-image:${capas.map((x) => x[0]).join(",")};background-size:${capas.map((x) => x[1]).join(",")};background-repeat:${capas.map((x) => x[2]).join(",")}"></div>`;
+  return { css: base, html: `<div class="ccf-caja">${html}</div>` };
+}
+/** Insignias de los marcos (imagen o GIF pegada al aro: corona, mascota, emblema…). */
+export const INSIGNIAS = {};
+const insigniaHTML = (marco) => { const i = INSIGNIAS[marco]; return i ? `<img class="cc-marco-insignia cc-ins-${i.pos} ccf-a-${i.anim || "ninguna"}" src="${i.imagen}" alt="" draggable="false" style="width:${i.tam}%">` : ""; };
+/** Aro de foto diseñado en el panel: estilos aro, neón, holográfico, fuego o imagen (+ grosor, órbita y latido). */
+function cssMarcoPanel(k, d) {
+  const c = d.colores?.length > 1 ? d.colores : ["#22d3ee", "#a855f7"];
+  const giro = `cc-rot ${(12 - (d.velocidad || 4)).toFixed(1)}s linear infinite`;
+  const anims = [];
+  let fondo;
+  if (d.estilo === "neon") { fondo = `background:${c[0]};box-shadow:0 0 4px #fff,0 0 10px ${c[0]},0 0 24px ${hexA(c[0], .85)},0 0 44px ${hexA(c[1], .6)}`; anims.push("cc-pm-pulso 1.8s ease-in-out infinite"); }
+  else if (d.estilo === "holo") { fondo = `background:conic-gradient(${[...c, "#ffffff", c[0]].join(",")});box-shadow:0 0 18px ${hexA(c[0], .7)}`; anims.push(giro, "cc-pm-holo 4s linear infinite"); }
+  else if (d.estilo === "fuego") { fondo = `background:radial-gradient(circle at 50% 110%,#fff7 0 18%,transparent 40%),conic-gradient(from 180deg,${[c[0], c[1], c[2] || c[0], c[1], c[0]].join(",")});box-shadow:0 -6px 20px ${hexA(c[0], .8)},0 0 30px ${hexA(c[1], .5)}`; anims.push("cc-pm-llama .9s ease-in-out infinite alternate"); }
+  else if (d.estilo === "imagen" && d.imagen) { fondo = `background:url("${d.imagen}") center/cover;${d.brillo ? `box-shadow:0 0 18px ${hexA(c[0], .7)}` : ""}`; if (d.gira) anims.push(giro); }
+  else { fondo = (d.gira ? `background:conic-gradient(${[...c, c[0]].join(",")})` : `background:linear-gradient(135deg,${c.join(",")})`) + (d.brillo ? `;box-shadow:0 0 16px ${hexA(c[0], .7)}` : ""); if (d.gira) anims.push(giro); }
+  if (d.pulso && d.estilo !== "neon") anims.push("cc-pm-pulso 2s ease-in-out infinite");
+  const antes = `${fondo}${anims.length ? `;animation:${anims.join(",")}` : ""}`;
+  const sel = `.cc-marco[data-marco="${k}"]`;
+  let css = `${sel}::before{${antes}}\n${sel}{padding:${d.grosor || 4}px}`;
+  if (d.orbita) css += `\n${sel}::after{content:"";position:absolute;inset:-5px;border-radius:50%;pointer-events:none;z-index:1;background:radial-gradient(circle at 50% 4px,#fff 0 1.6px,${c[0]} 2.6px,transparent 4.5px),radial-gradient(circle at 50% calc(100% - 4px),#fff 0 1.2px,${c[1]} 2.2px,transparent 4px),radial-gradient(circle at 4px 50%,${c[2] || c[0]} 0 1.6px,transparent 3px);filter:drop-shadow(0 0 3px ${c[0]});animation:cc-rot 2.6s linear infinite}`;
+  return css;
+}
+const CSS_MARCO_PANEL = `@keyframes cc-pm-pulso{0%,100%{filter:brightness(1)}50%{filter:brightness(1.55) saturate(1.3)}}
+@keyframes cc-pm-holo{to{filter:hue-rotate(360deg)}}
+@keyframes cc-pm-llama{from{transform:scale(1);filter:brightness(1)}to{transform:scale(1.07);filter:brightness(1.3)}}
+@media (prefers-reduced-motion:reduce){.cc-marco::before,.cc-marco::after{animation:none!important}}
+.ccf{position:absolute;inset:0;pointer-events:none}
+.ccf-caja{position:absolute;inset:0;overflow:hidden;container-type:size;pointer-events:none}
+.ccf-relleno{display:none;inset:-40px!important;filter:blur(22px) brightness(.75) saturate(1.1)}
+@container (max-aspect-ratio: 4/5){
+  .ccf-relleno{display:block}
+  .ccf-mov-completa{background-size:contain!important;background-position:center!important}
+  .ccf-mov-completa.ccf-m-paneo{inset:0!important;animation:ccf-zoom 24s ease-in-out infinite alternate}
+  .ccf-sticker{width:calc(var(--tam-m,18) * 1cqw)!important}
+}
+.ccf-img{will-change:transform}
+.ccf-m-zoom{animation:ccf-zoom 24s ease-in-out infinite alternate}.ccf-m-paneo{inset:0 -12%!important;animation:ccf-paneo 30s ease-in-out infinite alternate}
+.ccf-m-flotar{inset:-3%!important;animation:ccf-flota 9s ease-in-out infinite}.ccf-m-latido{animation:ccf-late 2.4s ease-in-out infinite}
+.ccf-sticker{position:absolute;height:auto;transform:translate(-50%,-50%) rotate(var(--g,0deg));pointer-events:none;user-select:none;max-width:none}
+.ccf-a-flotar{animation:ccf-s-flota 4s ease-in-out infinite}.ccf-a-girar{animation:ccf-s-gira 8s linear infinite}
+.ccf-a-latido{animation:ccf-s-late 1.6s ease-in-out infinite}.ccf-a-rebotar{animation:ccf-s-rebota 1.4s cubic-bezier(.3,0,.5,1) infinite}
+.ccf-a-balanceo{animation:ccf-s-balanceo 3s ease-in-out infinite}.ccf-a-parpadeo{animation:ccf-s-parpadeo 2.2s ease-in-out infinite}
+.ccf-a-cruzar{animation:ccf-s-cruza 18s linear infinite}
+@keyframes ccf-zoom{to{transform:scale(1.18)}}@keyframes ccf-paneo{to{transform:translateX(-18%)}}
+@keyframes ccf-flota{50%{transform:translate(1.5%,-2%) scale(1.03)}}@keyframes ccf-late{50%{transform:scale(1.04);filter:brightness(1.15)}}
+@keyframes ccf-s-flota{50%{transform:translate(-50%,calc(-50% - 14px)) rotate(var(--g,0deg))}}
+@keyframes ccf-s-gira{to{transform:translate(-50%,-50%) rotate(calc(var(--g,0deg) + 360deg))}}
+@keyframes ccf-s-late{50%{transform:translate(-50%,-50%) rotate(var(--g,0deg)) scale(1.15)}}
+@keyframes ccf-s-rebota{0%,100%{transform:translate(-50%,-50%) rotate(var(--g,0deg))}50%{transform:translate(-50%,calc(-50% - 28px)) rotate(var(--g,0deg))}}
+@keyframes ccf-s-balanceo{0%,100%{transform:translate(-50%,-50%) rotate(calc(var(--g,0deg) - 10deg))}50%{transform:translate(-50%,-50%) rotate(calc(var(--g,0deg) + 10deg))}}
+@keyframes ccf-s-parpadeo{50%{opacity:.25}}
+@keyframes ccf-s-cruza{from{left:-20%}to{left:120%}}
+.cc-marco>.cc-marco-insignia{position:absolute;z-index:3;height:auto;border-radius:0!important;pointer-events:none;max-width:none}
+.cc-ins-arriba{left:50%;top:0;translate:-50% -58%}.cc-ins-abajo{left:50%;bottom:0;translate:-50% 52%}
+.cc-ins-derecha{right:0;top:50%;translate:45% -50%}.cc-ins-izquierda{left:0;top:50%;translate:-45% -50%}
+.cc-marco>.cc-marco-insignia.ccf-a-flotar{animation:cc-ins-flota 3s ease-in-out infinite}.cc-marco>.cc-marco-insignia.ccf-a-girar{animation:cc-ins-gira 6s linear infinite}
+.cc-marco>.cc-marco-insignia.ccf-a-latido{animation:cc-ins-late 1.6s ease-in-out infinite}.cc-marco>.cc-marco-insignia:is(.ccf-a-rebotar,.ccf-a-balanceo,.ccf-a-parpadeo,.ccf-a-cruzar){animation:cc-ins-flota 2s ease-in-out infinite}
+@keyframes cc-ins-flota{50%{transform:translateY(-5px)}}@keyframes cc-ins-gira{to{transform:rotate(360deg)}}@keyframes cc-ins-late{50%{transform:scale(1.15)}}
+.cdx-img{transform-box:fill-box;transform-origin:center}
+.cdx-img.ccf-a-flotar{animation:cdx-i-flota 3s ease-in-out infinite}.cdx-img.ccf-a-girar{animation:cdx-i-gira 6s linear infinite}
+.cdx-img.ccf-a-latido{animation:cdx-i-late 1.6s ease-in-out infinite}.cdx-img.ccf-a-balanceo{animation:cdx-i-balanceo 3s ease-in-out infinite}
+.cdx-img.ccf-a-rebotar{animation:cdx-i-rebota 1.4s ease-in-out infinite}.cdx-img.ccf-a-parpadeo{animation:ccf-s-parpadeo 2.2s ease-in-out infinite}
+@keyframes cdx-i-flota{50%{transform:translateY(-6px)}}@keyframes cdx-i-gira{to{transform:rotate(360deg)}}@keyframes cdx-i-late{50%{transform:scale(1.12)}}
+@keyframes cdx-i-balanceo{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}@keyframes cdx-i-rebota{50%{transform:translateY(-12px)}}
+.ccf-lluvia span{position:absolute;line-height:1;font-family:system-ui,"Segoe UI Emoji","Apple Color Emoji",sans-serif;font-weight:800;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.35);will-change:transform;user-select:none}
+.ccf-ll-cae span{top:-10%!important;animation:ccf-ll-cae linear infinite}.ccf-ll-sube span{top:105%!important;animation:ccf-ll-sube linear infinite}
+.ccf-ll-flota span{animation:ccf-ll-flota ease-in-out infinite alternate}.ccf-ll-remolino span{animation:ccf-ll-remolino linear infinite}
+@keyframes ccf-ll-cae{from{transform:translateY(0) rotate(0)}to{transform:translateY(115vh) rotate(360deg)}}
+@keyframes ccf-ll-sube{from{transform:translateY(0) scale(.8);opacity:0}10%{opacity:1}to{transform:translateY(-115vh) scale(1.15);opacity:.2}}
+@keyframes ccf-ll-flota{from{transform:translate(0,0) rotate(-8deg)}to{transform:translate(18px,-26px) rotate(8deg)}}
+@keyframes ccf-ll-remolino{from{transform:rotate(0) translateX(40px) rotate(0)}to{transform:rotate(360deg) translateX(40px) rotate(-360deg)}}
+.ccf-a-caer{animation:ccf-s-cae 9s linear infinite}.ccf-a-orbitar{animation:ccf-s-orbita 10s linear infinite}
+@keyframes ccf-s-cae{from{top:-25%}to{top:125%}}
+@keyframes ccf-s-orbita{from{transform:translate(-50%,-50%) rotate(0) translateX(70px) rotate(0) rotate(var(--g,0deg))}to{transform:translate(-50%,-50%) rotate(360deg) translateX(70px) rotate(-360deg) rotate(var(--g,0deg))}}
+.cc-onda{position:fixed;z-index:2147483000;pointer-events:none;border-radius:50%;border:3px solid currentColor;translate:-50% -50%}
+.cc-mascota{position:fixed;left:0;top:0;z-index:2147483000;pointer-events:none;height:auto;will-change:transform;transition:opacity .3s}
+@media (prefers-reduced-motion:reduce){.ccf,.ccf-sticker,.cc-marco-insignia,.cdx-img{animation:none!important}}`;
+/** Partícula con una imagen subida en el panel. */
+function particulaImg(x, y, url, { tam, dx, dy, dur }) {
+  const p = document.createElement("img");
+  p.src = url; p.alt = ""; p.className = "cc-particula";
+  p.style.cssText = `left:${x}px;top:${y}px;width:${tam}px;height:${tam}px;background:none;box-shadow:none;border-radius:0;object-fit:contain`;
+  document.body.appendChild(p);
+  p.animate([{ transform: "translate(-50%,-50%) scale(1) rotate(0)", opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) scale(.5) rotate(${(Math.random() - .5) * 120}deg)`, opacity: 0 }], { duration: dur, easing: "cubic-bezier(.2,.7,.3,1)" }).onfinish = () => p.remove();
+}
+// Temas del panel: tipo de letra y brillo neón en botones y títulos
+const FUENTES_TEMA = {
+  redondeada: '"Nunito","Varela Round","Quicksand","Arial Rounded MT Bold",system-ui,sans-serif',
+  mono: 'ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,monospace',
+  manuscrita: '"Comic Neue","Segoe Print","Bradley Hand","Comic Sans MS",cursive',
+  pixel: '"Press Start 2P","VT323","Courier New",monospace',
+  elegante: 'Georgia,"Palatino Linotype","Book Antiqua",serif',
+};
+function extraTema(t) {
+  let css = "";
+  if (FUENTES_TEMA[t.fuente]) css += `\nbody,body :is(h1,h2,h3,h4,button,input,select,textarea,.bj,.btn,a){font-family:${FUENTES_TEMA[t.fuente]}!important}\n:is(code,pre,.monaco-editor,.monaco-editor *,.xterm,.xterm *,kbd){font-family:ui-monospace,Consolas,monospace!important}`;
+  if (t.fuente === "pixel") css += "\nbody{letter-spacing:.02em}";
+  if (t.neon) css += `\n:is(.bj,.btn.pri,.ide-boton.pri):not(:disabled){box-shadow:0 0 12px ${t.acc},0 0 28px color-mix(in srgb,${t.cy} 55%,transparent)!important}\n:is(h1,h2){text-shadow:0 0 14px color-mix(in srgb,${t.acc} 70%,transparent)}`;
+  return css;
+}
+/** Una parte del puntero del panel → { url, x, y } (o null = la del sistema). tam: 24 a 64 px. */
+const FORMAS_PUNTERO = {
+  circulo: (r, b) => `<circle cx="16" cy="16" r="9" fill="${r}" stroke="${b}" stroke-width="2"/><circle cx="13" cy="13" r="2.5" fill="#fff" opacity=".7"/>`,
+  mira: (r, b) => `<circle cx="16" cy="16" r="10" fill="none" stroke="${b}" stroke-width="4"/><circle cx="16" cy="16" r="10" fill="none" stroke="${r}" stroke-width="2"/><path d="M16 2v8M16 22v8M2 16h8M22 16h8" stroke="${b}" stroke-width="4" stroke-linecap="round"/><path d="M16 2v8M16 22v8M2 16h8M22 16h8" stroke="${r}" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="16" r="2" fill="${r}"/>`,
+  estrella: (r, b) => `<path d="M16 2l4 9 10 1-7.5 6.6 2.3 9.8L16 23l-8.8 5.4 2.3-9.8L2 12l10-1z" fill="${r}" stroke="${b}" stroke-width="1.8" stroke-linejoin="round"/>`,
+  corazon: (r, b) => `<path d="M16 28S3 20 3 11a6.5 6.5 0 0113-2 6.5 6.5 0 0113 2c0 9-13 17-13 17z" fill="${r}" stroke="${b}" stroke-width="1.8" stroke-linejoin="round"/><circle cx="10" cy="10" r="2" fill="#fff" opacity=".6"/>`,
+  rombo: (r, b) => `<path d="M16 2l12 14-12 14L4 16z" fill="${r}" stroke="${b}" stroke-width="1.8" stroke-linejoin="round"/><path d="M16 6l7 10-7 3z" fill="#fff" opacity=".35"/>`,
+  punto: (r, b) => `<circle cx="16" cy="16" r="6" fill="${r}" stroke="${b}" stroke-width="2"/><circle cx="16" cy="16" r="12" fill="none" stroke="${r}" stroke-width="1.5" opacity=".5"/>`,
+  rayo: (r, b) => `<path d="M19 2L6 18h8l-3 12 15-17h-9z" fill="${r}" stroke="${b}" stroke-width="1.8" stroke-linejoin="round"/>`,
+};
+function parteCursor(p, tam, def) {
+  const r = p.c1 || "#ffffff", b = p.c2 || "#0f172a";
+  const esc = tam / 32;
+  const centro = p.punta === "centro";
+  const punto = (x, y) => (centro ? [Math.round(tam / 2), Math.round(tam / 2)] : [Math.round(x * esc), Math.round(y * esc)]);
+  let cuerpo;
+  switch (p.tipo || def) {
+    case "sistema": return null;
+    case "imagen": if (urlOk(p.imagen)) { const [x, y] = centro ? [24, 24] : [3, 3]; return { url: p.imagen, x, y }; } cuerpo = FLECHA(r, b); break;
+    case "emoji": cuerpo = `<text x="16" y="25" font-size="24" text-anchor="middle">${escXml(p.emoji || "⭐")}</text>`; break;
+    case "flecha_emoji": cuerpo = `<path d="M2 2l10 4-4.2 1.4L6 12z" fill="${r}" stroke="${b}" stroke-width="1.4" stroke-linejoin="round"/><text x="20" y="26" font-size="17" text-anchor="middle">${escXml(p.emoji || "⭐")}</text>`; break;
+    case "forma": cuerpo = (FORMAS_PUNTERO[p.forma] || FORMAS_PUNTERO.estrella)(r, b); break;
+    case "mano": cuerpo = MANO(r, b, ""); { const [x, y] = centro ? punto() : [Math.round(12 * esc), Math.round(3 * esc)]; return { url: svg(cuerpo, tam, tam), x, y }; }
+    case "barra": cuerpo = TEXTO(r, b, ""); { const [x, y] = [Math.round(tam / 2), Math.round(tam / 2)]; return { url: svg(cuerpo, tam, tam), x, y }; }
+    default: cuerpo = FLECHA(r, b);
+  }
+  const [x, y] = p.tipo === "emoji" || p.tipo === "forma" ? (p.punta === "esquina" ? [Math.round(4 * esc), Math.round(4 * esc)] : [Math.round(tam / 2), Math.round(tam / 2)]) : punto(3, 3);
+  return { url: svg(cuerpo, tam, tam), x, y };
+}
+/** Rastro «mascota»: una imagen o GIF que persigue al mouse o al dedo con un poco de retraso (como un compañero). */
+function mascotaQueSigue(d) {
+  let el = null, x = 0, y = 0, tx = 0, ty = 0, cuadro = 0, chao = 0;
+  const tam = d.tam || 48;
+  const paso = () => {
+    x += (tx - x) * 0.14; y += (ty - y) * 0.14;
+    if (el) el.style.transform = `translate(${x + 14}px,${y + 14}px) scaleX(${tx < x - 1 ? -1 : 1})`;
+    cuadro = Math.abs(tx - x) + Math.abs(ty - y) > 0.5 ? requestAnimationFrame(paso) : 0;
+  };
+  const mover = (px, py) => {
+    if (!el) {
+      el = document.createElement("img"); el.className = "cc-mascota"; el.src = d.imagen; el.alt = ""; el.style.width = `${tam}px`;
+      document.body.appendChild(el); x = tx = px; y = ty = py;
+    }
+    el.style.opacity = "1";
+    tx = px; ty = py;
+    clearTimeout(chao); chao = setTimeout(() => { if (el && matchMedia("(pointer: coarse)").matches) el.style.opacity = "0"; }, 1500);
+    if (!cuadro) cuadro = requestAnimationFrame(paso);
+  };
+  return { mover: (px, py) => mover(px, py), tocar: (px, py) => mover(px, py), quitar: () => { cancelAnimationFrame(cuadro); el?.remove(); el = null; } };
+}
+/** Cómo se presenta cada cosmético del panel en la tienda (movimiento 3D, aura, brillo, destellos). */
+export const VITRINA = {};
+function particulaPanel(d, x, y, i, { suave = false } = {}) {
+  const col = d.colores[(i ?? Math.floor(Math.random() * 99)) % d.colores.length];
+  const dx = (Math.random() - .5) * (suave ? 24 : 120), dy = suave ? 10 + Math.random() * 14 : -40 - Math.random() * 90;
+  if (d.forma === "texto") {
+    const ps = String(d.palabras || "+1").trim().split(/\s+/);
+    if (!suave && i % 3) return;   // al hacer clic salen pocas palabras (no 10 encima)
+    const w = ps[Math.floor(Math.random() * ps.length)];
+    texto(x, y, w, { color: col, tam: suave ? 13 : 18 + Math.random() * 8, dx: dx * .6, dy: suave ? dy : -50 - Math.random() * 60, dur: suave ? 700 : 1100, emoji: /\p{Extended_Pictographic}/u.test(w) });
+    return;
+  }
+  if (d.forma === "onda") {
+    if (!suave && i > 2) return;
+    const o = document.createElement("span"); o.className = "cc-onda"; o.style.cssText = `left:${x}px;top:${y}px;color:${col};width:10px;height:10px`;
+    document.body.appendChild(o);
+    o.animate([{ width: "10px", height: "10px", opacity: 1, borderWidth: "4px" }, { width: `${suave ? 50 : 110 + i * 40}px`, height: `${suave ? 50 : 110 + i * 40}px`, opacity: 0, borderWidth: "1px" }], { duration: suave ? 500 : 650 + i * 120, easing: "cubic-bezier(.2,.7,.3,1)" }).onfinish = () => o.remove();
+    return;
+  }
+  if (d.forma === "emoji" && String(d.emojis || "").trim()) {
+    const es = String(d.emojis).trim().split(/\s+/);
+    texto(x, y, es[(i ?? 0) % es.length], { tam: 16 + Math.random() * 10, dx, dy, dur: 900 + Math.random() * 300, emoji: true, girar: (Math.random() - .5) * 120 });
+    return;
+  }
+  if (d.forma === "imagen" && d.imagen) particulaImg(x, y, d.imagen, { tam: (d.tam || 24) * (suave ? .8 : .8 + Math.random() * .5), dx, dy, dur: (suave ? 650 : 950) + Math.random() * 300 });
+  else if (d.forma === "emoji") texto(x, y, d.emoji || "✨", { tam: 16 + Math.random() * 8, dx, dy, dur: 900 + Math.random() * 300, emoji: true });
+  else particula(x, y, { color: col, tam: d.forma === "corazon" ? 12 : d.forma === "moneda" ? 12 : 6 + Math.random() * 6, dx, dy, dur: (suave ? 600 : 900) + Math.random() * 300, forma: d.forma });
+}
+let ultimosDisenos = [];
+/** Estilos base de las vistas previas (para páginas que no aplican cosméticos, como el panel de administrador). */
+export function prepararVistas() { estilo("cc-cosmeticos-base", CSS_BASE); }
+/** Panel de administrador: prueba un diseño en vivo sin guardarlo. */
+export function probarDiseno(item) { const resto = ultimosDisenos.filter((x) => x.clave !== item.clave); registrarDisenos([...resto, item]); ultimosDisenos = resto; }
+export function registrarDisenos(lista = []) {
+  ultimosDisenos = lista;
+  for (const k of DE_PANEL) { delete FONDOS[k]; delete TEMAS[k]; delete MARCOS[k]; delete CURSORES[k]; delete EFECTOS[k]; delete DEDOS[k]; delete TECLADOS[k]; delete VITRINA[k]; delete INSIGNIAS[k]; TEMAS_LEGENDARIOS.delete(k); if (ACCESORIOS_CODI[k]?.panel) delete ACCESORIOS_CODI[k]; }
+  DE_PANEL.clear();
+  const cssMarcos = [];
+  for (const { clave, tipo, diseno: d = {} } of lista) {
+    if (!/^a_[a-z0-9_]+$/.test(clave || "")) continue;
+    DE_PANEL.add(clave);
+    if (d.vitrina) VITRINA[clave] = d.vitrina;
+    if (tipo === "fondo") { const f = fondoPanel(d); FONDOS[clave] = { css: f.css, capas: f.html, oscuro: d.oscuro !== false, ...(d.animacion && !["ninguna", "aurora"].includes(d.animacion) ? { canvas: d.animacion } : {}) }; }
+    else if (tipo === "codi" && urlOk(d.imagen)) {
+      const t = d.tam || 90;
+      ACCESORIOS_CODI[clave] = { capa: d.capa || "cabeza", sinAntena: Boolean(d.sinAntena), panel: true,
+        svg: `<g transform="rotate(${d.girar || 0} ${d.x ?? 100} ${d.y ?? 40})"><image class="cdx-img ccf-a-${d.anim || "ninguna"}" href="${d.imagen}" x="${(d.x ?? 100) - t / 2}" y="${(d.y ?? 40) - t / 2}" width="${t}" height="${t}" preserveAspectRatio="xMidYMid meet"/></g>` };
+    }
+    else if (tipo === "tema") { TEMAS[clave] = { acc: d.acc, acc2: d.acc2, cy: d.cy, fuente: d.fuente, neon: d.neon }; if (d.fluir) TEMAS_LEGENDARIOS.add(clave); }
+    else if (tipo === "marco") {
+      MARCOS[clave] = "background:transparent";   // el estilo real va en cssMarcoPanel (necesita ::after y padding)
+      cssMarcos.push(cssMarcoPanel(clave, d));
+      if (d.insignia && urlOk(d.insignia.imagen)) INSIGNIAS[clave] = d.insignia;
+    } else if (tipo === "cursor") {
+      const partes = d.partes || { normal: { tipo: d.imagen ? "imagen" : "flecha_emoji", c1: d.c1, c2: d.c2, emoji: d.emoji, imagen: d.imagen, punta: d.centro ? "centro" : "esquina" } };
+      const juego = {};
+      for (const [k, def] of [["normal", "flecha"], ["mano", "mano"], ["texto", "barra"]]) juego[k] = parteCursor(partes[k] || { tipo: def }, d.tam || 32, def);
+      CURSORES[clave] = { x: 3, y: 3, c: [partes.normal?.c1 || "#fff", partes.normal?.c2 || "#0f172a", ""], partes: juego, svg: "" };
+    } else if (tipo === "efecto") EFECTOS[clave] = (x, y) => { for (let i = 0; i < (d.cantidad || 8); i++) particulaPanel(d, x, y, i); };
+    else if (tipo === "dedo" && d.modo === "mascota" && urlOk(d.imagen)) { DEDOS[clave] = mascotaQueSigue(d); COLOR_DEDO[clave] = d.colores?.[0] || "#22d3ee"; }
+    else if (tipo === "dedo") { DEDOS[clave] = { mover: (x, y, i) => { if (i % 2 === 0) particulaPanel(d, x, y, i, { suave: true }); } }; COLOR_DEDO[clave] = d.colores?.[0] || "#22d3ee"; }
+    else if (tipo === "teclado") TECLADOS[clave] = tecladoPanel(d);
+  }
+  estilo("cc-marcos-panel", `${CSS_MARCO_PANEL}\n${cssMarcos.join("\n")}`);
+  try { redibujarCodis(); } catch { /* aún no hay Codi en la página */ }
+}
+/** Teclado del panel: plano, 3D (teclas con relieve), neón, cristal o arcoíris; con imagen de fondo y chispas. */
+function tecladoPanel(d) {
+  const t = { bg: d.bg, fg: d.fg, borde: d.borde, enter: d.enter, fondo: d.imagen ? `url("${d.imagen}") center/cover no-repeat,${d.fondo}` : d.fondo };
+  if (d.estilo === "3d") { t.bg = `linear-gradient(180deg,color-mix(in srgb,${d.bg} 72%,#fff),${d.bg} 55%,color-mix(in srgb,${d.bg} 80%,#000))`; t.sombra = `0 4px 0 color-mix(in srgb,${d.borde} 70%,#000),0 6px 10px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.35)`; }
+  else if (d.estilo === "neon") { t.bg = `color-mix(in srgb,${d.bg} 85%,#000)`; t.sombra = `0 0 8px ${d.borde},0 0 2px ${d.borde},inset 0 0 8px ${hexA(d.borde, .45)}`; }
+  else if (d.estilo === "cristal") { t.bg = `linear-gradient(160deg,${hexA(d.bg, .55)},${hexA(d.bg, .25)})`; t.sombra = "inset 0 1px 0 rgba(255,255,255,.45),0 4px 14px rgba(0,0,0,.25)"; }
+  else if (d.estilo === "arcoiris") { t.bg = "linear-gradient(90deg,#f43f5e,#f59e0b,#84cc16,#22d3ee,#6366f1,#d946ef,#f43f5e)"; t.anim = "arcoiris"; }
+  if (d.chispas) t.chispa = [d.borde, d.enter, d.fg];
+  return t;
+}
+let cargaDisenos = null;
+/** Trae los diseños del panel (y los guarda para la próxima visita). Devuelve true si cambiaron. */
+export function cargarDisenos() {
+  cargaDisenos ??= fetch("/api/cosmeticos/disenos/", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((j) => {
+    if (!j) return false;
+    const texto_ = JSON.stringify(j.disenos || []);
+    let antes = "";
+    try { antes = localStorage.getItem("cc_disenos") || ""; localStorage.setItem("cc_disenos", texto_); } catch { /* sin almacenamiento */ }
+    if (texto_ === antes && DE_PANEL.size) return false;
+    registrarDisenos(j.disenos || []);
+    return true;
+  }).catch(() => false);
+  return cargaDisenos;
+}
+// Al cargar: lo último conocido al instante (sin esperar la red) y luego se actualiza en segundo plano
+if (typeof document !== "undefined" && typeof fetch === "function") {
+  try { registrarDisenos(JSON.parse(localStorage.getItem("cc_disenos") || "[]")); } catch { /* nada */ }
+  cargarDisenos().then((cambio) => {
+    const eq = cosmeticosGuardados();
+    if (cambio && Object.values(eq).some((v) => typeof v === "string" && v.startsWith("a_"))) aplicarCosmeticos(eq);
+  });
 }

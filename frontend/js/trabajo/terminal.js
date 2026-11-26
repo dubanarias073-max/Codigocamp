@@ -60,7 +60,7 @@ class Terminal {
     this.raiz.addEventListener("mouseup", () => { if (!getSelection().toString()) this.enfocar(); });
     this.raiz.addEventListener("keydown", (e) => this.#teclaGeneral(e));
     this.raiz.addEventListener("contextmenu", () => { /* permite copiar/pegar con el menú del navegador */ });
-    if (this.remota) this.escribir(`\x1b[35m🖥 Conectado a ${this.shell.equipo.equipo}\x1b[0m\x1b[90m · los comandos corren de verdad en tu equipo con tus permisos (empiezan en ${this.shell.equipo.carpeta || "la carpeta del Conector"}). Los comandos peligrosos se bloquean.\x1b[0m\n`);
+    if (this.remota) this.escribir(`\x1b[35m🖥 Conectado a ${this.shell.equipo.equipo}\x1b[0m\x1b[90m · los comandos corren de verdad en tu equipo con tus permisos (empiezan en ${this.shell.equipo.carpeta || "la carpeta del Conector"}). Revisa lo que ejecutas: aquí nada se bloquea.\x1b[0m\n`);
     else this.escribir("\x1b[90mTerminal de CódigoCamp · escribe \x1b[0m\x1b[1mhelp\x1b[0m\x1b[90m para ver los comandos.\x1b[0m\n");
     this.#prompt();
   }
@@ -541,7 +541,7 @@ export class PanelInferior {
     }
     this.problemasEl.innerHTML = [...grupos].map(([ruta, xs]) => `<div class="prob-grupo">
       <button type="button" class="prob-archivo" data-grupo><span class="prob-flecha">▾</span><b>${esc(ruta.split("/").pop())}</b><small>${esc(ruta)}</small><span class="prob-n">${xs.length}</span></button>
-      ${xs.map((x) => `<button type="button" class="prob-fila ${x.grave ? "grave" : "aviso"}" role="listitem" data-prob data-ruta="${esc(x.ruta)}" data-linea="${x.linea}">
+      ${xs.map((x) => `<button type="button" class="prob-fila ${x.grave ? "grave" : "advierte"}" role="listitem" data-prob data-ruta="${esc(x.ruta)}" data-linea="${x.linea}">
         <span class="prob-ic" aria-label="${x.grave ? "Error" : "Advertencia"}">${x.grave ? "⊗" : "⚠"}</span><span class="prob-msg">${esc(x.mensaje)}</span><small>[Ln ${x.linea}]</small></button>`).join("")}
     </div>`).join("");
   }
@@ -655,8 +655,13 @@ export class PanelInferior {
     if (k === "ctrl-c") { if (input) pulsar(input, "c", true); else pulsar(t.raiz, "c", true); return; }
     if (!input) return;
     input.focus({ preventScroll: true });
-    if (k === "ctrl-l") pulsar(input, "l", true);
-    else if (["Tab", "ArrowUp", "ArrowDown", "Escape"].includes(k)) pulsar(input, k);
+    if (/^ctrl-[a-z]$/.test(k)) pulsar(input, k.slice(5), true);
+    else if (["Tab", "ArrowUp", "ArrowDown", "Escape", "Enter"].includes(k)) pulsar(input, k);
+    else if (k === "Backspace") {
+      const a = input.selectionStart ?? input.value.length, b = input.selectionEnd ?? a;
+      if (a === b && a > 0) input.setRangeText("", a - 1, a, "end"); else if (a !== b) input.setRangeText("", a, b, "end");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     else if (k === "ArrowLeft" || k === "ArrowRight") {
       const p = Math.max(0, Math.min(input.value.length, input.selectionStart + (k === "ArrowLeft" ? -1 : 1)));
       input.setSelectionRange(p, p);

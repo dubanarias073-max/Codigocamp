@@ -141,8 +141,15 @@ def _enviar_ya(cfg, mensaje, carpeta):
         servidor.send_message(mensaje)
 
 
-def enviar(para, asunto, html_cuerpo, *, esperar=False):
-    """Envía un correo (en segundo plano salvo esperar=True). Nunca lanza: los fallos quedan en el log."""
+def smtp_configurado(app=None):
+    """¿Los correos salen de verdad? Sin servidor SMTP solo se guardan como .eml en almacen_archivos/correos."""
+    cfg = _config(app or current_app._get_current_object())
+    return bool(cfg["servidor"] and cfg["usuario"] and cfg["clave"])
+
+
+def enviar(para, asunto, html_cuerpo, *, esperar=False, al_terminar=None):
+    """Envía un correo (en segundo plano salvo esperar=True). Nunca lanza: los fallos quedan en el log.
+    al_terminar(estado, detalle) se llama al final (con la app activa): estado = enviado | sin_smtp | error."""
     app = current_app._get_current_object()
     cfg = _config(app)
     m = EmailMessage()
@@ -163,13 +170,25 @@ def enviar(para, asunto, html_cuerpo, *, esperar=False):
     enviados = app.extensions.setdefault("correos_enviados", [])
     if app.config.get("TESTING"):
         enviados.append({"para": para, "asunto": asunto, "html": html_cuerpo})
+        if al_terminar:
+            al_terminar("enviado", "")
         return True
 
     def tarea():
+        estado, detalle = "enviado", ""
         try:
             _enviar_ya(cfg, m, carpeta)
+            if not cfg["servidor"]:
+                estado, detalle = "sin_smtp", "Falta configurar SMTP en backend/.env: el correo solo se guardó en almacen_archivos/correos."
         except Exception as e:  # noqa: BLE001
+            estado, detalle = "error", f"{type(e).__name__}: {e}"[:300]
             app.logger.warning("No se pudo enviar el correo «%s» a %s: %s", asunto, para, e)
+        if al_terminar:
+            try:
+                with app.app_context():
+                    al_terminar(estado, detalle)
+            except Exception as e:  # noqa: BLE001
+                app.logger.warning("No se pudo guardar el estado del correo: %s", e)
 
     if esperar:
         tarea()

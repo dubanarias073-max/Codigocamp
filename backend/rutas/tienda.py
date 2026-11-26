@@ -22,13 +22,20 @@ def tienda():
     profile = get_profile(current_user)
     refresh_lives(profile)
     db.session.commit()
-    tuyos = ({c.articulo.clave for c in Purchase.query.filter_by(usuario_id=current_user.id).all()} & PERMANENTES) | {c.clave for c in OwnedCosmetic.query.filter_by(usuario_id=current_user.id).all()}
+    from models import ArticuloExtra
+    extras = {e.articulo_id: e for e in ArticuloExtra.query.all()}   # artículos creados desde el panel de administrador
+    permanentes = PERMANENTES | {i.clave for i in StoreItem.query.filter(StoreItem.id.in_([k for k, e in extras.items() if e.permanente])).all()}
+    # Los cosméticos solo cuentan si están en la colección (así, si el administrador quita uno, deja de aparecer como tuyo);
+    # las compras solo cuentan para los demás artículos permanentes.
+    tuyos = ({c.articulo.clave for c in Purchase.query.filter_by(usuario_id=current_user.id).all()} & permanentes - set(COSMETICOS)) | {c.clave for c in OwnedCosmetic.query.filter_by(usuario_id=current_user.id).all()}
     return jsonify(
         items=[{
             "clave": item.clave, "nombre": item.nombre, "descripcion": item.descripcion,
             "icono": item.icono, "precio": item.precio, "moneda": item.moneda,
             "categoria": item.categoria, "rareza": RAREZA.get(item.clave, "comun"),
-            "permanente": item.clave in PERMANENTES, "tuyo": item.clave in tuyos,
+            "permanente": item.clave in permanentes, "tuyo": item.clave in tuyos, "especial": item.id in extras,
+            "imagen": (extras[item.id].imagen or "") if item.id in extras else "",
+            "vitrina": (extras[item.id].vitrina if item.id in extras else (COSMETICOS.get(item.clave) or {}).get("diseno", {}).get("vitrina")) or {},
             "tipo": COSMETICOS[item.clave]["tipo"] if item.clave in COSMETICOS else ("cofre" if item.clave.startswith("cofre") else "avatar" if item.clave in PERMANENTES else "potenciador"),
         } for item in StoreItem.query.filter_by(activo=True).order_by(StoreItem.orden).all()],
         minerales={"diamante": profile.diamante},
@@ -61,12 +68,22 @@ def tienda_comprar():
         return api_error("Ya tienes el máximo de vidas y salvarrachas.")
     if item.clave in COSMETICOS and OwnedCosmetic.query.filter_by(usuario_id=current_user.id, clave=item.clave).first():
         return api_error("Ya tienes este artículo en tu colección.")
-    if item.clave in PERMANENTES and any(c.articulo_id == item.id for c in Purchase.query.filter_by(usuario_id=current_user.id).all()):
+    if item.clave in PERMANENTES and item.clave not in COSMETICOS and any(c.articulo_id == item.id for c in Purchase.query.filter_by(usuario_id=current_user.id).all()):
         return api_error("Ya tienes este artículo en tu colección.")
     if item.clave == "mega_vidas" and profile.vidas >= MAX_VIDAS:
         return api_error("Ya tienes el máximo de vidas.")
+    from models import ArticuloExtra, MedallaOtorgada
+    extra = db.session.get(ArticuloExtra, item.id)
+    if extra and extra.permanente and Purchase.query.filter_by(usuario_id=current_user.id, articulo_id=item.id).first():
+        return api_error("Ya tienes este artículo en tu colección.")
     profile.diamante -= item.precio
     premio = None
+    if extra:   # artículo creado desde el panel de administrador
+        premio = {k: getattr(extra, k) for k in ("xp", "vidas") if getattr(extra, k)} or None
+        if extra.salvarrachas:
+            profile.salvarrachas = min(MAX_SALVARRACHAS, profile.salvarrachas + extra.salvarrachas)
+        if extra.medalla_id and not MedallaOtorgada.query.filter_by(usuario_id=current_user.id, medalla_id=extra.medalla_id).first():
+            db.session.add(MedallaOtorgada(usuario_id=current_user.id, medalla_id=extra.medalla_id, motivo=f"Comprada en la tienda: {item.nombre}"[:160]))
     if item.clave == "impulso_xp":
         premio = {"xp": 60}
     elif item.clave == "mega_vidas":

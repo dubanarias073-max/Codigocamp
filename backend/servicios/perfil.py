@@ -38,7 +38,14 @@ def serialize_user(user, profile):
         "alias": profile.alias, "codigo": profile.codigo, "avatar": "",
         "desde": user.creado_en.date().isoformat(),
         **_extras(user.id),
+        **_marca_admin(user),
     }
+
+
+def _marca_admin(user):
+    # Solo la cuenta del administrador recibe «admin»: al resto no se le dice ni que existe un panel.
+    from servicios.admin import es_admin
+    return {"admin": True} if es_admin(user) else {}
 
 
 def _extras(usuario_id):
@@ -245,8 +252,10 @@ def review_challenges(profile, activity):
             usuario_id=profile.usuario_id, clave=challenge["clave"], fecha=activity.fecha,
         ))
         apply_reward(profile, challenge["premio"])
+        if challenge["premio"].get("salvarrachas"):
+            dar_salvarrachas(profile, challenge["premio"]["salvarrachas"])
         new_rewards.append({"clave": challenge["clave"], "titulo": challenge["titulo"], "premio": reward_text(challenge["premio"]),
-                            "datos": dict(challenge["premio"]), "cofre": "plata" if challenge["premio"].get("diamante", 0) >= 20 else "madera"})
+                            "datos": dict(challenge["premio"]), "cofre": cofre_de(challenge["premio"])})
         month = activity.fecha.replace(day=1)
         points = MonthChallenge.query.filter_by(usuario_id=profile.usuario_id, mes=month).first()
         if not points:
@@ -260,7 +269,16 @@ def review_challenges(profile, activity):
             apply_reward(profile, month_reward)
             new_rewards.append({"clave": "mes", "titulo": f"Desafío de {MESES[activity.fecha.month - 1]}", "premio": reward_text(month_reward),
                                 "datos": dict(month_reward), "cofre": "oro"})
+    db.session.flush()   # cada acción puede completar experiencias del mes (y ganar su medalla)
+    from servicios.medallas import revisar_mes
+    new_rewards += revisar_mes(profile, activity.fecha)
     return new_rewards
+
+
+def cofre_de(premio):
+    """El cofre que se ve según lo que trae: madera, plata, oro o diamante."""
+    valor = premio.get("diamante", 0) + premio.get("xp", 0) // 2 + premio.get("vidas", 0) * 8 + premio.get("salvarrachas", 0) * 40
+    return "diamante" if valor >= 80 else "oro" if valor >= 40 else "plata" if valor >= 20 else "madera"
 
 
 def award_xp(profile, amount, levels=0, perfect=False):

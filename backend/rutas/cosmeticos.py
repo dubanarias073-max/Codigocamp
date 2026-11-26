@@ -74,7 +74,17 @@ def equipar():
 def _medidas(usuario):
     p = get_profile(usuario)
     amigos = Friendship.query.filter(Friendship.estado == "aceptada", or_(Friendship.de_usuario_id == usuario.id, Friendship.a_usuario_id == usuario.id)).count()
+    from models import Course, DailyActivity, Level, Medal, Section, Stage
+    tot = db.session.query(*(func.coalesce(func.sum(getattr(DailyActivity, c)), 0) for c in ("ia", "ejecuciones", "mensajes", "perfectos"))).filter(
+        DailyActivity.usuario_id == usuario.id).one()
+    cursos_retos = {i for (i,) in db.session.query(Stage.curso_id).join(Section, Section.etapa_id == Stage.id).join(Level, Level.seccion_id == Section.id)
+                    .join(CompletedLevel, CompletedLevel.nivel_id == Level.id).filter(CompletedLevel.usuario_id == usuario.id).distinct().all()}
+    cursos_aprende = {i for (i,) in db.session.query(LessonDone.curso_id).filter(LessonDone.usuario_id == usuario.id).distinct().all()}
     return {
+        "ia": int(tot[0]), "ejecuciones": int(tot[1]), "mensajes": int(tot[2]), "perfectos": int(tot[3]),
+        "medallas": Medal.query.filter_by(usuario_id=usuario.id).count(),
+        "cursos": len(cursos_retos | cursos_aprende),
+        "nivel": p.nivel,
         "lecciones": LessonDone.query.filter_by(usuario_id=usuario.id).count(),
         "racha": max(p.racha_maxima, p.racha_actual),
         "xp": p.xp_total,
@@ -162,6 +172,15 @@ def subir_foto():
     destino = carpeta / f"foto-{h}"
     tmp = carpeta / f".foto-{h}.tmp"
     tmp.write_bytes(datos)
+    # La foto también pasa por el antivirus (una imagen puede llevar un virus pegado al final)
+    from servicios.antivirus import revisar_archivo_completo
+    hallazgo = revisar_archivo_completo(str(tmp), "foto." + tipo.split("/")[-1])
+    if hallazgo:
+        tmp.unlink(missing_ok=True)
+        from servicios.moderacion import registrar
+        registrar(current_user, "archivo", hallazgo["motivo"], evidencia="foto de perfil", origen="foto de perfil",
+                  gravedad=hallazgo["gravedad"], explicacion=hallazgo["explicacion"])
+        return api_error(f"🛡️ Bloqueamos esta imagen: {hallazgo['motivo']}. Te enviamos un correo con el detalle.", 422)
     os.replace(tmp, destino)
     if anterior and anterior.hash != h:
         try:
@@ -319,7 +338,7 @@ def _pregunta_rapida(usuario, p):
     """Una pregunta de opción múltiple para responder desde el widget: de lo que ya estudiaste en tu curso (repaso),
     o de la primera sección si aún no empiezas. Cambia cada 30 minutos. Solo es práctica: no da XP ni gasta vidas."""
     import random
-    from datetime import datetime
+    from datetime import datetime, timezone
     from models import Challenge, CompletedLevel, Level, Section, Stage
     if not p.curso_actual_id:
         return None
@@ -331,7 +350,7 @@ def _pregunta_rapida(usuario, p):
         ids = [x.id for x in base_q.order_by(Stage.orden, Section.orden, Level.orden).with_entities(Challenge.id).limit(40)]
     if not ids:
         return None
-    turno = int(datetime.utcnow().timestamp() // 1800)
+    turno = int(datetime.now(timezone.utc).timestamp() // 1800)
     reto = db.session.get(Challenge, random.Random(f"{usuario.id}:{turno}").choice(ids))
     opciones = list(reto.opciones or [])
     if len(opciones) < 2 or reto.respuesta not in opciones:

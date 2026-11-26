@@ -45,10 +45,14 @@ async function cargar() {
     if (!ruta.etapas.length) throw new Error("vacio");
     const color = ruta.curso.color;
     let n = 0;   // número de sección seguido a lo largo de todo el curso
+    // «Saltar aquí» (como Duolingo): en cada sección o etapa todavía bloqueada, un examen de lo anterior para llegar ahí
+    const bloqueada = (niveles) => niveles.length > 0 && niveles[0].estado === "bloqueado";
+    const saltar = (tipo, id, texto) => `<a class="saltar-aqui" href="/pages/reto.html?salto=${tipo}:${id}" title="Haz un examen de lo anterior para llegar aquí">⏩ ${texto}</a>`;
     cont.innerHTML = ruta.etapas.map((e) => `<div class="etapa-div" id="etapa-${e.orden}" style="--c:${color}"><div>
-        <small>ETAPA ${e.orden} DE ${ruta.etapas.length}</small><b>${esc(e.titulo)}</b><em>${esc(e.descripcion)}</em></div></div>`
+        <small>ETAPA ${e.orden} DE ${ruta.etapas.length}</small><b>${esc(e.titulo)}</b><em>${esc(e.descripcion)}</em>
+        ${bloqueada(e.secciones.flatMap((s) => s.niveles)) ? saltar("etapa", e.id, "Saltar a esta etapa") : ""}</div></div>`
       + e.secciones.map((s) => { n++; return `<div class="seccion" data-etapa="${e.orden}" data-num="${n}" data-titulo="${esc(s.titulo)}">
-        <h3 class="seccion-tit"><small>SECCIÓN ${n}</small>${esc(s.titulo)}</h3>${pintarSeccion(actual, s, n, color)}</div>`; }).join("")).join("");
+        <h3 class="seccion-tit"><small>SECCIÓN ${n}</small><span class="seccion-nom">${esc(s.titulo)}</span>${bloqueada(s.niveles) ? saltar("seccion", s.id, "Saltar aquí") : ""}</h3>${pintarSeccion(actual, s, n, color)}</div>`; }).join("")).join("");
     banner.style.setProperty("--ban", color);
     banner.style.setProperty("--ban-ink", tinta(color));
     banner.hidden = false;

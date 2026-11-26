@@ -15,19 +15,21 @@ function cargarXterm() {
   document.head.append(css);
   const script = (src) => new Promise((ok, mal) => {
     // Monaco trae un cargador AMD (define): se esconde mientras carga para que xterm quede en window
-    const amd = globalThis.define;
-    globalThis.define = undefined;
+    // (solo se esconde define.amd: quitar define rompía los lenguajes que Monaco carga en ese momento)
+    const def = globalThis.define, amd = def?.amd;
+    if (def && amd) def.amd = undefined;
+    const volver = () => { if (def && amd) def.amd = amd; };
     const s = document.createElement("script");
     s.src = src;
-    s.onload = () => { globalThis.define = amd; ok(); };
-    s.onerror = () => { globalThis.define = amd; mal(new Error("No se pudo cargar la terminal.")); };
+    s.onload = () => { volver(); ok(); };
+    s.onerror = () => { volver(); mal(new Error("No se pudo cargar la terminal.")); };
     document.head.append(s);
   });
   cargando = script(`${VENDOR}/xterm.js`).then(() => script(`${VENDOR}/addon-fit.js`)).catch((e) => { cargando = null; throw e; });
   return cargando;
 }
 
-const TECLAS = { Tab: "\t", ArrowUp: "\x1b[A", ArrowDown: "\x1b[B", ArrowRight: "\x1b[C", ArrowLeft: "\x1b[D", Escape: "\x1b", "ctrl-c": "\x03", "ctrl-l": "\x0c" };
+const TECLAS = { Backspace: "\x7f", Enter: "\r", Tab: "\t", ArrowUp: "\x1b[A", ArrowDown: "\x1b[B", ArrowRight: "\x1b[C", ArrowLeft: "\x1b[D", Escape: "\x1b", "ctrl-c": "\x03", "ctrl-l": "\x0c" };
 
 export class TerminalReal {
   /**
@@ -66,6 +68,7 @@ export class TerminalReal {
     this.ajuste = new globalThis.FitAddon.FitAddon();
     this.term.loadAddon(this.ajuste);
     this.term.open(this.raiz);
+    this.#deslizar();
     // Ctrl+C con texto seleccionado copia (como VS Code); sin selección, interrumpe el programa
     this.term.attachCustomKeyEventHandler((e) => {
       if (e.type === "keydown" && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && this.term.hasSelection()) {
@@ -190,7 +193,40 @@ export class TerminalReal {
   /** Ejecuta una línea (▶ Ejecutar, Git, servicios…) como si la escribieras y pulsaras Enter. */
   async lanzar(linea) { await this.listo; this.escribir(`${linea}\r`); }
   interrumpir() { this.escribir("\x03"); }
-  tecla(k) { this.escribir(TECLAS[k] ?? k); this.term?.focus(); }
+  /** En el celular: deslizar el dedo arriba/abajo recorre la salida de la terminal (xterm no lo hace solo en táctil). */
+  #deslizar() {
+    let y0 = null, resto = 0, vel = 0, ult = 0, inercia = 0;
+    const alto = () => (this.raiz.querySelector(".xterm-rows > div")?.getBoundingClientRect().height || 17);
+    const mover = (dy) => {
+      resto += dy / alto();
+      const n = Math.trunc(resto);
+      if (n) { this.term.scrollLines(-n); resto -= n; }
+    };
+    this.raiz.addEventListener("touchstart", (e) => { cancelAnimationFrame(inercia); if (e.touches.length === 1) { y0 = e.touches[0].clientY; ult = performance.now(); vel = 0; resto = 0; } }, { passive: true });
+    this.raiz.addEventListener("touchmove", (e) => {
+      if (y0 === null || e.touches.length !== 1) return;
+      const y = e.touches[0].clientY, dy = y - y0, ahora = performance.now();
+      if (Math.abs(dy) < 1) return;
+      vel = dy / Math.max(1, ahora - ult); ult = ahora; y0 = y;
+      mover(dy);
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+    this.raiz.addEventListener("touchend", () => {
+      y0 = null;
+      const paso = () => { if (Math.abs(vel) < 0.02) return; mover(vel * 16); vel *= 0.94; inercia = requestAnimationFrame(paso); };
+      inercia = requestAnimationFrame(paso);
+    }, { passive: true });
+  }
+
+  tecla(k) {
+    // Flechas: en modo «aplicación» (vim, less, nano, menús de npm…) la terminal espera ESC O A en lugar de ESC [ A
+    const app = this.term?.modes?.applicationCursorKeysMode;
+    const ctrl = /^ctrl-([a-z])$/.exec(k);   // Ctrl+A…Ctrl+Z → códigos 1…26 (Ctrl+D salir, Ctrl+Z suspender, Ctrl+R buscar…)
+    const seq = ctrl ? String.fromCharCode(ctrl[1].charCodeAt(0) - 96)
+      : app && /^Arrow/.test(k) ? { ArrowUp: "\x1bOA", ArrowDown: "\x1bOB", ArrowRight: "\x1bOC", ArrowLeft: "\x1bOD" }[k] : TECLAS[k] ?? k;
+    this.escribir(seq);
+    if (!matchMedia("(pointer: coarse)").matches) this.term?.focus();   // en el celular no se abre el teclado del sistema a cada toque
+  }
   destruir() {
     this.cerrada = true;
     clearTimeout(this.sinRespuesta);

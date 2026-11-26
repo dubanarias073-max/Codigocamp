@@ -13,6 +13,8 @@ export const PLANTILLAS = [
   { id: "preact", nombre: "Preact + Vite", desc: "Como React pero de 3 KB.", cmd: "npm create vite@latest mi-app -- --template preact" },
   { id: "vanilla", nombre: "JavaScript + Vite", desc: "HTML, CSS y JS con módulos, sin framework.", cmd: "npm create vite@latest mi-app -- --template vanilla" },
   { id: "vanilla-ts", nombre: "TypeScript + Vite", desc: "TypeScript puro con módulos.", cmd: "npm create vite@latest mi-app -- --template vanilla-ts" },
+  { id: "vue", nombre: "Vue + Vite", desc: "Componentes .vue con plantillas fáciles de leer (ref, v-for, @click).", cmd: "npm create vite@latest mi-app -- --template vue" },
+  { id: "svelte", nombre: "Svelte + Vite", desc: "Componentes .svelte que compilan a JavaScript pequeño y rápido.", cmd: "npm create vite@latest mi-app -- --template svelte" },
 ];
 
 export const RECOMENDADOS = {
@@ -93,6 +95,59 @@ export function importsDelProyecto(py) {
     }
   }
   return [...mods];
+}
+
+/**
+ * Como importsDelProyecto, pero solo de los archivos que de verdad usa la app que enciendes: el archivo de
+ * entrada y los módulos tuyos que importa (siguiendo sus imports). Así `flask --app app run` no pide instalar
+ * FastAPI porque otro archivo del proyecto lo use. Si no se encuentra la entrada, revisa todo el proyecto.
+ */
+export function importsDesde(py, entrada) {
+  if (!entrada || typeof py.files[entrada] !== "string") return importsDelProyecto(py);
+  const esPy = (r) => typeof py.files[r] === "string" && r.endsWith(".py");
+  const resolver = (base, partes) => {
+    const r = [base, ...partes].filter(Boolean).join("/");
+    return [`${r}.py`, `${r}/__init__.py`].find(esPy) ?? null;
+  };
+  const raizEntrada = FS.carpetaDe(entrada);
+  const vistos = new Set(), pendientes = [entrada], externos = new Set();
+  while (pendientes.length && vistos.size < 400) {
+    const ruta = pendientes.pop();
+    if (vistos.has(ruta)) continue;
+    vistos.add(ruta);
+    const texto = py.files[ruta];
+    if (texto.length > 300_000) continue;
+    const carpeta = FS.carpetaDe(ruta);
+    for (const m of texto.matchAll(/^[ \t]*(?:from\s+(\.*)([A-Za-z_][\w.]*)?\s+import[ \t]+([\w \t,()*]+)|import[ \t]+([A-Za-z_][\w.]*(?:[ \t]+as[ \t]+\w+)?(?:[ \t]*,[ \t]*[A-Za-z_][\w.]*(?:[ \t]+as[ \t]+\w+)?)*))/gm)) {
+      const candidatos = [];
+      if (m[4]) for (const x of m[4].split(/\s*,\s*/)) candidatos.push({ puntos: "", mod: x.split(/\s+as\s+/)[0].trim(), nombres: [] });
+      else candidatos.push({ puntos: m[1] || "", mod: m[2] || "", nombres: (m[3] || "").replace(/[()]/g, "").split(",").map((x) => x.trim().split(/\s+/)[0]).filter(Boolean) });
+      for (const { puntos, mod, nombres } of candidatos) {
+        const partes = mod ? mod.split(".") : [];
+        let encontrado = null;
+        if (puntos) {
+          let base = carpeta;
+          for (let i = 1; i < puntos.length; i += 1) base = FS.carpetaDe(base);
+          encontrado = partes.length ? resolver(base, partes) : null;
+          for (const n of nombres) { const r = resolver(base, [...partes, n]); if (r) pendientes.push(r); }
+          if (encontrado) pendientes.push(encontrado);
+          continue;   // un import relativo siempre es tuyo
+        }
+        for (const base of new Set([raizEntrada, "", carpeta])) {
+          encontrado = resolver(base, partes);
+          if (encontrado) {
+            pendientes.push(encontrado);
+            for (const n of nombres) { const r = resolver(base, [...partes, n]); if (r) pendientes.push(r); }
+            break;
+          }
+        }
+        const primero = partes[0];
+        if (!encontrado && primero && !STDLIB.has(primero) && !EMULADOS_PY.includes(primero)
+            && !py.folders.some((c) => FS.nombreBase(c) === primero)) externos.add(primero);
+      }
+    }
+  }
+  return [...externos];
 }
 
 /** De un módulo importado (flask_sqlalchemy) al nombre de pip (flask-sqlalchemy). */

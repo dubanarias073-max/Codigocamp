@@ -1,4 +1,5 @@
 // Lógica de perfil.html: cabecera con foto (y su marco), insignias, estadísticas, lo que llevas puesto, cofres y cursos.
+import { medallaSVG } from "/js/medalla-especial.js";
 import { iniciar, api, esc, aviso, fotoDe, aplicarCosmeticos } from "/js/app.js";
 import { FONDOS, vistaPrevia } from "/js/cosmeticos.js";
 import { iconoSVG } from "/js/iconos.js";
@@ -73,6 +74,15 @@ pintarPuesto().catch(() => {});
 // Cofres (resumen)
 api("/api/cofres/").then(({ cofres }) => {
   $("cofresP").innerHTML = cofres.map((c) => `<span class="cofre-mini ${c.abierto ? "abierto" : c.listo ? "listo" : ""}" title="${esc(c.nombre)} · ${esc(c.texto)}"><span class="cofre-dib">${svgCofre(c.cofre, { abierto: c.abierto })}</span><small>${esc(c.nombre)}</small></span>`).join("");
+}).catch(() => {});
+
+// Medallas del mes (las ganadas brillan; las de este año que faltan, en gris)
+import("/js/medallas.js").then(async ({ estilosMedallas, vitrinaMedallas, separarMedallas }) => {
+  estilosMedallas();
+  const { medallas, especiales = [], desde } = await api("/api/medallas/");
+  const anio = new Date().getFullYear();
+  const viejas = separarMedallas(medallas, anio, desde).otras;   // otros años y las de antes de que empezaran
+  $("medallasP").innerHTML = `<p class="nota" style="margin:0 0 8px">${medallas.length} ${medallas.length === 1 ? "medalla ganada" : "medallas ganadas"} · ${anio}</p>${vitrinaMedallas(medallas, { anio, tam: 56, desde })}${viejas.length ? `<h3 style="margin:14px 0 6px;font-size:14px">Años anteriores</h3>${vitrinaMedallas(viejas, { tam: 50 })}` : ""}${especiales.length ? `<h3 style="margin:14px 0 6px;font-size:14px">Medallas especiales</h3><div class="medallas-especiales" style="display:flex;flex-wrap:wrap;gap:12px">${especiales.map((m) => `<figure style="margin:0;display:grid;justify-items:center;gap:4px;width:92px;text-align:center" title="${esc(m.descripcion || m.nombre)}${m.motivo ? ` · ${esc(m.motivo)}` : ""}">${medallaSVG(m, 72)}<figcaption style="font-size:12px;line-height:1.2">${esc(m.nombre)}</figcaption></figure>`).join("")}</div>` : ""}`;
 }).catch(() => {});
 
 // Cursos

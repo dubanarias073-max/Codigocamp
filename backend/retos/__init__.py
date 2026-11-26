@@ -16,7 +16,22 @@ from .base import PREGUNTAS_POR_LECCION, XP_ETAPA
 
 # Mismo `slug` que la tabla `cursos`; el archivo se llama igual (javascript.py, csharp.py...).
 ORDEN = ["html", "css", "javascript", "python", "sql", "bd", "typescript", "java", "csharp",
-         "kotlin", "swift", "php", "ruby", "go", "rust", "c", "cpp", "terminal", "git", "github", "docker", "node", "nosql", "react", "reactnative"]
+         "kotlin", "swift", "php", "ruby", "go", "rust", "c", "cpp", "terminal", "git", "github", "docker", "node", "nosql", "react", "reactnative", "lua", "r"]
+
+# Retos agregados desde el panel de administrador a una lección del código: van con orden >= ORDEN_ADMIN y la
+# sincronización (sync-retos) no los toca. Los retos del código que el administrador edita u oculta quedan marcados
+# en la tabla retos_admin y la sincronización tampoco los pisa.
+ORDEN_ADMIN = 500
+
+
+def _marcas_admin(session):
+    from models import RetoAdmin
+    try:
+        return {r.reto_id for r in session.query(RetoAdmin).filter_by(editado=True).all()}
+    except Exception:  # noqa: BLE001 - tabla aún no creada
+        session.rollback()
+        return set()
+
 
 # Cursos que se crean solos en la tabla `cursos` si faltan (los demás vienen de codigocamp.sql).
 CURSOS_NUEVOS = {
@@ -28,6 +43,8 @@ CURSOS_NUEVOS = {
     "nosql": dict(nombre="NoSQL", tipo="bd", sigla="NoSQL", color="#22c55e", descripcion="MongoDB, Redis, Firestore, grafos y más", orden=23),
     "react": dict(nombre="React", tipo="lenguaje", sigla="RE", color="#61dafb", descripcion="Interfaces con componentes, hooks, rutas y Next.js", orden=24),
     "reactnative": dict(nombre="React Native", tipo="lenguaje", sigla="RN", color="#38bdf8", descripcion="Apps para Android y iPhone con React y Expo", orden=25),
+    "lua": dict(nombre="Lua", tipo="lenguaje", sigla="LUA", color="#818cf8", descripcion="El lenguaje de Roblox y los videojuegos", orden=26),
+    "r": dict(nombre="R", tipo="lenguaje", sigla="R", color="#60a5fa", descripcion="Estadística y análisis de datos", orden=27),
 }
 
 
@@ -42,6 +59,10 @@ def asegurar_cursos(session):
             creados.append(slug)
         else:   # nombre y descripción siguen a este archivo (p. ej. «Git y GitHub» pasó a «Git» al crear el curso GitHub)
             c = existentes[slug]
+            from models import CursoAdmin
+            marca = session.get(CursoAdmin, c.id)
+            if marca and marca.editado:   # el administrador lo editó en el panel: se respetan sus textos
+                continue
             for campo in ("nombre", "descripcion", "sigla", "color"):
                 if getattr(c, campo) != datos[campo]:
                     setattr(c, campo, datos[campo]); cambios = True
@@ -321,6 +342,7 @@ def sincronizar_catalogo(session):
             planes.append(plan_etapa)
 
     cambio = bool(nuevos or ampliados)   # cursos nuevos o etapas agregadas al final también son cambios
+    editados = _marcas_admin(session)
     try:
         for plan_etapa in planes:
             etapa = plan_etapa["etapa"]
@@ -378,11 +400,11 @@ def sincronizar_catalogo(session):
                         if getattr(db_nivel, campo) != valor:
                             setattr(db_nivel, campo, valor)
                             cambio = True
-                    db_retos = list(db_nivel.retos)
+                    db_retos = [r for r in db_nivel.retos if r.orden < ORDEN_ADMIN]   # los del panel no se tocan
                     for n, reto in enumerate(spec["retos"], 1):
                         if n <= len(db_retos):
                             db_reto = db_retos[n - 1]
-                            for campo, valor in reto.items():
+                            for campo, valor in ({} if db_reto.id in editados else reto).items():
                                 if getattr(db_reto, campo) != valor:
                                     setattr(db_reto, campo, valor)
                                     cambio = True
@@ -422,13 +444,19 @@ def poblar_catalogo(session, reset=False):
     if problemas:
         raise RuntimeError("Hay errores en los retos; ejecuta `flask --app app check-retos`:\n" + "\n".join(problemas[:10]))
 
-    if reset:
-        session.query(Stage).delete(synchronize_session=False)   # ON DELETE CASCADE limpia secciones, niveles y retos
+    if reset:   # solo los cursos del código: los creados en el panel de administrador se conservan
+        ids = [c.id for c in session.query(Course).filter(Course.slug.in_(list(cursos))).all()]
+        session.query(Stage).filter(Stage.curso_id.in_(ids)).delete(synchronize_session=False)   # CASCADE limpia el resto
         session.commit()
 
     esperado = _esperado(cursos)
-    existente = (session.query(Stage).count(), session.query(Section).count(),
-                 session.query(Level).count(), session.query(Challenge).count())
+    # Solo cuenta lo del código: los cursos creados en el panel y los retos agregados en el panel no son «catálogo»
+    codigo = session.query(Course.id).filter(Course.slug.in_(list(cursos)))
+    etapas_q = session.query(Stage).filter(Stage.curso_id.in_(codigo))
+    secciones_q = session.query(Section).join(Stage).filter(Stage.curso_id.in_(codigo))
+    niveles_q = session.query(Level).join(Section).join(Stage).filter(Stage.curso_id.in_(codigo))
+    retos_q = session.query(Challenge).join(Level).join(Section).join(Stage).filter(Stage.curso_id.in_(codigo), Challenge.orden < ORDEN_ADMIN)
+    existente = (etapas_q.count(), secciones_q.count(), niveles_q.count(), retos_q.count())
     if existente == esperado:
         return False
     if any(existente):

@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 RUTA = Path(__file__).resolve().parents[2] / "frontend" / "descargas" / "codigocamp-conector.py"
-EICAR = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+EICAR = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$" + b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 FALSO_CLAMSCAN = """#!/bin/sh
 for f in "$@"; do case "$f" in --*) ;; *) if grep -q "EICAR-STANDARD" "$f" 2>/dev/null; then echo "$f: Eicar-Test-Signature FOUND"; exit 1; fi;; esac; done
 exit 0
@@ -59,6 +59,37 @@ class AgenteTest(unittest.TestCase):
             self.a.fs_leer({"ruta": "../../etc/passwd"})
         self.assertNotIn(".ssh", self.a.fs_explorar({"ruta": str(self.casa)})["carpetas"])
 
+    def test_cliente_http_desde_el_equipo(self):
+        """El cliente HTTP de Trabajo llega a la API que corre en el equipo (localhost) a través del Conector."""
+        import http.server
+        import threading
+
+        class Api(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *x):
+                pass
+
+            def do_POST(self):
+                datos = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                self.send_response(201); self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(b'{"eco": ' + datos + b', "token": "' + (self.headers.get("Authorization") or "").encode() + b'"}')
+
+            def do_GET(self):
+                self.send_response(404); self.end_headers(); self.wfile.write(b"no existe")
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Api)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            url = f"http://127.0.0.1:{srv.server_address[1]}"
+            r = self.a.fs_http({"metodo": "POST", "url": url + "/items", "cabeceras": [["Content-Type", "application/json"], ["Authorization", "Bearer x"]],
+                                "cuerpo_b64": base64.b64encode(b'{"a": 1}').decode()})
+            self.assertEqual((r["status"], base64.b64decode(r["cuerpo_b64"])), (201, b'{"eco": {"a": 1}, "token": "Bearer x"}'))
+            self.assertEqual(self.a.fs_http({"metodo": "GET", "url": url + "/nada"})["status"], 404, "los errores HTTP también son respuestas")
+        finally:
+            srv.shutdown()
+        with self.assertRaises(self.m.ErrorFs):
+            self.a.fs_http({"metodo": "GET", "url": "file:///etc/passwd"})
+        with self.assertRaises(self.m.ErrorFs):
+            self.a.fs_http({"metodo": "GET", "url": "http://127.0.0.1:1/"})   # nada escuchando: mensaje claro
+
     def test_archivos_de_la_carpeta(self):
         a = self.a
         r = a.fs_escribir({"ruta": "src/app.py", "b64": base64.b64encode(b"print(1)\n").decode()})
@@ -68,20 +99,15 @@ class AgenteTest(unittest.TestCase):
         a.fs_borrar({"ruta": "src/app.py"})
         self.assertFalse(os.path.exists(os.path.join(self.proyecto, "src")))   # la carpeta vacía también se va
 
-    def test_el_antivirus_del_equipo_bloquea(self):
+    def test_no_revisa_archivos_ni_comandos_solo_carpetas_del_sistema(self):
+        """Con tu equipo, CódigoCamp no revisa archivos (lo hace tu antivirus en tiempo real): solo frena comandos
+        destructivos y carpetas del sistema."""
         a, m = self.a, self.m
-        self.assertEqual(a.av.estado()["herramienta"], "clamav")
-        with self.assertRaises(m.ErrorFs) as e:
-            a.fs_escribir({"ruta": "regalo.exe", "b64": base64.b64encode(EICAR).decode()})
-        self.assertTrue(e.exception.extra.get("virus"))
-        self.assertEqual(os.listdir(self.proyecto), ["src"])   # ni el archivo ni el temporal
-        Path(self.proyecto, "virus.bin").write_bytes(EICAR)
-        varios = a.fs_leer_varios({"rutas": ["virus.bin"]})["archivos"]
-        self.assertTrue(varios["virus.bin"]["virus"])
-        self.assertNotIn("virus.bin", [x["ruta"] for x in a.fs_listar({})["archivos"]])
-        Path(self.proyecto, "instalar.sh").write_bytes(EICAR)
-        self.assertIsNotNone(a.revisar_programa("bash instalar.sh", self.proyecto))
-        self.assertIsNone(a.revisar_programa("python src/app.py", self.proyecto))
+        self.assertEqual(a.av.estado()["herramienta"], "clamav")      # informa qué antivirus tienes
+        a.fs_escribir({"ruta": "programa.exe", "b64": base64.b64encode(b"MZ\x00datos").decode()})
+        self.assertTrue(Path(self.proyecto, "programa.exe").exists())   # se guarda directo, sin esperas
+        self.assertIsNone(m.REVISAR_COMANDO)   # en su equipo no se filtran comandos (la persona es responsable)
+        self.assertFalse(m.elegible("C:\\Windows\\System32" if os.name == "nt" else "/etc"))
 
     def test_archivos_grandes_por_partes(self):
         a, m = self.a, self.m
@@ -105,7 +131,7 @@ class AgenteTest(unittest.TestCase):
         self.assertEqual(r["tamano"], 3500)
         self.assertFalse(Path(self.proyecto, "copia.bin.ccparcial").exists())
 
-    def test_terminal_real_crea_carpetas_y_bloquea_lo_peligroso(self):
+    def test_terminal_real_crea_carpetas_sin_filtro(self):
         import queue, time
         a = self.a
         salida = queue.Queue()
@@ -125,27 +151,53 @@ class AgenteTest(unittest.TestCase):
         a.entrada({"id": "p1", "texto": "mkdir -p nueva/sub && echo hola > nueva/sub/a.txt && echo $((40+2))OK\r"})
         leer("42OK")
         self.assertTrue(Path(self.proyecto, "nueva", "sub", "a.txt").exists(), texto)
-        a.entrada({"id": "p1", "texto": "rm -rf /\r"})
-        leer("bloque")
-        self.assertIn("bloque", texto)
+        a.entrada({"id": "p1", "texto": "echo $((6*7))SINFILTRO\r"})   # nada se bloquea en la terminal del equipo
+        leer("42SINFILTRO")
+        self.assertIn("42SINFILTRO", texto)
+        self.assertNotIn("bloque", texto)
         a.detener({"id": "p1"})
         leer("__nada__", 5)
         self.assertTrue(fin)
 
-    def test_abrir_una_carpeta_con_muchas_imagenes_revisa_todo_de_una_vez(self):
-        """Antes era un programa del antivirus por cada imagen (minutos en Windows); ahora una revisión por lote."""
+    def test_abrir_una_carpeta_no_llama_al_antivirus(self):
+        """Como VS Code: abrir y leer la carpeta no llama al antivirus (lo hace el del equipo en tiempo real)."""
         llamadas = Path(self.tmp.name) / "llamadas"
         av = self.bin / "clamscan"
         av.write_text(f'#!/bin/sh\necho x >> "{llamadas}"\n' + FALSO_CLAMSCAN.split("\n", 1)[1])
         for i in range(30):
             Path(self.proyecto, f"img{i}.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00" + bytes([i]))
-        Path(self.proyecto, "malo.bin").write_bytes(b"\x00" + EICAR)
         a = self.m.Agente("http://x", "t" * 40, self.proyecto)
-        r = a.fs_leer_varios({"rutas": [f"img{i}.png" for i in range(30)] + ["malo.bin"]})["archivos"]
-        self.assertEqual(len(llamadas.read_text().splitlines()), 1)          # una sola revisión para los 31 archivos
-        self.assertTrue(r["malo.bin"].get("virus"))
+        r = a.fs_leer_varios({"rutas": [f"img{i}.png" for i in range(30)]})["archivos"]
+        self.assertFalse(llamadas.exists())          # ninguna revisión extra: rápido
         self.assertIn("b64", r["img3.png"])
         self.assertFalse(self.m.elegible(os.path.dirname(str(self.casa))))   # la carpeta de todas las cuentas (C:\\Users), tampoco
+
+    def test_listar_solo_manda_los_cambios(self):
+        """Como el vigilante de VS Code: tras la primera vez, solo viaja lo que cambió."""
+        a = self.a
+        r1 = a.fs_listar({})
+        r2 = a.fs_listar({"previo": r1["token"]})
+        self.assertTrue(r2["cambios"])
+        self.assertEqual((r2["archivos"], r2["borrados"]), ([], []))
+        Path(self.proyecto, "nuevo.txt").write_text("hola")
+        r3 = a.fs_listar({"previo": r2["token"]})
+        self.assertEqual([x["ruta"] for x in r3["archivos"]], ["nuevo.txt"])
+        os.remove(Path(self.proyecto, "nuevo.txt"))
+        self.assertEqual(a.fs_listar({"previo": r3["token"]})["borrados"], ["nuevo.txt"])
+        self.assertNotIn("cambios", a.fs_listar({"previo": "viejo"}))   # token desconocido: lista completa
+
+    def test_carpetas_pesadas_se_ven_pero_se_leen_al_abrirlas(self):
+        """Como VS Code: node_modules y venv aparecen, su contenido solo cuando las abres; .git no aparece."""
+        for d in ("node_modules/react", "venv/lib", ".git/objects"):
+            os.makedirs(Path(self.proyecto, d), exist_ok=True)
+        Path(self.proyecto, "node_modules/react/index.js").write_text("x")
+        r = self.a.fs_listar({"ignorar": ["node_modules", "venv", ".git"]})
+        self.assertIn("node_modules", r["carpetas"]); self.assertIn("venv", r["carpetas"])
+        self.assertFalse(any(c.startswith(".git") for c in r["carpetas"]))
+        self.assertIn("node_modules", r["pesadas"])
+        self.assertNotIn("node_modules/react/index.js", [x["ruta"] for x in r["archivos"]])
+        r = self.a.fs_listar({"ignorar": ["node_modules"], "abrir": ["node_modules", "node_modules/react"]})
+        self.assertIn("node_modules/react/index.js", [x["ruta"] for x in r["archivos"]])
 
     def test_git_solo_lo_permitido(self):
         with self.assertRaises(self.m.ErrorFs):

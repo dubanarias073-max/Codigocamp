@@ -23,7 +23,10 @@ const limpiarError = () => mostrarError("");
 
 // Si ya hay una sesión iniciada, no tiene sentido ver el formulario
 const yaDentro = await getUser();
-if (yaDentro) {
+const pideElegir = new URLSearchParams(location.search).get("elegir") === "1";
+if (yaDentro && yaDentro.admin && pideElegir) {
+  (await import("./elegir-admin.js")).mostrarEleccion(yaDentro);
+} else if (yaDentro) {
   location.replace(yaDentro.onboarding ? "/pages/inicio.html" : "/pages/onboarding.html");
 } else {
   document.body.classList.remove("cargando");
@@ -117,6 +120,7 @@ if (yaDentro) {
     google_email: "Tu cuenta de Google no tiene un correo verificado. Usa otra cuenta de Google o entra con tu correo y contraseña.",
     google_conflict: "Ese correo ya está unido a OTRA cuenta de Google. Entra con la cuenta de Google que usaste la primera vez, o con tu correo y contraseña (si no la recuerdas: «¿Olvidaste tu contraseña?»).",
     google_inactive: "Esta cuenta está desactivada.",
+    bloqueada: "Tu cuenta fue bloqueada por incumplir las normas de CódigoCamp. Revisa tu correo: ahí está el motivo.",
     app: "El enlace para volver a la app venció o ya se usó. Toca otra vez «Continuar con Google».",
   };
   const MOTIVOS_GOOGLE = {
@@ -174,6 +178,7 @@ if (yaDentro) {
     try {
       const r = await api(esRegistro ? "/api/auth/register/" : "/api/auth/login/", datos);
       setGuest(false);
+      if (r.user.admin) { (await import("./elegir-admin.js")).mostrarEleccion(r.user); return; }
       location.href = r.user.onboarding ? "/pages/inicio.html" : "/pages/onboarding.html";
     } catch (e2) {
       mostrarError(e2?.message || "No se pudo conectar con el servidor. Inténtalo de nuevo.");

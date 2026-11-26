@@ -95,3 +95,11 @@
   .cod-tab{max-width:52%}
 }
 @media (prefers-reduced-motion:reduce){.panel-cursos{animation:none}}
+
+/* «Saltar aquí»: examen de lo anterior para llegar a una sección o etapa bloqueada */
+.seccion-tit .seccion-nom{flex:1;min-width:0}
+.saltar-aqui{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:2px solid color-mix(in srgb,var(--c,var(--cy)) 55%,transparent);border-bottom-width:4px;border-radius:12px;background:color-mix(in srgb,var(--c,var(--cy)) 12%,var(--panel,#fff));color:var(--txt);font-size:13px;font-weight:800;letter-spacing:0;text-decoration:none;white-space:nowrap;transition:transform .1s}
+.saltar-aqui:hover{transform:translateY(-1px)}
+.saltar-aqui:active{transform:translateY(2px);border-bottom-width:2px}
+.etapa-div .saltar-aqui{margin-top:10px}
+.seccion-tit .saltar-aqui{align-self:center;font-size:12.5px;padding:5px 10px}

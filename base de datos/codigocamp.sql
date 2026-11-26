@@ -280,6 +280,19 @@ CREATE TABLE puntos_desafio (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Puntos del desafio mensual';
 
+CREATE TABLE medallas (
+  id          INT         NOT NULL AUTO_INCREMENT,
+  usuario_id  INT         NOT NULL,
+  clave       VARCHAR(20) NOT NULL COMMENT 'Mes de la medalla: 2026-11',
+  creada_en   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_medalla (usuario_id, clave),
+  KEY ix_medallas_usuario_id (usuario_id),
+  CONSTRAINT fk_medallas_usuario FOREIGN KEY (usuario_id)
+    REFERENCES usuarios (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Medallas del mes ganadas al completar todas las experiencias del mes';
+
 
 -- ======================== TIENDA =====================================
 
@@ -453,6 +466,7 @@ CREATE TABLE IF NOT EXISTS cosmeticos_propios (
 CREATE TABLE IF NOT EXISTS cosmeticos_equipados (
   usuario_id INT PRIMARY KEY,
   fondo VARCHAR(30) NULL, puntero VARCHAR(30) NULL COMMENT 'Puntero del mouse', tema VARCHAR(30) NULL, marco VARCHAR(30) NULL, efecto VARCHAR(30) NULL, dedo VARCHAR(30) NULL COMMENT 'Estela del dedo (celular)',
+  codi VARCHAR(30) NULL COMMENT 'Accesorio de Codi', teclado VARCHAR(30) NULL COMMENT 'Estilo del teclado de codigo del celular',
   CONSTRAINT fk_equipados_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Cosmeticos que lleva puestos cada usuario';

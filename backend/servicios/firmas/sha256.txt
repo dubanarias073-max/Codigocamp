@@ -1,0 +1,8 @@
+# Huellas SHA-256 de virus conocidos que el antivirus de CódigoCamp bloquea al instante (aunque cambien el nombre).
+# Una por línea; lo que va después de # es un comentario. Para agregar más sin tocar este archivo usa FIRMAS_SHA256 en
+# backend/.env (rutas a otros .txt separadas por «:» en Linux o «;» en Windows), por ejemplo listas de MalwareBazaar.
+# El antivirus también aprende solo: cada archivo que bloquea como «crítico» se guarda en almacen_archivos/firmas_aprendidas.txt.
+275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f  # EICAR (archivo de prueba estándar)
+8b3f191819931d1f2cef7289239b5f77c00b079847b9c2636e56854d1e5eff71  # EICAR con salto de línea de Windows
+131f95c51cc819465fa1797f6ccacf9d494aaaff46fa3eac73ae63ffbdfd8267  # EICAR con salto de línea
+c36abbde92fd222510de933a155021e40d2ee540bfb1a88b35ef008bc022a20f  # Archivo de prueba de CódigoCamp (muestras_antivirus.py)

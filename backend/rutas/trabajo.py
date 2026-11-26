@@ -231,6 +231,40 @@ def obtener_proyecto():
     return jsonify(proyecto=leer_proyecto(workspace), actualizado=_marca(workspace))
 
 
+def _revisar_archivos_editor(project):
+    """Antivirus también para lo que se crea o escribe DENTRO del editor (no solo para lo que se sube): un archivo con
+    nombre peligroso (.exe, .vbs…), la firma de un virus o código malicioso no se guarda en el servidor. Se avisa al
+    estudiante (correo) y al administrador (panel) una sola vez por archivo. Lo que se trabaja con el Conector, en el
+    equipo de la persona, nunca llega aquí."""
+    from datetime import timedelta
+    from models import Incidente, utcnow
+    from servicios.antivirus import revisar_texto
+    from servicios.moderacion import registrar
+    bloqueados = []
+    for ruta, texto in list(project["files"].items()):
+        try:
+            h = revisar_texto(ruta, texto)
+        except Exception:  # noqa: BLE001 - el antivirus nunca debe impedir guardar el resto
+            current_app.logger.exception("No se pudo revisar %s", ruta)
+            continue
+        if not h:
+            continue
+        del project["files"][ruta]
+        git = project.get("git") or {}
+        for k in ("staged", "tracked"):
+            if isinstance(git.get(k), list) and ruta in git[k]:
+                git[k] = [x for x in git[k] if x != ruta]
+        if isinstance(git.get("committed"), dict):
+            git["committed"].pop(ruta, None)
+        bloqueados.append({"ruta": ruta, "motivo": h["motivo"]})
+        ya = Incidente.query.filter(Incidente.usuario_id == current_user.id, Incidente.evidencia == str(h["evidencia"])[:400],
+                                    Incidente.creado_en >= utcnow() - timedelta(hours=24)).first()
+        if not ya:
+            registrar(current_user, "archivo", h["motivo"], evidencia=h["evidencia"], origen="Trabajo (editor)",
+                      gravedad=h["gravedad"], explicacion=h["explicacion"])
+    return bloqueados
+
+
 @bp.put("/api/trabajo/")
 @login_required
 def guardar_proyecto():
@@ -241,6 +275,7 @@ def guardar_proyecto():
     if project is None:
         return api_error("El proyecto no es válido o supera el límite de almacenamiento.")
 
+    bloqueados = _revisar_archivos_editor(project)
     workspace = UserWorkspace.query.filter_by(usuario_id=current_user.id).first()
     if workspace is None:
         workspace = UserWorkspace(usuario_id=current_user.id)
@@ -250,4 +285,32 @@ def guardar_proyecto():
     workspace.actualizado_en = datetime.now(timezone.utc)
     limpiar_huerfanas(current_user.id, project["files"], project["git"])
     db.session.commit()
-    return jsonify(ok=True, actualizado=_marca(workspace))
+    return jsonify(ok=True, actualizado=_marca(workspace), bloqueados=bloqueados)
+
+
+# ------------------------------------------------------------------------- cliente HTTP (tipo Postman) ----
+@bp.post("/api/trabajo/cliente-http")
+@login_required
+def cliente_http():
+    """Peticiones del cliente HTTP de Trabajo a APIs públicas de internet (ver servicios/proxy_http.py)."""
+    import base64
+    from servicios.proxy_http import ErrorProxy, pedir
+    from utilidades import too_many
+    from rutas.trabajored import _activo, _enlace_peligroso
+    if not _activo():
+        return api_error("Este servidor no permite peticiones a internet desde Trabajo (TRABAJO_RED=0).", 403)
+    if too_many(f"http:{current_user.id}", 40, 60):
+        return api_error("Muchas peticiones seguidas: espera un minuto.", 429)
+    data = request.get_json(silent=True) or {}
+    try:
+        cuerpo = base64.b64decode(str(data.get("cuerpo_b64") or ""), validate=True) if data.get("cuerpo_b64") else str(data.get("cuerpo") or "").encode()
+    except (ValueError, TypeError):
+        return api_error("El cuerpo no es válido.")
+    cabeceras = [(c[0], c[1]) for c in (data.get("cabeceras") or []) if isinstance(c, (list, tuple)) and len(c) == 2]
+    try:
+        r = pedir(data.get("metodo"), str(data.get("url") or "").strip(), cabeceras, cuerpo, verificar_tls=data.get("verificar", True) is not False,
+                  revisar=_enlace_peligroso)
+    except ErrorProxy as e:
+        return api_error(str(e), 422)
+    return jsonify(status=r["status"], razon=r["razon"], cabeceras=r["cabeceras"], cuerpo_b64=base64.b64encode(r["cuerpo"]).decode(),
+                   truncado=r["truncado"], ms=r["ms"], url=r["url"])

@@ -215,7 +215,7 @@ const NO_DISPONIBLE = ["apt", "apt-get", "brew", "sudo", "curl", "wget", "ssh", 
 
 export const NOMBRES_COMANDOS = [
   "cat", "cd", "clear", "cls", "code", "cp", "date", "echo", "env", "exit", "export", "find", "gcc", "g++", "gh", "git", "go", "grep", "head", "help",
-  "history", "true", "false", "printf", "docker", "docker-compose", "test", "read", "alias", "unalias", "unset", "let", "expr", "shift", "local", "break", "continue", "return", "seq", "sleep", "sort", "uniq", "cut", "tr", "sed", "awk", "rev", "tac", "nl", "basename", "dirname", "tee", "diff", "xargs", "time", "du", "stat", "chmod", "bash", "sh", "nano", "vim", "less", "more", "man", "cal", "uname", "lua", "lua5.4", "luajit", "perl", "Rscript", "scala", "scala-cli", "runghc", "runhaskell", "ghc", "elixir", "julia", "groovy", "crystal", "nim", "ocaml", "rdmd", "dmd", "ldc2", "fpc", "zig", "sbcl", "clisp", "java", "javac", "kotlinc", "ls", "vite", "mkdir", "mv", "node", "npm", "npx", "php", "pip", "pip3", "pwd", "python", "python3", "rm", "rmdir", "ruby", "run", "rustc", "sqlite3", "mysql", "mariadb", "psql", "mongosh", "mongo", "redis-cli", "bd-puente",
+  "history", "true", "false", "printf", "docker", "docker-compose", "test", "read", "alias", "unalias", "unset", "let", "expr", "shift", "local", "break", "continue", "return", "seq", "sleep", "sort", "uniq", "cut", "tr", "sed", "awk", "rev", "tac", "nl", "basename", "dirname", "tee", "diff", "xargs", "time", "du", "stat", "chmod", "bash", "sh", "nano", "vim", "less", "more", "man", "cal", "uname", "lua", "lua5.4", "luajit", "perl", "Rscript", "scala", "scala-cli", "runghc", "runhaskell", "ghc", "elixir", "julia", "groovy", "crystal", "nim", "ocaml", "rdmd", "dmd", "ldc2", "fpc", "zig", "sbcl", "clisp", "java", "javac", "kotlinc", "ls", "vite", "mkdir", "mv", "node", "npm", "npx", "php", "pip", "pip3", "pwd", "python", "python3", "django-admin", "rm", "rmdir", "ruby", "run", "rustc", "sqlite3", "mysql", "mariadb", "psql", "mongosh", "mongo", "redis-cli", "bd-puente",
   "swift", "tail", "tree", "touch", "ts-node", "wc", "whoami", "dotnet", "py", "dir", "type", "ll", "virtualenv", "deactivate", "source", "which", "where", "fastapi", "uvicorn", "flask",
 ];
 
@@ -1325,6 +1325,19 @@ async function comandoFlask(a, io) {
 }
 COMANDOS.flask = comandoFlask;
 
+// django-admin startproject / startapp …: el django-admin de verdad (el de tu Django instalado), dentro del Python del navegador.
+COMANDOS["django-admin"] = async function djangoAdmin(a, io) {
+  if (!a.length || a[0] === "help" || a[0] === "--help") { io.out("Uso: django-admin startproject <nombre> [carpeta] · django-admin startapp <nombre> · django-admin --version\n"); return a.length ? 0 : 1; }
+  const codigo = [
+    "import importlib.util, sys",
+    "if importlib.util.find_spec('django') is None:",
+    "    print('django-admin: Django no está instalado. Instálalo con: pip install django', file=sys.stderr); raise SystemExit(1)",
+    "from django.core import management",
+    `management.execute_from_command_line(['django-admin', *${JSON.stringify(a.map(String))}])`,
+  ].join("\n");
+  return COMANDOS.python.call(this, ["-c", codigo], io);
+};
+
 COMANDOS.python = async function python(a, io) {
   if (a[0] === "-m" && (a[1] === "http.server" || a[1] === "SimpleHTTPServer")) return COMANDOS.__httpServerPython.call(this, a.slice(2), io);
   if (a[0] === "-m" && a[1] === "pip") return COMANDOS.pip.call(this, a.slice(2), io);
@@ -1338,7 +1351,8 @@ COMANDOS.python = async function python(a, io) {
   if (a[0] === "-m") {
     if (a[1] === "http.server") return COMANDOS.__httpServerPython.call(this, a.slice(2), io);
     if (a[1] === "pip") return COMANDOS.pip.call(this, a.slice(2), io);
-    io.err(`python: el módulo -m ${a[1] ?? ""} no está disponible aquí (solo -m pip).\n`);
+    if (a[1] === "django") return COMANDOS["django-admin"].call(this, a.slice(2), io);
+    io.err(`python: el módulo -m ${a[1] ?? ""} no está disponible aquí (sí: -m pip, -m venv, -m django, -m flask, -m uvicorn, -m http.server).\n`);
     return 1;
   }
   const venv = this.almacenVenv(io);

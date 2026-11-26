@@ -31,6 +31,10 @@ def ejecutar_codigo():
         return api_error("El servidor está ocupado ejecutando otros programas. Inténtalo de nuevo.", 503)
     try:
         archivos = data.get("archivos") if isinstance(data.get("archivos"), list) else None
+        from servicios.moderacion import frenar_codigo
+        alto = frenar_codigo(data.get("codigo"), archivos, origen=f"ejecutar {str(data.get('lenguaje', ''))[:20]} en el servidor")
+        if alto:
+            return alto
         return jsonify(ejecutar(str(data.get("lenguaje", "")), data.get("codigo"), data.get("entrada") or "", archivos))
     except ValueError as error:
         return api_error(str(error))
@@ -96,8 +100,12 @@ def python_servidor():
     if not cupo.acquire(timeout=15):
         return api_error("El servidor está ocupado ejecutando otros programas. Inténtalo de nuevo.", 503)
     try:
+        from servicios.moderacion import frenar_codigo
+        alto = frenar_codigo(None, data.get("archivos"), origen="ejecutar Python en el servidor")
+        if alto:
+            return alto
         return jsonify(ps.ejecutar(current_user.id, data.get("ruta"), data.get("archivos"),
-                                   str(data.get("entrada") or "")[:20_000], data.get("args")))
+                                   str(data.get("entrada") or "")[:20_000], data.get("args"), paquetes=data.get("paquetes")))
     except ValueError as error:
         return api_error(str(error))
     except Exception:
@@ -130,6 +138,11 @@ def docker_orden():
         return api_error("Docker está ocupado con otras órdenes. Inténtalo en un momento.", 503)
     try:
         archivos = data.get("archivos") if isinstance(data.get("archivos"), list) else None
+        from servicios.moderacion import frenar_codigo
+        args = data.get("args") if isinstance(data.get("args"), list) else []
+        alto = frenar_codigo(None, archivos, origen="Docker en el servidor", comando="docker " + " ".join(str(a) for a in args)[:4000])
+        if alto:
+            return alto
         return jsonify(dk.ejecutar(current_user.id, data.get("args"), str(data.get("proyecto") or "proyecto"),
                                    archivos, str(data.get("entrada") or "")[:20_000], str(data.get("cwd") or "")))
     except ValueError as error:
@@ -174,6 +187,13 @@ def php_servidor(accion):
     from utilidades import too_many
     data = json_body()
     uid = current_user.id
+    if isinstance(data, tuple):
+        return data
+    if accion in ("iniciar", "sincronizar"):
+        from servicios.moderacion import frenar_codigo
+        alto = frenar_codigo(None, data.get("archivos"), origen="servidor PHP")
+        if alto:
+            return alto
     try:
         if accion == "iniciar":
             if too_many(f"php-iniciar:{uid}", 20, 60):

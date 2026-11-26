@@ -296,11 +296,12 @@ export class Entradas {
   }
 
   /** Descarga un solo archivo del proyecto (texto o archivo de la cuenta). */
-  descargarArchivo(ruta) {
+  async descargarArchivo(ruta) {
     const texto = this.proyecto().files[ruta];
     if (texto === undefined) return;
     const a = document.createElement("a");
     a.download = FS.nombreBase(ruta);
+    if (esMarcador(texto)) await this.archivos.asegurar?.(texto);
     a.href = esMarcador(texto) ? this.archivos.url(texto, { descargar: true, nombre: FS.nombreBase(ruta) }) : URL.createObjectURL(new Blob([texto], { type: "text/plain;charset=utf-8" }));
     document.body.appendChild(a);
     a.click();
@@ -316,6 +317,15 @@ export class Entradas {
     let max = "1 GB";
     try { const u = await this.archivos.consultarUso(); cuenta = `${formatoBytes(u.uso)} de ${formatoBytes(u.limite)} (${Math.round((u.uso / u.limite) * 100)} %)`; max = formatoBytes(u.max_archivo); } catch { /* se muestra el aviso */ }
     const n = Object.keys(py.files).length;
+    if (!FS.hayLimites()) {
+      await dialogo({
+        titulo: "Espacio del proyecto",
+        lista: [`Archivos: ${n.toLocaleString("es")}`, `Carpetas: ${py.folders.length.toLocaleString("es")}`],
+        nota: "Estás trabajando en la carpeta de tu equipo: no hay límites de la cuenta ni se usa tu espacio de CódigoCamp. El único límite es tu disco.",
+        botones: [{ texto: "Cerrar", valor: true, cancelar: true }],
+      });
+      return;
+    }
     await dialogo({
       titulo: "Espacio del proyecto",
       lista: [
@@ -399,7 +409,7 @@ export class Entradas {
   }
 
   /** Primera sincronización con una carpeta (del navegador o del equipo). true si quedó vinculada. */
-  async #empezar(disco) {
+  async #empezar(disco, { silencioso = false } = {}) {
     const handle = { name: disco.nombre };
     let enCarpeta;
     try { enCarpeta = (await disco.listar()).archivos.length; }
@@ -426,7 +436,7 @@ export class Entradas {
       const r = await this.sinc.vincular(modo);
       quitar();
       const omit = [...r.omitidos].map(([ruta, motivo]) => ({ ruta, motivo }));
-      aviso(disco.esEquipo ? `«${handle.name}» abierta desde tu equipo${omit.length ? ` · ${omit.length} archivos muy grandes se ven solo en la terminal` : ""}.` : `Carpeta «${handle.name}» vinculada${r.traidos ? ` · ${r.traidos} archivos traídos` : ""}${omit.length ? ` · ${omit.length} se quedan solo en la carpeta` : ""}.`, {
+      if (!(silencioso && !omit.length)) aviso(disco.esEquipo ? `«${handle.name}» abierta desde tu equipo${omit.length ? ` · ${omit.length} archivos muy grandes se ven solo en la terminal` : ""}.` : `Carpeta «${handle.name}» vinculada${r.traidos ? ` · ${r.traidos} archivos traídos` : ""}${omit.length ? ` · ${omit.length} se quedan solo en la carpeta` : ""}.`, {
         ms: 9000, accion: omit.length ? { texto: "Ver cuáles", fn: () => this.#detalles({ omitidos: omit, renombrados: [] }) } : undefined,
       });
       this.#pintarCarpeta("ok");
@@ -459,11 +469,23 @@ export class Entradas {
   async #retomarEquipo(g) {
     // Al volver a Trabajo se empieza de cero con la carpeta del equipo (manda la carpeta: nunca se toca la nube)
     this.disco = this.#discoEquipo(g.equipo, g.carpeta);
-    const lista = await this.conector.listarEquipos();
-    const eq = lista.find((e) => e.id === g.equipo.id);
-    if (!eq) { this.disco = null; await recuerdo.borrar(this.clave); return; } // lo desconectaste
-    if (eq.en_linea && await this.#raizEquipo(eq, g.carpeta) && await this.alAntesEquipo({ equipo: eq, carpeta: g.carpeta, silencioso: true })) {
-      if (await this.#empezar(this.disco)) { this.alEquipo({ ...eq, carpeta: g.carpeta }); return; }
+    // Al recargar, el Conector puede tardar un instante en aparecer «en línea» (red lenta, el equipo se estaba
+    // reconectando…): se insiste unos segundos antes de rendirse, en vez de soltar el equipo a la primera.
+    let eq = null, quitar = null;
+    for (let intento = 0; intento < 14; intento++) {
+      let lista = null;
+      try { lista = await this.conector.listarEquipos(); } catch { /* red: se reintenta */ }
+      if (lista) {
+        eq = lista.find((e) => e.id === g.equipo.id) || null;
+        if (!eq) { quitar?.(); this.disco = null; await recuerdo.borrar(this.clave); return; } // lo desconectaste
+        if (eq.en_linea) break;
+      }
+      if (intento === 1) quitar = aviso(`Reconectando con ${g.equipo.equipo}…`, { ms: 60000 });
+      await new Promise((ok) => setTimeout(ok, 1500));
+    }
+    quitar?.();
+    if (eq?.en_linea && await this.#raizEquipo(eq, g.carpeta) && await this.alAntesEquipo({ equipo: eq, carpeta: g.carpeta, silencioso: true })) {
+      if (await this.#empezar(this.disco, { silencioso: true })) { this.alEquipo({ ...eq, carpeta: g.carpeta }, "retomar"); return; }
       this.alEquipo(null, "cerrar");
     }
     void this.#soltarEquipo();
@@ -496,17 +518,24 @@ export class Entradas {
     this.#detener();
     this.disco = disco;
     let maxArchivo;
-    try { maxArchivo = (await this.archivos.consultarUso()).max_archivo; } catch { /* se usa el de fábrica */ }
+    if (!disco.esEquipo) try { maxArchivo = (await this.archivos.consultarUso()).max_archivo; } catch { /* se usa el de fábrica */ }   // tu equipo no usa la cuenta
     this.sinc = new Sincronizador({
       disco, base, cache, ...(maxArchivo ? { maxArchivo } : {}),
       proyecto: () => this.proyecto(), // solo lo guardado: con el autoguardado apagado, lo no guardado no viaja
       alCambiar: (info) => this.cambio(info),
       subirArchivo: (d, o) => this.archivos.subir(d, o),
       leerArchivo: (m) => this.archivos.blob(m),
+      ...(disco.esEquipo && this.archivos.registrarEquipo ? { registrarEquipo: (m, cargar, parte) => this.archivos.registrarEquipo(m, cargar, parte) } : {}),
       guardarBase: (b, c) => this.#guardarBase(b, c),
       alAviso: (a) => this.#avisoSinc(a),
     });
-    this.temporizador = setInterval(() => { if (document.visibilityState === "visible") this.#programar(0); }, INTERVALO);
+    // Carpetas enormes: si revisar la carpeta tarda, se revisa con menos frecuencia (tu equipo no se calienta)
+    this.temporizador = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      const d = this.disco;
+      if (d?.duracionListar && Date.now() - (d.finListar || 0) < d.duracionListar * 4) return;
+      this.#programar(0);
+    }, INTERVALO);
   }
 
   #guardarBase(base, cache) {

@@ -42,9 +42,41 @@ export async function restaurarPaquetes({ pyo, lista, out = () => {}, err = () =
  *  1. tal cual;  2. sin versión exacta ni extras;  3. el paquete solo y luego cada dependencia aparte,
  *  saltando las que no existen para el navegador (casi siempre opcionales para lo que usa tu código).
  */
+/**
+ * Versiones que SÍ funcionan juntas en el Python del navegador (Pyodide 0.26.4 trae pydantic 2.7.0,
+ * pydantic-core 2.18.1 y typing_extensions 4.11.0, que no se pueden cambiar). Las versiones más nuevas de PyPI
+ * piden un pydantic-core compilado que no existe para el navegador o un typing_extensions más nuevo, y FastAPI
+ * quedaba a medio instalar («cannot import name 'sentinel'»). Probadas una por una con FastAPI y Flask.
+ */
+export const COMPATIBLES = {
+  fastapi: ["fastapi==0.115.12", "anyio==4.8.0"],
+  "fastapi-slim": ["fastapi==0.115.12", "anyio==4.8.0"],
+  "fastapi-cli": [],
+  starlette: ["starlette==0.46.2", "anyio==4.8.0"],
+  anyio: ["anyio==4.8.0"],
+  pydantic: ["pydantic==2.7.0"],
+  "pydantic-core": [],
+  "pydantic-settings": ["pydantic-settings==2.3.4"],
+  sqlmodel: ["sqlmodel==0.0.22", "anyio==4.8.0"],
+  "typing-extensions": [],
+};
+const conVersionExacta = (espec) => /==/.test(espec);
+
 export async function instalarTolerante(micropip, espec, { deps = dependenciasPip } = {}) {
+  const compat = COMPATIBLES[nombreDe(espec)];
+  if (compat && !conVersionExacta(espec)) {
+    // Sin versión pedida: directo a la combinación que funciona (la última de PyPI se instalaría a medias).
+    if (compat.length) await micropip.install(compat);
+    return { instalado: compat[0] || espec, aviso: compat.length ? null : `${espec} ya viene con el Python del navegador.` };
+  }
   try { await micropip.install(espec); return { instalado: espec }; }
   catch (primero) {
+    if (compat) {
+      try {
+        if (compat.length) await micropip.install(compat);
+        return { instalado: compat[0] || espec, aviso: `${espec} no funciona en el navegador; se instaló ${compat[0] || "la versión que trae Python"}, que sí es compatible.` };
+      } catch { /* se intenta por partes */ }
+    }
     const simple = espec.replace(/\[.*?\]/, "").split(/[=<>~!]/)[0];
     if (simple !== espec) {
       try { await micropip.install(simple); return { instalado: simple, aviso: `${espec} no está disponible para el navegador; se instaló ${simple} (la versión más parecida).` }; }

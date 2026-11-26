@@ -97,6 +97,22 @@ async function aDataUrl(blob) {
   return `data:${blob.type || "application/octet-stream"};base64,${btoa(bin)}`;
 }
 
+/** El service worker pide trozos de archivos de tu equipo (videos, descargas grandes) y esta pestaña se los lee. */
+let clienteConPartes = null;
+function escucharPartes(cliente) {
+  if (clienteConPartes || typeof navigator === "undefined" || !navigator.serviceWorker) { clienteConPartes ||= cliente; return; }
+  clienteConPartes = cliente;
+  navigator.serviceWorker.addEventListener("message", async (e) => {
+    if (e.data?.tipo !== "cc-equipo-parte" || !e.ports?.[0]) return;
+    const x = clienteConPartes?.local?.get(e.data.hash);
+    try {
+      if (!x?.parte) throw new Error("Ese archivo ya no está abierto.");
+      const { bytes, total } = await x.parte(e.data.desde, e.data.largo);
+      e.ports[0].postMessage({ bytes, total }, [bytes.buffer]);
+    } catch (err) { e.ports[0].postMessage({ error: err.message || "error" }); }
+  });
+}
+
 export class ClienteArchivos {
   constructor({ fetchFn = (...a) => fetch(...a), csrf = leerCsrf, usarXhr = typeof XMLHttpRequest === "function", reintentos = 8, pausa = 2000 } = {}) {
     Object.assign(this, { fetchFn, csrf, usarXhr, reintentos, pausa });
@@ -155,6 +171,25 @@ export class ClienteArchivos {
     return crearMarcador({ hash, tipo, tamano: blob.size });
   }
 
+  /** Un archivo de tu equipo que se deja allá: se registra cómo pedirlo y se lee solo cuando lo abres. */
+  registrarEquipo(marcador, cargar, parte = null) {
+    const m = leerMarcador(marcador);
+    if (!m || !this.local) return;
+    const x = this.local.get(m.hash);
+    if (!x) this.local.set(m.hash, { cargar, parte, tipo: m.tipo, tamano: m.tamano });
+    else if (!x.blob) Object.assign(x, { cargar, parte });
+    escucharPartes(this);
+  }
+
+  /** Deja listo en memoria un archivo de tu equipo (para verlo o descargarlo). */
+  async asegurar(marcador) {
+    const m = leerMarcador(marcador);
+    const x = m && this.local?.get(m.hash);
+    if (!x || x.blob) return;
+    x.carga ||= Promise.resolve(x.cargar()).then((b) => { x.blob = b.type ? b : new Blob([b], { type: x.tipo }); }).finally(() => { x.carga = null; });
+    await x.carga;
+  }
+
   async subir(datos, { nombre = "", progreso = () => {} } = {}) {
     if (this.local) return this.#subirLocal(datos, nombre);
     const tamano = tamanoDe(datos);
@@ -190,7 +225,7 @@ export class ClienteArchivos {
   blob(marcador) {
     const m = leerMarcador(marcador);
     if (!m) return Promise.reject(new Error("No es un archivo guardado en la cuenta."));
-    if (this.local?.has(m.hash)) return Promise.resolve(this.local.get(m.hash).blob);
+    if (this.local?.has(m.hash)) return this.asegurar(marcador).then(() => this.local.get(m.hash).blob);
     if (this.cache.has(m.hash)) return this.cache.get(m.hash);
     const p = this.fetchFn(`/api/trabajo/archivos/${m.hash}`, { credentials: "same-origin" }).then(async (r) => {
       if (!r.ok) throw new Error(r.status === 404 ? "El archivo ya no está en tu cuenta." : `No se pudo descargar (${r.status}).`);
@@ -207,7 +242,13 @@ export class ClienteArchivos {
     const m = leerMarcador(marcador);
     if (!m) return null;
     const x = this.local?.get(m.hash);
-    if (x) { x.url ||= URL.createObjectURL(x.blob); return x.url; }
+    if (x?.blob) { x.url ||= URL.createObjectURL(x.blob); return x.url; }
+    // Videos y audios grandes de tu equipo: se reproducen por trozos (como un streaming), sin cargarlos enteros.
+    // Las descargas de archivos grandes también pasan por aquí, trozo a trozo.
+    if (x?.parte && navigator.serviceWorker?.controller && (descargar || (/^(video|audio)\//.test(m.tipo) && m.tamano > 8 * 1024 * 1024))) {
+      return `/__equipo/${m.hash}?t=${m.tamano}&m=${encodeURIComponent(m.tipo)}${descargar ? `&d=${encodeURIComponent(nombre || "archivo")}` : ""}`;
+    }
+    if (x) return null;   // de tu equipo y aún sin leer: antes se llama asegurar()
     const q = new URLSearchParams();
     if (descargar) q.set("descargar", "1");
     if (nombre) q.set("nombre", nombre);
@@ -220,6 +261,10 @@ export class ClienteArchivos {
       const m = new Map();
       for (const x of Object.values(py.files).map(leerMarcador).filter(Boolean)) {
         const l = this.local.get(x.hash);
+        // De tu equipo: la vista previa solo necesita imágenes, fuentes y audio/video; no se leen programas ni archivos enormes
+        if (l && !l.blob && (x.tamano > 64 * 1024 * 1024 || !/^(image|font|audio|video)\//.test(x.tipo))) continue;
+        if (l && !l.blob) await this.asegurar(`ccbin:v1:${x.hash}:${x.tipo}:${x.tamano}`).catch(() => {});
+        if (l && !l.blob) continue;
         if (l && !m.has(x.hash)) m.set(x.hash, l.blob.size <= 12 * 1024 * 1024 ? await aDataUrl(l.blob) : (l.url ||= URL.createObjectURL(l.blob)));
       }
       return m;

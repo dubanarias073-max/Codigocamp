@@ -9,6 +9,12 @@
 export const RAIZ = "/workspace";
 // caracteres: solo el texto editable; los archivos guardados en la cuenta (marcadores) no cuentan.
 export const LIMITES = { archivos: 5000, carpetas: 2000, caracteres: 5_000_000, ruta: 400, nombre: 120 };
+const LIMITES_CUENTA = { ...LIMITES };
+/** Con el Conector (la carpeta de tu equipo) no hay límites de la cuenta: tu disco es el límite, como en VS Code. */
+export function sinLimites(si) {
+  Object.assign(LIMITES, si ? { archivos: Infinity, carpetas: Infinity, caracteres: Infinity } : LIMITES_CUENTA);
+}
+export const hayLimites = () => LIMITES.caracteres !== Infinity;
 
 // Nombres como en Windows, macOS y Linux: se admiten espacios, tildes, ñ, paréntesis… Solo se prohíben los caracteres
 // que Windows no acepta (\ / : * ? " < > |), los de control, y los espacios o puntos al final (Windows los quita).
@@ -171,7 +177,7 @@ export function crearArchivo(py, ruta, contenido = "", { padres = false } = {}) 
   const problema = comprobarDestino(py, ruta, { padres });
   if (problema) return problema;
   if (Object.keys(py.files).length >= LIMITES.archivos) return fallo(`Se alcanzó el límite de ${LIMITES.archivos} archivos.`);
-  if (!esMarcadorFs(contenido) && usoCaracteres(py) + contenido.length > LIMITES.caracteres) return fallo("El proyecto superaría el límite de almacenamiento.");
+  if (hayLimites() && !esMarcadorFs(contenido) && usoCaracteres(py) + contenido.length > LIMITES.caracteres) return fallo("El proyecto superaría el límite de almacenamiento.");
   if (padres && carpetaDe(ruta)) {
     const r = crearCarpeta(py, carpetaDe(ruta), { padres: true });
     if (!r.ok) return r;
@@ -189,7 +195,7 @@ export function escribirArchivo(py, ruta, texto, { anexar = false } = {}) {
   if (!tieneCarpeta(py, padre)) return fallo("No existe el archivo o el directorio.");
   if (!tieneArchivo(py, ruta)) return crearArchivo(py, ruta, texto);
   const nuevo = anexar ? py.files[ruta] + texto : texto;
-  if (!esMarcadorFs(nuevo) && usoCaracteres(py) - (esMarcadorFs(py.files[ruta]) ? 0 : py.files[ruta].length) + nuevo.length > LIMITES.caracteres) return fallo("El proyecto superaría el límite de almacenamiento.");
+  if (hayLimites() && !esMarcadorFs(nuevo) && usoCaracteres(py) - (esMarcadorFs(py.files[ruta]) ? 0 : py.files[ruta].length) + nuevo.length > LIMITES.caracteres) return fallo("El proyecto superaría el límite de almacenamiento.");
   py.files[ruta] = nuevo;
   return bien();
 }
@@ -250,7 +256,7 @@ export function copiar(py, de, a, { recursivo = false } = {}) {
   const archivos = archivosEn(py, de);
   if (Object.keys(py.files).length + archivos.length > LIMITES.archivos) return fallo(`Se alcanzó el límite de ${LIMITES.archivos} archivos.`);
   const extra = archivos.reduce((s, r) => s + (esMarcadorFs(py.files[r]) ? 0 : py.files[r].length), 0);
-  if (usoCaracteres(py) + extra > LIMITES.caracteres) return fallo("El proyecto superaría el límite de almacenamiento.");
+  if (hayLimites() && usoCaracteres(py) + extra > LIMITES.caracteres) return fallo("El proyecto superaría el límite de almacenamiento.");
   if (tieneArchivo(py, de)) {
     py.files[a] = py.files[de];
     return bien();

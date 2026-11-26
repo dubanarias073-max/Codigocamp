@@ -326,7 +326,7 @@ export function runtimeNode(CC) {
       const r = new Buffer(x.length || 0); r.set(x); return r;
     }
     static alloc(n, f = 0) { return new Buffer(n).fill(f); }
-    static concat(l) { const t = l.reduce((s, b) => s + b.length, 0); const r = new Buffer(t); let o = 0; for (const b of l) { const u = typeof b === "string" ? codificador.encode(b) : b; r.set(u, o); o += u.length; } return r; }
+    static concat(l, largo) { const partes = l.map((b) => (typeof b === "string" ? codificador.encode(b) : b)); const t = largo ?? partes.reduce((s, b) => s + b.length, 0); const r = new Buffer(t); let o = 0; for (const u of partes) { if (o >= t) break; const v = u.length > t - o ? u.subarray(0, t - o) : u; r.set(v, o); o += v.length; } return r; }
     static isBuffer(b) { return b instanceof Buffer; }
     static byteLength(s) { return typeof s === "string" ? codificador.encode(s).length : s.length; }
     toString(enc) {
@@ -1078,11 +1078,15 @@ export function leerDePyodide(pyo) {
       const rel = ruta.slice(RAIZ_PY.length + 1);
       if (nombre === "__pycache__" || nombre.endsWith(".pyc")) continue;
       if (sis.isDir(sis.stat(ruta).mode)) { salida.folders.push(rel); recorrer(ruta); } else {
-        try {
-          const bytes = sis.readFile(ruta);
-          const t = typeof bytes === "string" ? bytes : comoTexto(bytes);
-          if (t === null) salida.binarios.set(rel, bytes); else salida.files[rel] = t;
-        } catch { /* ilegible: se ignora */ }
+        let bytes;
+        try { bytes = sis.readFile(ruta); }
+        catch {
+          // Sin permiso de lectura (p. ej. django-admin startproject copia permisos de sus plantillas y quedan en 0o200):
+          // en tu PC el archivo sería tuyo y se podría leer, así que se le da permiso y se lee igual.
+          try { sis.chmod(ruta, 0o644); bytes = sis.readFile(ruta); } catch { continue; }
+        }
+        const t = typeof bytes === "string" ? bytes : comoTexto(bytes);
+        if (t === null) salida.binarios.set(rel, bytes); else salida.files[rel] = t;
       }
     }
   };
@@ -1110,6 +1114,10 @@ export function borrarEnPyodide(pyo, dir = RAIZ_PY, raiz = true) {
 /** Diferencias entre el proyecto y lo que dejó el programa Python (para aplicarlas con aplicarCambios). */
 export function diferencias(antes, despues) {
   const cambios = { files: {}, folders: [], carpetasBorradas: [] };
+  // Red de seguridad: si /workspace se leyó vacío (otro proceso lo estaba reescribiendo) no se borra el proyecto.
+  // Un programa de verdad casi nunca borra TODOS tus archivos; si pasa, es más seguro no aplicar nada.
+  const nAntes = Object.keys(antes.files).length;
+  if (nAntes > 0 && !Object.keys(despues.files).length && !(despues.binarios?.size)) return cambios;
   for (const [r, t] of Object.entries(despues.files)) if (antes.files[r] !== t) cambios.files[r] = t;
   for (const r of Object.keys(antes.files)) if (!(r in despues.files)) cambios.files[r] = null;
   for (const c of despues.folders) if (!antes.folders.includes(c)) cambios.folders.push(c);
@@ -1136,8 +1144,10 @@ export function textoError(e) {
 export const STDLIB_APARTE = { ssl: "ssl", _ssl: "ssl", hashlib: "hashlib", _hashlib: "hashlib", lzma: "lzma", _lzma: "lzma", sqlite3: "sqlite3", _sqlite3: "sqlite3", _pydecimal: "pydecimal", pydoc_data: "pydoc-data" };
 const USA_RED_O_CIFRADO = /^\s*(?:from|import)\s+(?:requests|httpx|urllib3|aiohttp|fastapi|starlette|anyio|flask|werkzeug|jwt|jose|passlib|bcrypt|smtplib|ssl|hashlib|hmac|secrets|email|http|urllib|django|sqlalchemy|sqlmodel|pydantic|dotenv|itsdangerous|authlib|google)\b/m;
 /** Carga ssl, hashlib y sqlite3 de Pyodide (una vez). Sin red o sin ellos, sigue: el error real lo dirá Python. */
-export async function cargarStdlibAparte(pyo, nombres = ["ssl", "hashlib", "sqlite3"]) {
-  try { await pyo.loadPackage(nombres); } catch { /* nada */ }
+export async function cargarStdlibAparte(pyo, nombres = ["ssl", "hashlib", "sqlite3"], fuentes = "") {
+  // Zonas horarias (zoneinfo): Django las usa siempre (TIME_ZONE = "UTC"), y también pandas/arrow/pendulum.
+  const lista = /\b(?:django|zoneinfo|pandas|arrow|pendulum|tzdata)\b/.test(fuentes) ? [...nombres, "tzdata"] : nombres;
+  try { await pyo.loadPackage(lista); } catch { /* nada */ }
 }
 
 const limpiarTraza = (mensaje) => String(mensaje).split("\n").filter((l) => !/_pyodide|pyodide\/|python3\d+\.zip/.test(l)).join("\n").trim();
@@ -1154,7 +1164,8 @@ export async function ejecutarPython(o) {
   const fuentesPy = [o.codigo, ...Object.entries(o.proyecto.files).filter(([r, t]) => r.endsWith(".py") && t.length < 200_000).map(([, t]) => t)].join("\n")
     .replace(/^\s*(?:import|from)\s+(?:pymysql|mysql|MySQLdb|psycopg2?|pymongo|bson|redis)\b.*$/gm, "");
   try { await pyo.loadPackagesFromImports(fuentesPy); } catch { /* si falta un paquete, Python mostrará su propio error */ }
-  if (USA_RED_O_CIFRADO.test(fuentesPy)) await cargarStdlibAparte(pyo);
+  if (USA_RED_O_CIFRADO.test(fuentesPy)) await cargarStdlibAparte(pyo, undefined, fuentesPy);
+  else if (/\b(?:django|zoneinfo)\b/.test(fuentesPy)) await cargarStdlibAparte(pyo, [], fuentesPy);
   // Bases de datos: tu servidor real por el puente o, si no se puede llegar, SQLite en el proyecto (bdpython.js).
   let conBd = false;
   if (/^\s*(?:from|import)\s+(?:pymysql|mysql|MySQLdb|psycopg2?|pymongo|bson|redis|sqlalchemy|sqlmodel|flask_sqlalchemy|flask_mysqldb|django|requests|httpx|urllib|smtplib|email|google|openai|anthropic|fastapi|flask|aiohttp)\b/m.test(fuentesPy + "\n" + o.codigo)) {
@@ -1171,8 +1182,9 @@ export async function ejecutarPython(o) {
   const antes = { files: { ...py.files }, folders: [...py.folders] };
   const binarios = await binariosParaPython(py, o.archivos);
   let codigo = 0;
+  let miGeneracion = 0;
   try {
-    nuevaGeneracionFsPy();
+    miGeneracion = nuevaGeneracionFsPy();
     borrarEnPyodide(pyo);
     escribirEnPyodide(pyo, py, binarios);
     const cwd = `${RAIZ_PY}${o.cwd ? "/" + o.cwd : ""}`;
@@ -1200,9 +1212,13 @@ export async function ejecutarPython(o) {
   } finally {
     if (conBd) { try { pyo.runPython("guardar_mongo()"); } catch { /* nada */ } }   // antes de copiar los archivos al proyecto
     try {
-      const despues = await consolidarBinarios(antes, leerDePyodide(pyo), { subir: o.archivos ? (b, op) => o.archivos.subir(b, op) : null, hash: sha256Hex, err: o.err });
-      if (aplicarCambios(py, diferencias(antes, despues))) o.cambio?.({});
-      borrarEnPyodide(pyo);
+      // Si otro programa o un servidor reescribió /workspace mientras este corría, lo que hay ahí ya no es de este
+      // programa: no se toca el proyecto (antes se podían «borrar» archivos que solo se estaban reescribiendo).
+      if (miGeneracion === generacionFsPy) {
+        const despues = await consolidarBinarios(antes, leerDePyodide(pyo), { subir: o.archivos ? (b, op) => o.archivos.subir(b, op) : null, hash: sha256Hex, err: o.err });
+        if (aplicarCambios(py, diferencias(antes, despues))) o.cambio?.({});
+        if (miGeneracion === generacionFsPy) borrarEnPyodide(pyo);
+      }
     } catch { /* el programa no dejó nada que guardar */ }
     if (o.bd) cerrarMysqlEnPython(pyo);
   }
@@ -1232,7 +1248,7 @@ export async function ejecutarSQL(o) {
 }
 
 /** Los ejecutores que usa el shell. `api` es la función de llamadas al servidor (js/auth.js). */
-export function crearEjecutores({ api, almacenPip = null, archivos = null, bd = null }) {
+export function crearEjecutores({ api, almacenPip = null, archivos = null, bd = null, paquetesServidor = () => [] }) {
   return {
     node: (o) => ejecutarNode({ ...o, clienteArchivos: archivos }),
     ts: ejecutarTS,
@@ -1252,7 +1268,7 @@ export function crearEjecutores({ api, almacenPip = null, archivos = null, bd = 
     async phpServidor(accion, datos) { return api(`/api/trabajo/php/${accion}`, datos); },
     async pythonServidor({ ruta, archivos, entrada = "", args = [] }) {
       try {
-        const d = await api("/api/python/run", { ruta, archivos, entrada, args });
+        const d = await api("/api/python/run", { ruta, archivos, entrada, args, paquetes: paquetesServidor() });
         return { salida: d.salida || "", error: Boolean(d.error) };
       } catch (error) {
         return { salida: error.message, error: true };

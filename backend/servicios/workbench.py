@@ -71,6 +71,20 @@ def reparar(engine):
                 con.execute(text("ALTER TABLE cosmeticos_equipados CHANGE `cursor` puntero VARCHAR(30) NULL "
                                  "COMMENT 'Puntero del mouse'"))
                 hechos.append("cosmeticos_equipados.cursor -> puntero")
+
+        # 4. Tablas que no están en utf8mb4: tildes, «¿» o emojis se guardaban como «?» (p. ej. títulos de chats de la IA).
+        for tabla, cotejo in con.execute(text(
+                "SELECT TABLE_NAME, TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA = :b AND TABLE_TYPE = 'BASE TABLE'"), {"b": base}):
+            if cotejo and not str(cotejo).lower().startswith("utf8mb4"):
+                try:
+                    con.execute(text(f"ALTER TABLE {_q(tabla)} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+                    hechos.append(f"{tabla}: {cotejo} -> utf8mb4")
+                except Exception:  # noqa: BLE001 - p. ej. un índice demasiado largo: se deja como estaba
+                    pass
+        try:
+            con.execute(text(f"ALTER DATABASE {_q(base)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+        except Exception:  # noqa: BLE001 - sin permiso: no pasa nada
+            pass
     return hechos
 
 
@@ -135,6 +149,63 @@ def migraciones_de_datos(db):
         Profile.query.filter(Profile.avatar.isnot(None)).update({Profile.avatar: None}, synchronize_session=False)
         db.session.add(AppliedMigration(clave="quitar_avatares"))
         hechas.append("quitar_avatares")
+    if db.session.get(AppliedMigration, "compras_a_coleccion") is None:
+        # Cosméticos comprados antes de que existiera la colección: pasan a la colección (desde ahora es lo único que cuenta).
+        from cosmeticos import POR_CLAVE
+        from models import OwnedCosmetic, Purchase, StoreItem
+        ids = {i.id: i.clave for i in StoreItem.query.filter(StoreItem.clave.in_(list(POR_CLAVE))).all()}
+        tiene = {(c.usuario_id, c.clave) for c in OwnedCosmetic.query.all()}
+        for compra in Purchase.query.filter(Purchase.articulo_id.in_(list(ids))).all() if ids else []:
+            par = (compra.usuario_id, ids[compra.articulo_id])
+            if par not in tiene:
+                db.session.add(OwnedCosmetic(usuario_id=par[0], clave=par[1], origen="tienda"))
+                tiene.add(par)
+        db.session.add(AppliedMigration(clave="compras_a_coleccion"))
+        hechas.append("compras_a_coleccion")
+    if db.session.get(AppliedMigration, "ia_sin_duplicados") is None:
+        # Cuando la IA fallaba, cada «reintentar» abría una conversación nueva con la misma pregunta: se dejan en una sola.
+        borradas = limpiar_conversaciones_repetidas()
+        db.session.add(AppliedMigration(clave="ia_sin_duplicados"))
+        hechas.append(f"ia_sin_duplicados ({borradas})")
     if hechas:
         db.session.commit()
     return hechas
+
+
+def limpiar_conversaciones_repetidas(usuario_id=None):
+    """Junta las conversaciones con la IA que son la misma pregunta repetida (reintentos que fallaron).
+    De cada grupo (misma primera pregunta, creadas con menos de 1 hora de diferencia) se queda la que tenga respuesta y
+    más mensajes; se borran las otras solo si son cortas (pregunta sin respuesta o una sola respuesta)."""
+    from datetime import timedelta
+    from models import AIConversation, db
+    q = AIConversation.query
+    if usuario_id:
+        q = q.filter_by(usuario_id=usuario_id)
+    grupos = {}
+    for c in q.order_by(AIConversation.usuario_id, AIConversation.creada).all():
+        msgs = list(c.mensajes)
+        primera = next((m.texto.strip() for m in msgs if m.rol == "yo"), None)
+        if primera is None:
+            if not msgs:
+                db.session.delete(c)   # vacía
+            continue
+        lista = grupos.setdefault((c.usuario_id, primera), [])
+        if lista and (c.creada - lista[-1][-1].creada) <= timedelta(hours=1):
+            lista[-1].append(c)
+        else:
+            lista.append([c])
+    borradas = 0
+    for lista in grupos.values():
+        for grupo in lista:
+            if len(grupo) < 2:
+                continue
+            def valor(c):
+                ms = list(c.mensajes)
+                return (any(m.rol == "tutor" for m in ms), len(ms), c.actualizada)
+            mejor = max(grupo, key=valor)
+            for c in grupo:
+                if c is not mejor and len(c.mensajes) <= 2 and not c.fijada:
+                    db.session.delete(c)
+                    borradas += 1
+    db.session.flush()
+    return borradas

@@ -1,0 +1,26 @@
+/* Vitrina: cómo se presenta en la tienda un artículo diseñado en el panel (movimiento 3D, aura, brillo, destellos).
+   La usan tienda.html (tarjetas .producto) y admin.html (vista previa .vit-card). */
+:is(.producto,.vit-card).vit-aura{border-color:var(--vit-aura)!important;box-shadow:0 0 0 1px var(--vit-aura),0 0 26px color-mix(in srgb,var(--vit-aura) 55%,transparent),0 0 60px color-mix(in srgb,var(--vit-aura) 22%,transparent)!important}
+:is(.producto,.vit-card).vit-aura .producto-rango{border-color:var(--vit-aura);color:var(--vit-aura)}
+:is(.producto,.vit-card).vit-flotar :is(.vista,.ic,.producto-img){animation:vit-flota 3s ease-in-out infinite!important}
+:is(.producto,.vit-card).vit-girar{perspective:700px}
+:is(.producto,.vit-card).vit-girar :is(.vista,.ic){animation:vit-giro 7s linear infinite!important;transform-style:preserve-3d}
+:is(.producto,.vit-card).vit-girar .producto-img{animation:vit-giro 5s linear infinite!important;filter:drop-shadow(0 10px 12px rgba(0,0,0,.45))}
+:is(.producto,.vit-card).vit-latido{animation:vit-latido 1.9s ease-in-out infinite!important}
+:is(.producto,.vit-card).vit-inclinar{transform:perspective(800px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transform-style:preserve-3d;transition:transform .18s ease-out}
+:is(.producto,.vit-card).vit-inclinar :is(.vista,.ic,.producto-img){transform:translateZ(34px)}
+:is(.producto,.vit-card).vit-inclinar.vit-balanceo{animation:vit-balanceo 6s ease-in-out infinite!important}
+:is(.producto,.vit-card).vit-brillo{position:relative;overflow:hidden;isolation:isolate}
+:is(.producto,.vit-card).vit-brillo::after{content:"";position:absolute;inset:-60% -30%;z-index:2;background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.42) 47%,color-mix(in srgb,var(--vit-aura,#a5f3fc) 45%,transparent) 53%,transparent 62%);transform:translateX(-70%);animation:vit-barrido 3.4s ease-in-out infinite!important;pointer-events:none;mix-blend-mode:screen}
+.vit-destello{position:absolute;z-index:3;width:10px;height:10px;pointer-events:none;background:radial-gradient(circle,#fff 0 18%,var(--vit-aura,#fde68a) 30%,transparent 62%);clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);animation:vit-sube 2.6s ease-in infinite;opacity:0}
+.producto-img{width:110px;height:110px;object-fit:contain;display:block;margin:auto;border-radius:14px;image-rendering:auto}
+.vista-img{display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--vit-aura,#64748b) 30%,transparent),transparent 70%)!important}
+@keyframes vit-flota{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@keyframes vit-giro{from{transform:rotateY(0)}to{transform:rotateY(360deg)}}
+@keyframes vit-latido{0%,100%{transform:scale(1)}12%{transform:scale(1.035)}24%{transform:scale(.99)}36%{transform:scale(1.025)}}
+@keyframes vit-balanceo{0%,100%{transform:perspective(800px) rotateX(4deg) rotateY(-7deg)}50%{transform:perspective(800px) rotateX(-3deg) rotateY(7deg)}}
+@keyframes vit-barrido{0%,15%{transform:translateX(-70%)}60%,100%{transform:translateX(70%)}}
+@keyframes vit-sube{0%{opacity:0;transform:translateY(0) scale(.4) rotate(0)}25%{opacity:1}100%{opacity:0;transform:translateY(-90px) scale(1.1) rotate(180deg)}}
+/* Celulares y equipos modestos: se queda lo que solo mueve (transform), sin barridos ni destellos */
+.tienda-ligera :is(.producto,.vit-card).vit-brillo::after,.tienda-ligera .vit-destello{animation:none!important;display:none}
+@media (prefers-reduced-motion:reduce){:is(.producto,.vit-card)[class*="vit-"],:is(.producto,.vit-card)[class*="vit-"] *,:is(.producto,.vit-card)[class*="vit-"]::after{animation:none!important}}

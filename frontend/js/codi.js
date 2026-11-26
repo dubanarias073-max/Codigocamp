@@ -183,7 +183,7 @@ export function ponerAccesorioCodi(clave) {
   accesorioPuesto = nuevo;
   redibujarCodis();
 }
-function redibujarCodis() {
+export function redibujarCodis() {
   if (typeof document === "undefined") return;
   for (const svg of document.querySelectorAll("svg.codi:not([data-fijo])")) {
     const animo = [...svg.classList].find((c) => c.startsWith("codi-") && c !== "codi-animado")?.slice(5) || "feliz";

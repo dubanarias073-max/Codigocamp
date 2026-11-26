@@ -161,3 +161,33 @@ def test_ia_quita_cercas_de_codigo():
     assert sin_cercas("```js\nconst a = 1;\n```") == "const a = 1;"
     assert sin_cercas("```\nprint(1)\n```") == "print(1)"
     assert sin_cercas("x = 2") == "x = 2"
+
+
+def test_python_servidor_paquetes_no_desaparecen(carpeta, monkeypatch):
+    """Antes los entornos iban a la carpeta temporal del sistema y «al rato» los paquetes ya no estaban.
+    Ahora hay un registro: si el entorno se borra, se reinstala solo antes de ejecutar."""
+    import shutil
+    assert "almacen_archivos" in ps.__dict__["_BACKEND"] + "/almacen_archivos" and "tmp" not in os.path.basename(ps.VENVS)
+    instalados, llamadas = set(), []
+
+    def pip_falso(py, args, tiempo=0):
+        if args[0] == "install":
+            llamadas.append(args[2:])
+            instalados.update(ps.nombre_de(a) for a in args[2:])
+        return 0, "ok"
+    monkeypatch.setattr(ps, "_pip", pip_falso)
+    monkeypatch.setattr(ps, "_info", lambda py, nombres: {n: {"version": "1.0", "modulos": [n]} for n in nombres if n in instalados})
+    ps.instalar(7, ["cowsay==6.1"])
+    assert ps.registrados(7) == ["cowsay==6.1"]
+    # El entorno desaparece (alguien limpió el disco o se reinstaló Python)
+    shutil.rmtree(ps.carpeta(7)); instalados.clear(); llamadas.clear()
+    r = ps.ejecutar(7, "a.py", [{"ruta": "a.py", "contenido": "print('hola')"}])
+    assert llamadas == [["cowsay==6.1"]] and "Se reinstalaron" in r["salida"] and "hola" in r["salida"]
+    llamadas.clear()
+    ps.ejecutar(7, "a.py", [{"ruta": "a.py", "contenido": "print('hola')"}])
+    assert llamadas == [], "si ya está todo, no reinstala nada"
+    # Lo que el navegador recuerda de instalaciones antiguas (sin registro) también se repara
+    ps.ejecutar(7, "a.py", [{"ruta": "a.py", "contenido": "print(1)"}], paquetes=["tabulate==0.9.0", "../malo"])
+    assert llamadas == [["tabulate==0.9.0"]]
+    ps.desinstalar(7, ["cowsay"])
+    assert [ps.nombre_de(p) for p in ps.registrados(7)] == ["tabulate"]

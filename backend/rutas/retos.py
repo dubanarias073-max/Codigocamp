@@ -25,10 +25,13 @@ def cursos():
     if current_user.is_authenticated:
         done = dict(base.join(CompletedLevel, CompletedLevel.nivel_id == Level.id).filter(
             CompletedLevel.usuario_id == current_user.id).group_by(Stage.curso_id).all())
+    from models import CursoAdmin
+    motores = {c.curso_id: c.motor for c in CursoAdmin.query.all()}
     return jsonify(cursos=[{
         "slug": item.slug, "nombre": item.nombre, "tipo": item.tipo, "sigla": item.sigla,
         "color": item.color, "descripcion": item.descripcion, "tiene_retos": item.id in course_ids,
         "lecciones": totals.get(item.id, 0), "hechas": done.get(item.id, 0),
+        **({"motor": motores[item.id]} if item.id in motores else {}),
     } for item in courses])
 
 
@@ -92,10 +95,12 @@ def reto_responder(challenge_id):
     get_profile(current_user)
     profile = Profile.query.filter_by(usuario_id=current_user.id).with_for_update().one()
     refresh_lives(profile)
-    if profile.vidas <= 0:
+    from rutas.salto import anotar, en_examen
+    examen = request.args.get("salto") == "1" and en_examen(challenge_id)   # examen para saltar: sin vidas ni bloqueo
+    if profile.vidas <= 0 and not examen:
         db.session.commit()
         return api_error("Te quedaste sin vidas.", 403)
-    if not allowed_level(current_user, challenge.nivel):
+    if not examen and not allowed_level(current_user, challenge.nivel):
         return api_error("Nivel bloqueado.", 403)
     data = json_body()
     if isinstance(data, tuple):
@@ -136,7 +141,9 @@ def reto_responder(challenge_id):
         answer = " ".join(sol)
     else:
         correct, answer = bool(data.get("correcto")), ""
-    if not correct:
+    if examen:
+        anotar(challenge_id, correct)
+    elif not correct:
         lose_life(profile)
     db.session.commit()
     return jsonify(

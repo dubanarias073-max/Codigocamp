@@ -8,7 +8,7 @@ import {
   cargarStdlibAparte, escribirEnPyodide, generacionFsPy, leerDePyodide, nuevaGeneracionFsPy, RAIZ_PY, STDLIB_APARTE, textoError,
 } from "./ejecucion.js";
 import { ejecutarPip, restaurarPaquetes, sugerenciaPython } from "./paquetes.js";
-import { importsDelProyecto, pipDeImport } from "./extensiones.js";
+import { importsDelProyecto, importsDesde, pipDeImport } from "./extensiones.js";
 import { prepararBdPython, usaMongo } from "./bdpython.js";
 import { cerrarMysqlEnPython } from "./pymysql.js";
 
@@ -50,10 +50,11 @@ export function moduloDeArchivo(py, ruta) {
 const IMPORTA = { fastapi: /^\s*(?:from|import)\s+fastapi\b/m, flask: /^\s*(?:from|import)\s+flask\b/m, starlette: /^\s*(?:from|import)\s+starlette\b/m, django: /^\s*(?:from|import)\s+django\b/m };
 
 /** Qué paquete de pip necesita el servidor (según el comando y lo que importa el código). */
-function paqueteNecesario(py, estilo) {
+function paqueteNecesario(py, estilo, entrada = null) {
   if (estilo === "flask") return "flask";
   if (estilo === "django") return "django";
-  const fuentes = Object.entries(py.files).filter(([r]) => r.endsWith(".py")).map(([, t]) => t).join("\n");
+  const fuentes = entrada && typeof py.files[entrada] === "string" ? py.files[entrada]
+    : Object.entries(py.files).filter(([r]) => r.endsWith(".py")).map(([, t]) => t).join("\n");
   if (estilo.startsWith("fastapi") || IMPORTA.fastapi.test(fuentes)) return "fastapi";
   if (IMPORTA.starlette.test(fuentes)) return "starlette";
   if (IMPORTA.flask.test(fuentes)) return "flask";
@@ -86,7 +87,7 @@ export async function ejecutarServidorPy(o) {
   const fuentes = todoPy.replace(/^\s*(?:import|from)\s+(?:pymysql|mysql|MySQLdb|psycopg2?|pymongo|bson|redis|uvicorn|flask_mysqldb)\b.*$/gm, "");
   try { await pyo.loadPackagesFromImports(fuentes); } catch { /* el import dará su propio error */ }
   // ssl, hashlib y sqlite3 vienen aparte en Pyodide y FastAPI/Flask/Django los usan por dentro (anyio importa ssl).
-  await cargarStdlibAparte(pyo);
+  await cargarStdlibAparte(pyo, undefined, `${fuentes}\n${o.estilo === "django" ? "django" : ""}`);
 
   // Como VS Code: TODO lo que tu proyecto importa y no está instalado (el framework, sus extensiones, dotenv…),
   // en una sola pregunta. Lo que no existe para el navegador se avisa antes, con alternativa.
@@ -101,8 +102,16 @@ export async function ejecutarServidorPy(o) {
     try { await pyo.loadPackagesFromImports(fuentes); } catch { /* nada */ }
     return true;   // aunque alguno no se pudiera (p. ej. un import opcional), se intenta arrancar: el error real lo dirá Python
   };
+  // El archivo de la app que se enciende (no todo el proyecto: otro .py puede usar otro framework).
+  const entradaApp = (() => {
+    if (o.estilo === "django" || !o.spec) return null;
+    const partes = String(o.spec).split(":")[0].split(".").filter(Boolean);
+    const base = [o.carpetaModulo || o.cwd || "", ...partes].filter(Boolean).join("/");
+    return [`${base}.py`, `${base}/__init__.py`].find((r) => typeof py.files[r] === "string") ?? null;
+  })();
   const faltantes = () => {
-    const mods = [...new Set([...importsDelProyecto(py), ...(paqueteNecesario(py, o.estilo) ? [paqueteNecesario(py, o.estilo)] : [])])];
+    const soloCarpeta = (c) => (c ? { files: Object.fromEntries(Object.entries(py.files).filter(([r]) => r.startsWith(c + "/"))), folders: py.folders.filter((f) => f.startsWith(c + "/")) } : py);
+    const mods = [...new Set([...(entradaApp ? importsDesde(py, entradaApp) : importsDelProyecto(o.estilo === "django" ? soloCarpeta(o.carpetaModulo) : py)), ...(paqueteNecesario(py, o.estilo, entradaApp) ? [paqueteNecesario(py, o.estilo, entradaApp)] : [])])];
     if (!mods.length) return [];
     const sinInstalar = JSON.parse(pyo.runPython(`import importlib.util as _u, json as _j\n_j.dumps([m for m in ${JSON.stringify(mods)} if _u.find_spec(m) is None])`));
     return [...new Set(sinInstalar.map(pipDeImport))];
@@ -123,9 +132,14 @@ export async function ejecutarServidorPy(o) {
   let antes = null, generacion = 0, firmaPy = "";
   const firma = () => Object.entries(py.files).filter(([r]) => r.endsWith(".py")).map(([r, t]) => `${r}\u0000${t}`).sort().join("\u0001");
   const sincronizar = async () => {
+    // Primero se preparan los binarios (es asíncrono) y DESPUÉS se vacía y reescribe /workspace de una sola vez:
+    // antes se vaciaba y luego se esperaba, y si en ese momento llegaba una petición, guardarCambios leía la carpeta
+    // vacía y creía que el programa había borrado todo el proyecto (se guardaba vacío en la cuenta).
+    antes = null;
+    const binarios = await binariosParaPython(py, o.archivos);
     generacion = nuevaGeneracionFsPy();
     borrarEnPyodide(pyo);
-    escribirEnPyodide(pyo, py, await binariosParaPython(py, o.archivos));
+    escribirEnPyodide(pyo, py, binarios);
     antes = { files: { ...py.files }, folders: [...py.folders] };
   };
   const guardarCambios = async () => {

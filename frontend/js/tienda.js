@@ -2,13 +2,18 @@
 import { iniciar, api, esc, aviso, actualizarStats, aplicarCosmeticos } from "/js/app.js";
 import { sonar } from "/js/sonidos.js";
 import { iconoSVG } from "/js/iconos.js";
-import { vistaPrevia } from "/js/cosmeticos.js";
+import { vistaPrevia, cargarDisenos, VITRINA } from "/js/cosmeticos.js";
 import { escenaArticulo } from "/js/escenas-tienda.js";
 const { user } = await iniciar("tienda");
 const $ = (id) => document.getElementById(id);
 const RAREZA = { comun: "Común", raro: "Raro", epico: "Épico", legendario: "Legendario" };
-const COSMETICO = new Set(["fondo", "cursor", "tema", "marco", "efecto", "dedo", "codi"]);
+const COSMETICO = new Set(["fondo", "cursor", "tema", "marco", "efecto", "dedo", "codi", "teclado"]);
 const TACTIL = matchMedia("(pointer: coarse)").matches;
+// Modo ligero: celulares y equipos modestos (o «reducir movimiento»). Se ve igual de bonito, pero sin las animaciones que
+// obligan a redibujar la pantalla en cada cuadro (sombras que laten, bordes giratorios, texto brillante, destellos).
+const LIGERO = TACTIL || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4 || navigator.connection?.saveData
+  || matchMedia("(prefers-reduced-motion: reduce)").matches;
+document.documentElement.classList.toggle("tienda-ligera", Boolean(LIGERO));
 const AYUDA = {
   fondo: "El fondo se ve detrás de todas las páginas. Prueba cómo queda con «Probar».",
   cursor: TACTIL ? "Los punteros se ven cuando usas mouse (en el computador). Cada uno trae 3: normal, mano (enlaces y botones) y texto (para escribir). En el celular prueba los «Rastros»." : "Cada puntero trae 3: normal, mano (enlaces y botones) y texto (para escribir). Pasa el mouse por cada uno para probarlo.",
@@ -17,6 +22,7 @@ const AYUDA = {
   efecto: "Haz clic en la vista previa para ver el efecto.",
   dedo: "Rastros: siguen tu mouse en el computador y tu dedo en el celular (también mientras desplazas la pantalla). Pruébalos moviendo el mouse o deslizando el dedo sobre cada tarjeta.",
   codi: "Viste a Codi, la mascota: el accesorio que te pongas lo lleva en el menú, en los retos, en el ícono de IA y en toda la página. Pulsa «Probar» para verlo en vivo.",
+  teclado: "Diseños para el teclado del celular: actívalo en Configuración → «Teclado de CódigoCamp» y se pone en toda la página (IA, Aprende, Retos, Trabajo y la terminal). Cada diseño tiene su fondo y su propio sonido al teclear; los épicos y legendarios se mueven y sueltan chispas. Toca la vista previa para escucharlo.",
   potenciador: "Vidas, salvarrachas, XP y cofres sorpresa.",
   coleccion: "Todo lo que tienes. Ponte o quítate cada cosmético cuando quieras. Los exclusivos salen de los cofres de Recompensas.",
 };
@@ -36,13 +42,24 @@ function boton(i) {
   return `<button class="bj" type="button" data-c="${esc(i.clave)}">${iconoMoneda} ${i.precio} diamantes</button>`;
 }
 
+/** Clases y estilo de la «vitrina» que el administrador eligió en el panel (3D, aura, brillo, destellos). */
+function vitrina(v) {
+  if (!v) return { clases: "", estilo: "" };
+  const c = [];
+  if (v.efecto && v.efecto !== "ninguno") c.push(`vit-${v.efecto}`, ...(v.efecto === "inclinar" && TACTIL ? ["vit-balanceo"] : []));
+  if (/^#[0-9a-f]{6}$/i.test(v.aura || "")) c.push("vit-aura");
+  if (v.brillo) c.push("vit-brillo");
+  if (v.destellos) c.push("vit-destellos");
+  return { clases: c.length ? ` ${c.join(" ")}` : "", estilo: /^#[0-9a-f]{6}$/i.test(v.aura || "") ? ` style="--vit-aura:${v.aura}"` : "" };
+}
 function tarjeta(i) {
   const cos = COSMETICO.has(i.tipo);
-  return `<div class="tarjeta producto rareza-${esc(i.rareza)}${i.tuyo ? " tuyo" : ""}${cos ? " cosmetico" : ""}" data-clave="${esc(i.clave)}" data-tipo="${esc(i.tipo)}">
+  const vit = vitrina(Object.keys(i.vitrina || {}).length ? i.vitrina : VITRINA[i.clave]);
+  return `<div class="tarjeta producto rareza-${esc(i.rareza)}${i.tuyo ? " tuyo" : ""}${cos ? " cosmetico" : ""}${vit.clases}"${vit.estilo} data-clave="${esc(i.clave)}" data-tipo="${esc(i.tipo)}">
     <span class="producto-rango">${esc(RAREZA[i.rareza] || "Común")}</span>
-    ${cos ? `<div class="vista vista-${i.tipo}" data-prev="${esc(i.clave)}"></div>` : (escenaArticulo(i.clave, "potenciador") ? `<div class="vista vista-potenciador cc-prev-escena">${escenaArticulo(i.clave, "potenciador")}</div>` : `<span class="ic ic-${esc(i.rareza)}">${iconoSVG(i.clave, "producto-icon")}</span>`)}
+    ${cos ? `<div class="vista vista-${i.tipo}" data-prev="${esc(i.clave)}"></div>` : i.imagen && /^\/api\/admin-img\/[a-f0-9]+\.(png|jpe?g|webp|gif)$/.test(i.imagen) ? `<div class="vista vista-img"><img class="producto-img" src="${esc(i.imagen)}" alt="" loading="lazy" decoding="async"></div>` : (i.especial ? `<span class="ic ic-${esc(i.rareza)}" style="font-size:44px;line-height:1">${esc(i.icono)}</span>` : escenaArticulo(i.clave, "potenciador") ? `<div class="vista vista-potenciador cc-prev-escena">${escenaArticulo(i.clave, "potenciador")}</div>` : `<span class="ic ic-${esc(i.rareza)}">${iconoSVG(i.clave, "producto-icon")}</span>`)}
     <h3>${esc(i.nombre)}</h3><small>${esc(i.descripcion)}</small>
-    ${cos && !["cursor", "efecto", "dedo"].includes(i.tipo) ? `<button type="button" class="probar" data-probar="${esc(i.clave)}" data-tipo="${i.tipo}">${probando?.clave === i.clave ? "Dejar de probar" : "Probar"}</button>` : ""}
+    ${cos && !["cursor", "efecto", "dedo", "teclado"].includes(i.tipo) ? `<button type="button" class="probar" data-probar="${esc(i.clave)}" data-tipo="${i.tipo}">${probando?.clave === i.clave ? "Dejar de probar" : "Probar"}</button>` : ""}
     ${boton(i)}</div>`;
 }
 
@@ -63,16 +80,56 @@ function pintar() {
   }
   if (tab !== "coleccion") lista.sort(porValor);
   $("items").innerHTML = lista.length ? lista.map(tarjeta).join("") : '<p class="nota">Aún no tienes cosméticos. ¡Compra el primero o abre un cofre en Recompensas!</p>';
-  $("items").querySelectorAll("[data-prev]").forEach((el) => vistaPrevia(el, el.dataset.prev, el.closest(".producto").dataset.tipo));
+  observar();
   adornarLegendarios();
+}
+
+/* Solo trabaja lo que se ve: la vista previa se arma cuando la tarjeta se acerca a la pantalla y las animaciones de las
+   tarjetas que quedan fuera se pausan (antes TODAS animaban siempre: eso trababa el celular). */
+let vigia = null;
+function observar() {
+  vigia?.disconnect();
+  const tarjetas = $("items").querySelectorAll(".producto");
+  if (!("IntersectionObserver" in window)) {
+    $("items").querySelectorAll("[data-prev]").forEach(armarVista);
+    return;
+  }
+  vigia = new IntersectionObserver((entradas) => {
+    for (const e of entradas) {
+      e.target.classList.toggle("fuera", !e.isIntersecting);
+      if (e.isIntersecting) e.target.querySelectorAll("[data-prev]:not([data-lista])").forEach(armarVista);
+    }
+  }, { rootMargin: "300px 0px" });
+  tarjetas.forEach((t) => { t.classList.add("fuera"); vigia.observe(t); });
+}
+function armarVista(el) {
+  el.dataset.lista = "1";
+  vistaPrevia(el, el.dataset.prev, el.closest(".producto").dataset.tipo);
 }
 
 /** Legendarios: destellos que suben y la tarjeta se inclina en 3D siguiendo el mouse. */
 const QUIETO = matchMedia("(prefers-reduced-motion: reduce)").matches;
 function adornarLegendarios() {
-  if (QUIETO) return;
-  $("items").querySelectorAll(".producto.rareza-legendario").forEach((t, k) => {
+  if (QUIETO || LIGERO) return;
+  $("items").querySelectorAll(".producto.vit-destellos").forEach((t, k) => {
     for (let i = 0; i < 6; i++) {
+      const d = document.createElement("span");
+      d.className = "vit-destello";
+      d.style.cssText = `left:${6 + Math.random() * 88}%;bottom:${4 + Math.random() * 40}%;animation-delay:${(i * 0.45 + k * 0.15).toFixed(2)}s;transform:scale(${0.6 + Math.random() * 0.9})`;
+      t.append(d);
+    }
+  });
+  $("items").querySelectorAll(".producto.vit-inclinar:not(.rareza-legendario)").forEach((t) => {
+    t.onpointermove = (e) => {
+      if (e.pointerType !== "mouse") return;
+      const r = t.getBoundingClientRect();
+      t.style.setProperty("--ry", `${((e.clientX - r.left) / r.width - 0.5) * 22}deg`);
+      t.style.setProperty("--rx", `${(0.5 - (e.clientY - r.top) / r.height) * 18}deg`);
+    };
+    t.onpointerleave = () => { t.style.removeProperty("--rx"); t.style.removeProperty("--ry"); };
+  });
+  $("items").querySelectorAll(".producto.rareza-legendario").forEach((t, k) => {
+    for (let i = 0; i < 4; i++) {
       const d = document.createElement("span");
       d.className = "destello-tienda";
       d.style.cssText = `left:${8 + Math.random() * 84}%;bottom:${4 + Math.random() * 30}%;animation-delay:${(i * 0.55 + k * 0.2).toFixed(2)}s;transform:scale(${0.6 + Math.random() * 0.8})`;
@@ -89,6 +146,7 @@ function adornarLegendarios() {
 }
 
 async function cargar() {
+  await cargarDisenos();   // cosméticos diseñados en el panel de administrador
   const [t, c] = await Promise.all([api("/api/tienda/"), api("/api/cosmeticos/")]);
   saldo = t.minerales.diamante;
   equipados = c.equipados;

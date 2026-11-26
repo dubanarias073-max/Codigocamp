@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 
 from models import Course, DailyActivity, DailyChallenge, LessonDone, MonthChallenge, db
 from constantes import MESES, META_MES, PREMIO_MES
-from servicios.perfil import award_xp, contar_actividad, encargos_del_dia, get_profile, progreso_encargo, progress, reward_text
+from servicios.perfil import cofre_de, award_xp, contar_actividad, encargos_del_dia, get_profile, progreso_encargo, progress, reward_text
 from utilidades import api_error, json_body
 
 bp = Blueprint("progreso", __name__)
@@ -70,11 +70,12 @@ def desafios():
             "premio": month_reward, "completado": bool(month and month.premio_dado),
         },
         horas_restantes=max(0, int((midnight - now).total_seconds() // 3600)),
+        medalla=_estado_medalla(current_user.id, today),
         hoy=[{
             "clave": item["clave"], "icono": item["icono"], "titulo": item["titulo"], "meta": item["meta"],
             "progreso": progreso_encargo(item, activity),
             "premio": reward_text(item["premio"]), "completado": item["clave"] in completed,
-            "datos": dict(item["premio"]), "cofre": "plata" if item["premio"].get("diamante", 0) >= 20 else "madera",
+            "datos": dict(item["premio"]), "cofre": cofre_de(item["premio"]),
         } for item in encargos_del_dia(current_user.id, today)],
     )
 
@@ -96,3 +97,30 @@ def actividad():
     db.session.commit()
     return jsonify(desafios_completados=rewards)
 
+
+
+def _estado_medalla(usuario_id, fecha):
+    from servicios.medallas import estado_del_mes
+    from servicios.perfil import reward_text as texto
+    e = estado_del_mes(usuario_id, fecha)
+    e["premio_texto"] = texto(e["premio"])
+    for x in e["experiencias"] + e["hitos_xp"] + e["hitos_encargos"]:
+        x["premio_texto"] = texto(x["premio"])
+    return e
+
+
+@bp.get("/api/medallas/")
+@login_required
+def medallas():
+    """Tus medallas del mes (y el diseño de las 12 para mostrar las que te faltan)."""
+    from datetime import date
+    from servicios.medallas import diseno, medallas_de
+    anio = date.today().year
+    from models import MedallaOtorgada
+    especiales = [{"nombre": o.medalla.nombre, "descripcion": o.medalla.descripcion, "icono": o.medalla.icono, "color": o.medalla.color,
+                   "diseno": o.medalla.diseno or None, "motivo": o.motivo, "fecha": o.creada_en.date().isoformat()}
+                  for o in MedallaOtorgada.query.filter_by(usuario_id=current_user.id).order_by(MedallaOtorgada.id.desc()) if o.medalla and o.medalla.activa]
+    from servicios.medallas import medallas_desde
+    desde = medallas_desde()
+    return jsonify(medallas=medallas_de(current_user.id), disenos={str(k): diseno(k, anio) for k in range(1, 13)}, especiales=especiales,
+                   desde={"anio": desde.year, "mes": desde.month})

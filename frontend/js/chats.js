@@ -146,7 +146,8 @@ async function abrir(id) {
   mostrarEmojis(false); menu(false);
   const amigo = datos.amigos.find((a) => a.id === id);
   $("cNombre").textContent = amigo?.nombre ?? "";
-  $("cAlias").textContent = amigo ? `@${amigo.alias}` : "";
+  // Detalles del amigo en la cabecera del chat: nivel, racha y medallas (tócalos para ver su perfil completo)
+  $("cAlias").textContent = amigo ? [`@${amigo.alias}`, amigo.nivel ? `⭐ Nivel ${amigo.nivel}` : "", amigo.racha ? `🔥 ${amigo.racha}` : "", amigo.medallas ? `🏅 ${amigo.medallas}` : ""].filter(Boolean).join(" · ") : "";
   $("cAv").outerHTML = amigo ? avatar(amigo).replace('class="c-av', 'id="cAv" class="c-av') : '<span class="c-av" id="cAv"></span>';
   $("cg").classList.add("en-chat");
   listaChats(false);
@@ -219,9 +220,19 @@ async function abrirPerfil() {
       const e = p.equipados[t];
       return `<div class="pf-c${e ? "" : " vacio"}"><span class="pf-prev" data-tipo="${t}" data-clave="${e ? esc(e.clave) : ""}"></span><small>${n}</small><b>${e ? esc(e.nombre) : "—"}</b>${e ? `<em class="r-${esc(e.rareza)}">${RAREZA[e.rareza] ?? esc(e.rareza)}</em>` : ""}</div>`;
     }).join("")}</div></section>
+    <section><h4>🏅 Medallas (${(p.medallas || []).length})</h4><div class="pf-medallas"></div></section>
+    <section class="pf-logros"><h4>🎁 Logros</h4>
+      <div class="pf-stats pf-stats-3"><div><b>${p.logros_abiertos ?? 0}/${p.logros_total ?? 0}</b><small>cofres de logro</small></div><div><b>${p.encargos_total ?? 0}</b><small>encargos superados</small></div><div><b>${(p.medallas || []).length}</b><small>medallas del mes</small></div></div>
+      ${p.logros?.length ? `<div class="pf-tags">${p.logros.map((l) => `<span class="pf-logro c-${esc(l.cofre)}" title="${esc(l.texto)}">${esc(l.nombre)}</span>`).join("")}</div>` : ""}
+    </section>
     ${p.intereses?.length ? `<section><h4>Le interesa</h4><div class="pf-tags">${p.intereses.map((i) => `<span>${esc(i)}</span>`).join("")}</div></section>` : ""}
     <p class="pf-fechas">En CódigoCamp desde el ${fecha(p.miembro_desde)} · Amigos desde el ${fecha(p.amigos_desde)}</p>
     <button class="btn pri pf-escribir" type="button" id="pfEscribir">💬 Escribirle</button>`;
+  try {
+    const { estilosMedallas, vitrinaMedallas } = await import("/js/medallas.js");
+    estilosMedallas();
+    c.querySelector(".pf-medallas").innerHTML = vitrinaMedallas(p.medallas || [], { tam: 52 });
+  } catch { /* sin medallas */ }
   try {
     const { vistaPrevia } = await import("/js/cosmeticos.js");
     for (const el of c.querySelectorAll(".pf-prev[data-clave]:not([data-clave=''])")) { try { vistaPrevia(el, el.dataset.clave, el.dataset.tipo); } catch { /* sin vista previa */ } }

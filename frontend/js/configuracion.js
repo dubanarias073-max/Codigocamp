@@ -85,6 +85,15 @@ import("/js/temporada.js").then(({ temporadaActiva, activarTemporada, temporadaD
   $("temporada").onchange = () => activarTemporada($("temporada").checked);
 });
 $("sonido").onchange = () => { try { localStorage.setItem("cc_sonido", $("sonido").checked ? "1" : "0"); if ($("sonido").checked) import("/js/sonidos.js").then((m) => m.sonar("premio")); } catch { aviso("No se pudo guardar en este navegador.", true); } };
+// Teclado de CódigoCamp (celular)
+$("tecladoCC").checked = pref("cc_teclado_propio", "0") === "1";
+$("tecladoCC").onchange = async () => {
+  const m = await import("/js/teclado-cc.js");
+  m.activarTeclado($("tecladoCC").checked);
+  if ($("tecladoCC").checked && !matchMedia("(pointer: coarse)").matches) aviso?.("Queda activado: lo verás cuando entres desde tu celular o tableta.");
+};
+$("tecladoSonido").checked = pref("cc_teclado_sonido", "1") !== "0";
+$("tecladoSonido").onchange = () => { try { localStorage.setItem("cc_teclado_sonido", $("tecladoSonido").checked ? "1" : "0"); } catch { /* nada */ } };
 $("movimiento").checked = pref("cc_menos_mov", "0") === "1";
 $("movimiento").onchange = () => {
   try { localStorage.setItem("cc_menos_mov", $("movimiento").checked ? "1" : "0"); } catch { /* nada */ }

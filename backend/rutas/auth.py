@@ -109,7 +109,8 @@ def google_callback():
             user.google_id = subject
 
     if not user.activo:
-        return redirect("/pages/login.html?error=google_inactive")
+        from models import Bloqueo
+        return redirect("/pages/login.html?error=" + ("bloqueada" if db.session.get(Bloqueo, user.id) else "google_inactive"))
     try:
         db.session.commit()
     except IntegrityError:
@@ -120,8 +121,7 @@ def google_callback():
         return _volver_a_la_app(user, nuevo)
     _entrar(user, "Google")
     _avisar_inicio(user, "Google", nuevo)
-    destination = "/pages/inicio.html" if user.profile and user.profile.onboarding_completo else "/pages/onboarding.html"
-    return redirect(destination)
+    return redirect(_destino(user))
 
 
 # ---------- Entrar con Google desde la app de Android ----------
@@ -274,12 +274,29 @@ def entrar():
         return data
     email = str(data.get("email", "")).strip().lower()
     password = str(data.get("password", ""))
-    user = User.query.filter_by(email=email, activo=True).first() if email else None
+    user = User.query.filter_by(email=email).first() if email else None
     if not user or len(password) > 100 or not check_password_hash(user.password_hash, password):
         return api_error("Correo o contraseña incorrectos.", 401)
+    if not user.activo:
+        return api_error(_mensaje_inactivo(user), 403)
     _entrar(user, "contraseña")
     _avisar_inicio(user, "contraseña", False)
     return jsonify(user=_user(user))
+
+
+def _mensaje_inactivo(user):
+    from models import Bloqueo
+    b = db.session.get(Bloqueo, user.id)
+    if b:
+        return "Tu cuenta fue bloqueada por incumplir las normas de CódigoCamp" + (f": {b.motivo}" if b.motivo else ".") + " Si crees que es un error, responde al correo que te enviamos."
+    return "Esta cuenta está desactivada."
+
+
+def _destino(user):
+    from servicios.admin import es_admin
+    if es_admin(user):
+        return "/pages/login.html?elegir=1"   # el administrador elige: panel o su cuenta de usuario
+    return "/pages/inicio.html" if user.profile and user.profile.onboarding_completo else "/pages/onboarding.html"
 
 
 def _entrar(user, metodo):

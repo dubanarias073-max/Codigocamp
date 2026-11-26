@@ -65,13 +65,15 @@ def tolerancia_parejas(n):
 def level_challenges(level):
     """Lección: sus 10 preguntas. Práctica: 10 al azar de lo visto en la etapa hasta esa sección.
     Trofeo (examen): 10 al azar de todas las lecciones de la etapa."""
+    from models import RetoAdmin
+    ocultos = {r.reto_id for r in RetoAdmin.query.filter_by(oculto=True).all()}   # retos que el administrador quitó
     if level.tipo == "leccion":
-        return list(level.retos)
+        return [r for r in level.retos if r.id not in ocultos]
     query = Challenge.query.join(Level).join(Section).filter(
         Section.etapa_id == level.seccion.etapa_id, Level.tipo == "leccion")
     if level.tipo == "practica":
         query = query.filter(Section.orden <= level.seccion.orden)
-    pool = query.all()
+    pool = [r for r in query.all() if r.id not in ocultos]
     return random.sample(pool, min(REPASO_PREGUNTAS, len(pool)))
 
 

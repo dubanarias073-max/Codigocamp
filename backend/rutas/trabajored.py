@@ -73,6 +73,19 @@ def ip_publica(host):
     return True
 
 
+def _enlace_peligroso(url):
+    """Filtro de enlaces del escudo (phishing, malware…). Devuelve el motivo si hay que bloquear."""
+    from servicios.seguridad_enlaces import revisar_enlace
+    r = revisar_enlace(url, consultar_externos=False)
+    if r["nivel"] == "bloqueado":
+        from flask_login import current_user
+        from servicios.moderacion import registrar
+        if current_user.is_authenticated:
+            registrar(current_user, "enlace", r.get("motivo", ""), evidencia=url[:400], origen="internet desde Trabajo")
+        return f"🛡️ CódigoCamp bloqueó esta dirección: {r['motivo']}"
+    return None
+
+
 def _url_permitida(url):
     p = urlsplit(url)
     if p.scheme not in ("http", "https") or not p.hostname:
@@ -80,11 +93,7 @@ def _url_permitida(url):
     motivo = problema_host(p.hostname)
     if motivo:
         return motivo + (" Si es tu propio backend, usa la vista previa (fetch a /api o a http://localhost:<puerto>)." if "red local" in motivo else "")
-    from servicios.seguridad_enlaces import revisar_enlace
-    r = revisar_enlace(url, consultar_externos=False)
-    if r["nivel"] == "bloqueado":
-        return f"🛡️ CódigoCamp bloqueó esta dirección: {r['motivo']}"
-    return None
+    return _enlace_peligroso(url)
 
 
 @bp.post("/api/trabajo/http")

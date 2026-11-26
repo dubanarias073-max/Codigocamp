@@ -209,3 +209,11 @@ button.c-fila:hover { background: var(--panel2); }
   .c-velo[hidden] { display: none; }
   .c-lista-cab { display: flex; align-items: center; justify-content: space-between; }
 }
+/* Logros y medallas en el perfil del amigo */
+.pf-stats-3 { grid-template-columns: repeat(3, 1fr); }
+.pf-logro { border-left: 4px solid #a16207; }
+.pf-logro.c-plata { border-left-color: #94a3b8; }
+.pf-logro.c-oro { border-left-color: #facc15; }
+.pf-logro.c-diamante { border-left-color: #22d3ee; }
+.pf-logro.c-legendario { border-left-color: #a855f7; }
+.pf-medallas .medallas-vitrina { gap: 6px; }

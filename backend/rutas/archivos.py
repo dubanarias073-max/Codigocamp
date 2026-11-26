@@ -227,13 +227,17 @@ def subir():
         return api_error("El archivo está vacío.")
 
     # Antivirus: programas ejecutables, virus conocidos, macros, bombas zip… se borran al instante (servicios/antivirus.py)
-    from servicios.antivirus import revisar_archivo
+    from servicios.antivirus import revisar_archivo_completo
     try:
-        peligro = revisar_archivo(str(temporal), request.args.get("nombre", "")[:200])
+        hallazgo = revisar_archivo_completo(str(temporal), request.args.get("nombre", "")[:200])
     except OSError:
-        peligro = None
+        hallazgo = None
+    peligro = hallazgo["motivo"] if hallazgo else None
     if peligro:
         temporal.unlink(missing_ok=True)
+        from servicios.moderacion import registrar
+        registrar(current_user, "archivo", peligro, evidencia=hallazgo["evidencia"], origen=_origen_subida(),
+                  gravedad=hallazgo["gravedad"], explicacion=hallazgo["explicacion"])
         return api_error(f"🛡️ Bloqueamos este archivo: {peligro}. CódigoCamp no guarda archivos que puedan dañar tu equipo o el de otros.", 422)
 
     hexa = huella.hexdigest()
@@ -342,3 +346,13 @@ def limpiar_disco(app):
                 archivo.unlink(missing_ok=True)
                 borrados += 1
     return borrados
+
+
+def _origen_subida():
+    """Dónde se subió (para el aviso): la página que hizo la subida (chat, IA o Trabajo)."""
+    ref = request.headers.get("Referer", "")
+    if "/chats" in ref:
+        return "adjunto en un chat"
+    if "/ia" in ref or "/aula" in ref:
+        return "adjunto para la IA"
+    return "subida de archivo en Trabajo"

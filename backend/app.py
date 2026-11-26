@@ -25,14 +25,14 @@ from seguridad import configurar_seguridad  # noqa: E402
 def _crear_tablas_nuevas(app):
     """Crea las tablas que agregan las versiones nuevas si la base aún no las tiene (no toca las que ya existen).
     Así no hace falta ejecutar a mano migracion_archivos.sql. Si MySQL no está encendido, se intentará al reiniciar."""
-    from models import AIConversation, AIMessage, AppLoginCode, AppliedMigration, Attachment, DailyActivity, UserSession, EmailSettings, EquippedCosmetics, KnownDevice, Message, OpenedChest, OwnedCosmetic, Profile, ProfilePhoto, StreakReward, TermsAcceptance, Traduccion, UserWorkspace, WorkspaceFile, Conector, ChatBorrado
+    from models import AIConversation, AIMessage, AppLoginCode, AppliedMigration, Attachment, DailyActivity, UserSession, EmailSettings, EquippedCosmetics, KnownDevice, Message, OpenedChest, OwnedCosmetic, Profile, ProfilePhoto, StreakReward, TermsAcceptance, Traduccion, UserWorkspace, WorkspaceFile, Conector, ChatBorrado, Medal, Incidente, Bloqueo, MedallaEspecial, MedallaOtorgada, ArticuloExtra, AjusteArticulo, CosmeticoAdmin, CursoAdmin, RetoAdmin, LeccionAprende
     try:
         with app.app_context():
             from servicios.workbench import reparar
             cambios = reparar(db.engine)
             if cambios:
                 app.logger.info("Base ajustada para el diagrama de MySQL Workbench: %s", "; ".join(cambios))
-            nuevos = (Profile, UserWorkspace, WorkspaceFile, KnownDevice, EmailSettings, OwnedCosmetic, EquippedCosmetics, OpenedChest, ProfilePhoto, Attachment, AppliedMigration, UserSession, AIConversation, AIMessage, TermsAcceptance, AppLoginCode, Message, DailyActivity, StreakReward, Traduccion, Conector, ChatBorrado)
+            nuevos = (Profile, UserWorkspace, WorkspaceFile, KnownDevice, EmailSettings, OwnedCosmetic, EquippedCosmetics, OpenedChest, ProfilePhoto, Attachment, AppliedMigration, UserSession, AIConversation, AIMessage, TermsAcceptance, AppLoginCode, Message, DailyActivity, StreakReward, Traduccion, Conector, ChatBorrado, Medal, Incidente, Bloqueo, MedallaEspecial, MedallaOtorgada, ArticuloExtra, AjusteArticulo, CosmeticoAdmin, CursoAdmin, RetoAdmin, LeccionAprende)
             for modelo in nuevos:
                 modelo.__table__.create(bind=db.engine, checkfirst=True)
             from servicios.workbench import agregar_columnas

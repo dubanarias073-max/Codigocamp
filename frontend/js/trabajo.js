@@ -1,6 +1,7 @@
 // Trabajo: espacio de trabajo con aspecto y comportamiento de VS Code.
 // Este archivo solo conecta las piezas (js/trabajo/*): guardado, explorador, editor, terminal, vista previa y asistente.
 import { api, aviso as avisoSimple, iniciar } from "/js/app.js";
+import { apiEnVivo } from "/js/auth.js";
 import { sonar } from "/js/sonidos.js";
 import { Almacen } from "/js/trabajo/almacen.js";
 import { crearAlmacenamiento } from "/js/trabajo/almacenamiento.js";
@@ -17,6 +18,10 @@ import { ClienteArchivos, esMarcador, formatoBytes, leerMarcador } from "/js/tra
 import { importarEn } from "/js/trabajo/importar.js";
 import { Entradas } from "/js/trabajo/entradas.js";
 import { VisorArchivo } from "/js/trabajo/visor.js";
+import { VisorBD } from "/js/trabajo/visor-bd.js";
+import { VisorHTTP, parsearHttp, plantillaHttp, serializarHttp } from "/js/trabajo/visor-http.js";
+import { EXT_BASE } from "/js/trabajo/sqlite.js";
+import { base64ABytes, bytesABase64 } from "/js/trabajo/equipo.js";
 import { registrarEnMonaco } from "/js/trabajo/autocompletar.js";
 import { EditorMonaco, alCambiarProblemas, cambiarTema, cargarMonaco, crearDiff, marcarEjecucion, monaco as monacoVivo, problemas, sincronizarModelos } from "/js/trabajo/monaco.js";
 import { erroresDeSalida } from "/js/trabajo/errores-salida.js";
@@ -67,11 +72,19 @@ const ui = {
   ...(uiGuardada || {}),
 };
 const primeraVisita = !uiGuardada;
+const TABS_EQUIPO = "cc_tabs_equipo";
 const guardarUI = () => {
   ui.expandidas = [...expandidas];
-  try { localStorage.setItem(UI_STORAGE, JSON.stringify(ui)); } catch { /* sin espacio: se pierde solo la disposición */ }
+  try {
+    localStorage.setItem(UI_STORAGE, JSON.stringify(ui));
+    // Como VS Code: al recargar con el equipo conectado vuelven las mismas pestañas
+    if (typeof equipoAbierto !== "undefined" && equipoAbierto) {
+      localStorage.setItem(TABS_EQUIPO, JSON.stringify({ id: equipoAbierto.id, carpeta: equipoAbierto.carpeta, abiertos: ui.abiertos.filter((r) => r !== VISTA).slice(0, 30), activo: ui.activo }));
+    }
+  } catch { /* sin espacio: se pierde solo la disposición */ }
 };
 const expandidas = new Set(Array.isArray(ui.expandidas) ? ui.expandidas : []);
+globalThis.__ccExpandidas = expandidas;   // el Conector lee por dentro node_modules, venv… solo si las abres
 
 // ------------------------------------------------------------------------------- guardado ----
 const textoEstado = {
@@ -123,6 +136,14 @@ const almacen = new Almacen({
   clave: STORAGE, storage: copiaLocal,
   alEstado: pintarEstado,
   alRemoto: () => { proyectoCambio({ origen: "remoto" }); entradas?.alCambiarProyecto({ origen: "remoto" }); },
+  alBloqueados: (lista) => {
+    proyectoCambio({ origen: "remoto" }); entradas?.alCambiarProyecto({ origen: "remoto" });
+    dialogo({
+      titulo: "🛡️ El antivirus de CódigoCamp bloqueó un archivo",
+      mensaje: `${lista.map((b) => `• ${b.ruta}: ${b.motivo}.`).join("\n")}\n\nNo se guardó en el servidor y se quitó de tu proyecto. Te enviamos un correo con el detalle.`,
+      botones: [{ texto: "Entendido", valor: "ok" }],
+    });
+  },
   resolverConflicto: ({ local, nube }) => dialogo({
     titulo: "Hay dos versiones de tu proyecto",
     mensaje: `En este navegador hay cambios que no se llegaron a sincronizar (${local.archivos} archivos), y tu cuenta tiene otra versión distinta (${nube.archivos} archivos).\n\n¿Cuál quieres conservar? La otra se descartará.`,
@@ -155,9 +176,10 @@ const bd = new ClienteBD();
 // «Iniciar sesión con GitHub» (git push / pull / clone): una sola sesión para la terminal y el panel de Git.
 const sesionGitHub = new SesionGitHub({ cuenta: claveCuenta(user), api });
 const motorGit = () => cargarGitReal({ usuario: user, archivos, credencial: sesionGitHub });
-const ejecutores = crearEjecutores({ api, almacenPip, archivos, bd });
 // Lo que el navegador no puede instalar (paquetes con código en C) va a un pip de verdad en el servidor.
 const pyServidor = crearPaquetesServidor(CUENTA);
+// El servidor recibe la lista para reinstalar solo lo que se haya perdido (p. ej. si limpiaron su disco).
+const ejecutores = crearEjecutores({ api, almacenPip, archivos, bd, paquetesServidor: () => Object.entries(pyServidor.leer()).map(([n, v]) => (v.version ? `${n}==${v.version}` : n)) });
 const pipServidor = {
   almacen: pyServidor,
   instalar: (lista) => api("/api/python/pip", { paquetes: lista }),
@@ -184,6 +206,15 @@ const shell = new Shell({
 });
 // ---------------------------------------------------------------- celular: una sección a la vez ----
 const MOVIL = matchMedia("(max-width: 760px)");
+// ☰ en las pestañas del celular: muestra u oculta el menú de CódigoCamp (Inicio, Aprende…) sin quitarle espacio al código
+document.body.classList.add("trabajo-pagina");
+document.getElementById("movilMenu")?.addEventListener("click", (e) => {
+  const ver = document.body.classList.toggle("ver-menu");
+  e.currentTarget.setAttribute("aria-expanded", String(ver));
+});
+document.getElementById("movilTabs")?.addEventListener("click", (e) => {
+  if (e.target.closest("button[data-movil]")) { document.body.classList.remove("ver-menu"); document.getElementById("movilMenu")?.setAttribute("aria-expanded", "false"); }
+});
 let terminalEnSilencio = false;   // terminales que abre Trabajo solo (al abrir o cambiar de carpeta): en el celular no te sacan de donde estás
 function seccionMovil(cual) {
   $("ide").dataset.movil = cual;
@@ -197,7 +228,7 @@ function seccionMovil(cual) {
 }
 $("ide").dataset.movil = "codigo";
 document.getElementById("movilTabs").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-movil]");
+  const b = e.target.closest("button[data-movil]");
   if (b) seccionMovil(b.dataset.movil);
 });
 const panel = new PanelInferior({
@@ -221,6 +252,15 @@ const panel = new PanelInferior({
     guardarUI();
   },
 });
+// Teclado de CódigoCamp (celular): reemplaza al del sistema y se viste con los de la Tienda (se activa también en Configuración)
+import("/js/teclado-cc.js").then((m) => {
+  m.registrarTerminal((k) => panel.tecla(k));
+  document.addEventListener("cc-teclado-alternar", () => {
+    const on = !m.tecladoActivo();
+    m.activarTeclado(on);
+    aviso(on ? "⌨ Teclado de CódigoCamp activado en toda la página (puedes cambiarlo en Configuración). Se viste con el teclado que tengas puesto en la Tienda." : "Volvió el teclado de tu celular.", { ms: 4500 });
+  });
+}).catch(() => {});
 document.documentElement.style.setProperty("--alto-panel", "260px");
 $("ide").style.setProperty("--alto-panel", `${ui.altoPanel}px`);
 
@@ -264,12 +304,31 @@ if (usarMonaco) {
   b.onclick = () => { activarCopiloto(!copilotoActivo()); pintarCopiloto(); avisoSimple(copilotoActivo() ? "Copiloto activado: la IA sugiere en gris mientras escribes. Tab acepta." : "Copiloto desactivado"); };
 }
 
+// Archivos .http que el usuario prefirió ver como texto (en vez del cliente visual)
 function editorPara(ruta) {
   let ed = editores.get(ruta);
   if (ed) return ed;
   const texto = proyecto().files[ruta] ?? "";
+  const ext = FS.extension(ruta);
+  if (EXT_BASE.has(ext) && (esMarcador(texto) || texto === "")) {
+    // Base de datos SQLite: visor con tablas, datos, estructura y consultas (cuenta o equipo)
+    ed = new VisorBD({ ruta, texto, cargarSQL: () => ejecutores.cargarSQL(),
+      leer: async (m) => { await archivos.asegurar(m); return archivos.bytes(m); },
+      guardar: async (bytes) => {
+        const destino = ed.ruta;
+        const marcador = await archivos.subir(bytes, { nombre: destino });
+        if (!FS.tieneArchivo(proyecto(), destino)) throw new Error("El archivo ya no existe en el proyecto.");
+        proyecto().files[destino] = marcador;
+        proyectoCambio({ origen: "bd", ruta: destino });
+        return marcador;
+      },
+      aviso: (t, tipo = "info") => aviso(t, { tipo, ms: 3500 }) });
+    editores.set(ruta, ed);
+    $("editores").appendChild(ed.raiz);
+    return ed;
+  }
   if (esMarcador(texto)) {
-    ed = new VisorArchivo({ ruta, texto, url: (m, o) => archivos.url(m, o) });
+    ed = new VisorArchivo({ ruta, texto, url: (m, o) => archivos.url(m, o), preparar: (m) => archivos.asegurar(m) });
     editores.set(ruta, ed);
     $("editores").appendChild(ed.raiz);
     return ed;
@@ -391,8 +450,90 @@ function pintarMigas() {
   if (!r) { $("migas").innerHTML = ""; return; }
   const raizMigas = equipoAbierto ? nombreProyectoVisible() : "mi-proyecto";
   const partes = r === VISTA ? [raizMigas, paginaVista || "Vista previa"] : [raizMigas, ...r.split("/")];
-  $("migas").innerHTML = partes.map((p, i) => `<span class="${i === partes.length - 1 ? "ultima" : ""}">${p.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`).join("");
+  if (r === VISTA) { $("migas").innerHTML = partes.map((p, i) => `<span class="${i === partes.length - 1 ? "ultima" : ""}">${escH(p)}</span>`).join(""); return; }
+  // Como VS Code: cada parte de la ruta es un botón que abre la lista de esa carpeta para navegar o abrir archivos
+  const segs = r.split("/");
+  $("migas").innerHTML = partes.map((p, i) => {
+    const carpeta = i === 0 ? "" : segs.slice(0, i).join("/");
+    const dentro = i === partes.length - 1 ? segs.slice(0, -1).join("/") : (i === 0 ? "" : segs.slice(0, i).join("/"));
+    return `<span class="${i === partes.length - 1 ? "ultima" : ""}"><button type="button" class="miga" data-carpeta="${escH(i === partes.length - 1 ? dentro : carpeta)}" data-marca="${escH(i === partes.length - 1 ? r : segs.slice(0, i + 1).join("/"))}" title="Ver lo que hay aquí">${escH(p)}</button></span>`;
+  }).join("");
 }
+
+/* ===== Menú de navegación de las migas (editor y ruta del equipo), como los breadcrumbs de VS Code ===== */
+let menuMigasAbierto = null;
+function cerrarMenuMigas() { menuMigasAbierto?.remove(); menuMigasAbierto = null; }
+/**
+ * Abre un menú bajo `ancla`. cargar(ruta) → { titulo, arriba?, abrirAqui?, items: [{ nombre, ruta, carpeta: bool }] }.
+ * Las carpetas se recorren dentro del mismo menú; elegir(item) se llama al elegir un archivo (o «Abrir aquí»).
+ */
+async function menuMigas(ancla, ruta, { cargar, elegir, marca = "" }) {
+  cerrarMenuMigas();
+  const m = document.createElement("div");
+  m.className = "migas-menu";
+  m.setAttribute("role", "menu");
+  document.body.appendChild(m);
+  menuMigasAbierto = m;
+  const r = ancla.getBoundingClientRect();
+  m.style.left = `${Math.max(8, Math.min(r.left, innerWidth - 300))}px`;
+  m.style.top = `${r.bottom + 4}px`;
+  let datos = null;
+  const pintar = async (rr) => {
+    m.innerHTML = '<div class="mm-cargando">Cargando…</div>';
+    try { datos = await cargar(rr); } catch (e) { m.innerHTML = `<div class="mm-cargando">${escH(e.message || "No se pudo leer la carpeta")}</div>`; return; }
+    if (menuMigasAbierto !== m) return;
+    m.innerHTML = `<div class="mm-tope">${datos.arriba !== undefined && datos.arriba !== null ? '<button type="button" class="mm-atras" data-atras title="Subir">‹</button>' : ""}<b title="${escH(datos.titulo)}">${escH(datos.titulo)}</b>${datos.abrirAqui ? '<button type="button" class="mm-abrir" data-aqui>Abrir aquí</button>' : ""}</div>` +
+      `<div class="mm-lista">${datos.items.length ? datos.items.map((it, i) => `<button type="button" role="menuitem" class="mm-item ${it.ruta === marca ? "actual" : ""}" data-i="${i}">${it.carpeta ? '<span class="fi fi-carpeta" aria-hidden="true">📁</span>' : iconoArchivo(it.ruta)}<span class="mm-nombre">${escH(it.nombre)}</span>${it.carpeta ? "<i>›</i>" : ""}</button>`).join("") : '<div class="mm-cargando">(vacía)</div>'}</div>`;
+    (m.querySelector(".mm-item.actual") || m.querySelector(".mm-item"))?.focus({ preventScroll: true });
+    m.querySelector(".mm-item.actual")?.scrollIntoView({ block: "nearest" });
+  };
+  m.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || !datos) return;
+    if (b.dataset.atras !== undefined) { void pintar(datos.arriba); return; }
+    if (b.dataset.aqui !== undefined) { cerrarMenuMigas(); elegir({ ruta: datos.ruta, carpeta: true, aqui: true }); return; }
+    const it = datos.items[Number(b.dataset.i)]; if (!it) return;
+    if (it.carpeta && !it.abrir) void pintar(it.ruta);
+    else { cerrarMenuMigas(); elegir(it); }
+  });
+  m.addEventListener("keydown", (e) => {
+    const items = [...m.querySelectorAll(".mm-item")], i = items.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); items[Math.min(items.length - 1, i + 1)]?.focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); items[Math.max(0, i - 1)]?.focus(); }
+    else if (e.key === "ArrowLeft" && datos?.arriba != null) { e.preventDefault(); void pintar(datos.arriba); }
+    else if (e.key === "ArrowRight" && document.activeElement?.classList.contains("mm-item")) { e.preventDefault(); document.activeElement.click(); }
+    else if (e.key === "Escape") { e.preventDefault(); cerrarMenuMigas(); ancla.focus?.(); }
+  });
+  await pintar(ruta);
+}
+addEventListener("pointerdown", (e) => { if (menuMigasAbierto && !menuMigasAbierto.contains(e.target) && !e.target.closest(".miga, .exp-ruta-migas button")) cerrarMenuMigas(); }, true);
+addEventListener("resize", cerrarMenuMigas);
+
+/** Contenido de una carpeta del proyecto abierto (para las migas del editor). */
+function contenidoProyecto(carpeta) {
+  const py = proyecto();
+  const pre = carpeta ? `${carpeta}/` : "";
+  const hijos = new Map();
+  const agregar = (ruta, esCarpeta) => {
+    if (!ruta.startsWith(pre) || ruta === carpeta) return;
+    const resto = ruta.slice(pre.length), nombre = resto.split("/")[0];
+    const esC = esCarpeta || resto.includes("/");
+    if (!hijos.has(nombre) || esC) hijos.set(nombre, { nombre, ruta: pre + nombre, carpeta: esC });
+  };
+  for (const f of py.folders) agregar(f, true);
+  for (const r of Object.keys(py.files)) agregar(r, false);
+  const items = [...hijos.values()].sort((a, b) => (b.carpeta - a.carpeta) || a.nombre.localeCompare(b.nombre, "es", { numeric: true }));
+  const raiz = equipoAbierto ? nombreProyectoVisible() : "mi-proyecto";
+  return { titulo: carpeta ? carpeta.split("/").pop() : raiz, ruta: carpeta, arriba: carpeta ? carpeta.split("/").slice(0, -1).join("/") : null, items };
+}
+$("migas").addEventListener("click", (e) => {
+  const b = e.target.closest(".miga"); if (!b) return;
+  if (menuMigasAbierto) { cerrarMenuMigas(); return; }
+  void menuMigas(b, b.dataset.carpeta, {
+    marca: b.dataset.marca,
+    cargar: async (c) => contenidoProyecto(c),
+    elegir: (it) => { if (!it.carpeta) abrir(it.ruta); },
+  });
+});
 
 function pintarGit() {
   const g = proyecto().git;
@@ -403,6 +544,7 @@ function pintarGit() {
 let paginaVista = null;
 
 function activar(ruta, { enfocar = true } = {}) {
+  if (enfocar && !$("clienteHttp").hidden) { $("clienteHttp").hidden = true; $("migas").hidden = false; $("areaEditor").classList.remove("http-abierto"); $("abrirHttp")?.classList.remove("activo"); $("abrirHttp")?.setAttribute("aria-pressed", "false"); }
   for (const ed of editores.values()) if (!ed.raiz.hidden) ed.ocultar();
   ui.activo = ruta;
   $("panelVista").hidden = ruta !== VISTA && !ladoActivo();
@@ -478,6 +620,112 @@ async function pedirAServidor(url, { method = "GET", headers = [], body = null }
   const srv = servidores.get(Number(u.port || 80));
   if (!srv) throw new Error(`No hay ningún servidor en ${u.host}`);
   return srv.pedir({ method, url: u.pathname + u.search, headers, body });
+}
+/** Cliente HTTP de Trabajo: decide quién hace la petición.
+ *  · localhost con un servidor encendido en Trabajo (FastAPI, Flask, Express…) → ese servidor.
+ *  · localhost o tu red con la carpeta de tu equipo abierta → tu equipo, por el Conector (como curl en tu terminal).
+ *  · internet → el puente seguro del servidor de CódigoCamp (sin bloqueos CORS; no llega a redes internas). */
+async function enviarHttp({ metodo, url, cabeceras, cuerpo, verificar = true }) {
+  let u;
+  try { u = new URL(url); } catch { throw new Error("La dirección no es válida."); }
+  const host = u.hostname.replace(/^\[|\]$/g, "");
+  const local = /^(localhost|127(\.\d+){3}|0\.0\.0\.0|::1)$/i.test(host) || host.endsWith(".localhost");
+  const privada = local || /^(10(\.\d+){3}|192\.168(\.\d+){2}|172\.(1[6-9]|2\d|3[01])(\.\d+){2})$/.test(host) || host.endsWith(".local");
+  const bytes = cuerpo ? new TextEncoder().encode(cuerpo) : null;
+  const puerto = Number(u.port || (u.protocol === "https:" ? 443 : 80));
+  const srv = local ? servidores.get(puerto) : null;
+  const inicio = performance.now();
+  if (srv && srv.pedir) {
+    const r = await srv.pedir({ method: metodo, url: u.pathname + u.search, headers: cabeceras, body: bytes });
+    const b = r.body instanceof Uint8Array ? r.body : new Uint8Array(r.body || []);
+    return { status: r.status, razon: r.statusText || "", cabeceras: r.headers || [], cuerpo: b, ms: Math.round(performance.now() - inicio), via: `Tu servidor de Trabajo (puerto ${puerto})` };
+  }
+  const disco = entradas?.disco;
+  if (privada && disco?.esEquipo) {
+    let r;
+    try { r = await disco.fs("http", { metodo, url, cabeceras, cuerpo_b64: bytes ? bytesABase64(bytes) : "", verificar }); }
+    catch (e) { throw new Error(/Acción no válida/i.test(e.message) ? "Actualiza el Conector de tu equipo (versión 13 o más nueva) para hacer peticiones a tu equipo: descárgalo otra vez desde Trabajo → Conectar mi equipo." : e.message); }
+    return { status: r.status, razon: r.razon, cabeceras: r.cabeceras || [], cuerpo: base64ABytes(r.cuerpo_b64 || ""), ms: r.ms, truncado: r.truncado, via: "Tu equipo (Conector)" };
+  }
+  if (local) throw new Error(`No hay ningún servidor encendido en el puerto ${puerto}. Enciéndelo en la terminal (por ejemplo: fastapi dev main.py, flask --app app run o node server.js) o abre la carpeta de tu equipo para llegar a los servidores de tu computador.`);
+  if (privada) throw new Error(`${host} es una dirección de tu red local: solo se puede usar con la carpeta de tu equipo abierta (Conector).`);
+  const r = await api("/api/trabajo/cliente-http", { metodo, url, cabeceras, cuerpo_b64: bytes ? bytesABase64(bytes) : "", verificar });
+  return { status: r.status, razon: r.razon, cabeceras: r.cabeceras || [], cuerpo: base64ABytes(r.cuerpo_b64 || ""), ms: r.ms, truncado: r.truncado, via: "Internet (servidor de CódigoCamp)" };
+}
+/** Crea un archivo nuevo (cliente HTTP o base de datos) con un nombre libre y lo abre. */
+// ------------------------------------------------ Cliente HTTP: una herramienta propia, no un archivo ----
+// Las colecciones se guardan aparte (por cuenta, en este navegador), no dentro del proyecto.
+// Se pueden importar desde un .http y exportar a .http (formato REST Client de VS Code).
+const CLAVE_HTTP = `cc-http-col:${CUENTA}`;
+let clienteHttp = null;
+function leerColeccionHttp() { try { return localStorage.getItem(CLAVE_HTTP); } catch { return null; } }
+function guardarColeccionHttp(texto) {
+  try { localStorage.setItem(CLAVE_HTTP, texto); }
+  catch { aviso("No se pudo guardar la colección en este navegador (¿espacio lleno?). Exporta a .http para no perderla.", { tipo: "error", ms: 6000 }); }
+}
+function cerrarClienteHttp() {
+  $("clienteHttp").hidden = true;
+  $("migas").hidden = false; $("areaEditor").classList.remove("http-abierto");
+  $("abrirHttp")?.classList.remove("activo");
+  $("abrirHttp")?.setAttribute("aria-pressed", "false");
+  editores.get(ui.activo)?.enfocar?.();
+}
+function abrirClienteHttp() {
+  const caja = $("clienteHttp");
+  if (!clienteHttp) {
+    clienteHttp = new VisorHTTP({ titulo: "Cliente HTTP", texto: leerColeccionHttp() ?? plantillaHttp(),
+      guardar: guardarColeccionHttp,
+      enviar: (pet) => enviarHttp(pet),
+      botones: [
+        { texto: "⇩", titulo: "Importar peticiones de un archivo .http", fn: () => $("importarHttp").click() },
+        { texto: "⇧", titulo: "Exportar la colección a un archivo .http", fn: exportarHttp },
+        { texto: "✕", titulo: "Cerrar el cliente HTTP (Esc)", fn: cerrarClienteHttp }],
+      aviso: (t, tipo = "info") => aviso(t, { tipo, ms: 3000 }) });
+    caja.appendChild(clienteHttp.raiz);
+    clienteHttp.mostrar();
+  }
+  caja.hidden = false;
+  $("migas").hidden = true; $("areaEditor").classList.add("http-abierto");
+  $("abrirHttp")?.classList.add("activo");
+  $("abrirHttp")?.setAttribute("aria-pressed", "true");
+  if ($("ide").dataset.movil !== "codigo") seccionMovil("codigo");
+  clienteHttp.raiz.querySelector(".vh-url")?.focus();
+}
+function alternarClienteHttp() { if ($("clienteHttp").hidden) abrirClienteHttp(); else cerrarClienteHttp(); }
+function mezclarHttp(texto, origen) {
+  const nueva = parsearHttp(texto);
+  if (!nueva.peticiones.length) { aviso(`«${origen}» no tiene peticiones (usa ### para separarlas).`, { tipo: "error", ms: 4000 }); return; }
+  abrirClienteHttp();
+  const col = clienteHttp.col;
+  for (const v of nueva.variables) { const ya = col.variables.find((x) => x.nombre === v.nombre); if (ya) ya.valor = v.valor; else col.variables.push(v); }
+  col.peticiones.push(...nueva.peticiones);
+  const t = serializarHttp(col);
+  clienteHttp.establecer(t);
+  guardarColeccionHttp(t);
+  aviso(`Importadas ${nueva.peticiones.length} peticiones de «${origen}».`, { tipo: "ok", ms: 3000 });
+}
+function importarHttpDelProyecto() {
+  const r = ui.activo;
+  if (!r || !/\.(http|rest)$/i.test(r)) { aviso("Abre primero un archivo .http o .rest", { tipo: "info", ms: 2500 }); return; }
+  const ed = editores.get(r);
+  mezclarHttp(ed?.leer?.() ?? proyecto().files[r] ?? "", r.split("/").pop());
+}
+function exportarHttp() {
+  const texto = serializarHttp(clienteHttp.col);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([texto], { type: "text/plain;charset=utf-8" }));
+  a.download = "peticiones.http";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+function crearYAbrir(base, ext, contenido) {
+  let nombre = `${base}.${ext}`, n = 2;
+  while (FS.tieneArchivo(proyecto(), nombre)) nombre = `${base}-${n++}.${ext}`;
+  const r = FS.crearArchivo(proyecto(), nombre, contenido);
+  if (!r.ok) { aviso(r.error, { tipo: "error" }); return; }
+  proyectoCambio({ origen: "explorador" });
+  abrir(nombre);
 }
 /** Apps que corren fuera del navegador (Expo Snack, contenedores de Docker): se muestran con su dirección real. */
 function vistaExterna(x, url) {
@@ -1251,7 +1499,7 @@ function proyectoCambio(info = {}) {
   let cambioActivo = reconciliarPestanas();
   // Si un archivo pasó de imagen a texto (o al revés), su editor se vuelve a crear del tipo correcto.
   for (const [ruta, ed] of [...editores]) {
-    if (Boolean(ed.esImagen) !== esMarcador(proyecto().files[ruta])) { ed.destruir(); editores.delete(ruta); sucios.delete(ruta); if (ruta === ui.activo) cambioActivo = true; }
+    if (!ed.especial && Boolean(ed.esImagen) !== esMarcador(proyecto().files[ruta])) { ed.destruir(); editores.delete(ruta); sucios.delete(ruta); if (ruta === ui.activo) cambioActivo = true; }
   }
   // El texto sin guardar de un editor nunca se pisa con lo que haya en el proyecto.
   if (origen !== "editor") for (const [ruta, ed] of editores) if (!sucios.has(ruta)) ed.establecer(proyecto().files[ruta] ?? "");
@@ -1344,7 +1592,12 @@ pintarGitHubActivo();
 const explorador = new Explorador({
   raiz: $("arbol"), proyecto, expandidas,
   alAbrir: (ruta) => abrir(ruta),
-  alCambiar: proyectoCambio,
+  alCambiar: (info) => {
+    proyectoCambio(info);
+    // Abriste una carpeta pesada de tu equipo (node_modules, venv…): se trae su contenido al momento
+    const pesadas = entradas.disco?.foto?.pesadas;
+    if (info?.origen === "ui" && pesadas?.size && [...expandidas].some((c) => pesadas.has(c))) void entradas.sincronizarAhora(false);
+  },
   alBorrar: ofrecerDeshacer,
   alAbrirTerminalEn: (carpeta) => {
     if (!equipoAbierto) { panel.correr(`cd ${FS.rutaAbsoluta(carpeta)}`); return; }
@@ -1407,7 +1660,7 @@ async function verDocumentos() {
     const r = b.closest("[data-r]")?.dataset.r;
     if (b.dataset.a === "subir") { const nuevos = await entradas.subirDocumentos("documentos"); pintar(); if (nuevos?.length === 1) { d.close(); abrir(nuevos[0]); } return; }
     if (b.dataset.a === "ver") { d.close(); abrir(r); return; }
-    if (b.dataset.a === "bajar") { const m = proyecto().files[r]; const a = document.createElement("a"); a.href = archivos.url(m, { descargar: true, nombre: FS.nombreBase(r) }); a.download = FS.nombreBase(r); a.click(); return; }
+    if (b.dataset.a === "bajar") { const m = proyecto().files[r]; await archivos.asegurar(m); const a = document.createElement("a"); a.href = archivos.url(m, { descargar: true, nombre: FS.nombreBase(r) }); a.download = FS.nombreBase(r); a.click(); return; }
     if (b.dataset.a === "borrar") {
       const ok = await dialogo({ titulo: `¿Eliminar «${FS.nombreBase(r)}»?`, mensaje: "Se quita del proyecto.", botones: [{ texto: "Eliminar", valor: true, peligro: true }, { texto: "Cancelar", valor: false, cancelar: true }] });
       if (ok) { FS.borrar(proyecto(), r); proyectoCambio({ origen: "ui-archivos" }); explorador.render(); pintar(); }
@@ -1482,6 +1735,7 @@ $("asistenteToggle").onclick = () => alternarAsistente();
 document.addEventListener("keydown", (e) => {
   const ctrl = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
+  if (ctrl && e.altKey && k === "h") { e.preventDefault(); alternarClienteHttp(); return; }
   if (e.key === "F1" || (ctrl && e.shiftKey && k === "p")) { e.preventDefault(); manejarAtajo("paleta"); return; }
   if (ctrl && !e.shiftKey && k === "p") { e.preventDefault(); manejarAtajo("abrir-rapido"); return; }
   if (ctrl && e.shiftKey && k === "f") { e.preventDefault(); manejarAtajo("buscar-archivos"); return; }
@@ -1647,7 +1901,18 @@ $("preguntar").onsubmit = async (event) => {
   const contexto = contextoProyecto(proyecto(), { abierto: archivo, abiertos: [...(ui.abiertos || [])], seleccion: seleccionActual(), problemas: probs, terminal: salidaTerminal(), copiloto });
   globalThis.__ccIAOcupada = true;   // mientras el chat espera, el texto fantasma no gasta cuota de la IA
   try {
-    const r = await api("/api/tutor/", { mensaje: pregunta, adjuntos, historial: historial.slice(-12), contexto });
+    let pinta = 0;
+    const enVivo = (parcial) => {   // la respuesta aparece mientras se escribe (solo en el chat; los cambios llegan completos)
+      cancelAnimationFrame(pinta);
+      pinta = requestAnimationFrame(() => {
+        const c = $("chat"), cerca = c.scrollHeight - c.scrollTop - c.clientHeight < 120;
+        formato(espera, parcial);
+        if (cerca) c.scrollTop = c.scrollHeight;
+      });
+    };
+    const r = copiloto ? await api("/api/tutor/", { mensaje: pregunta, adjuntos, historial: historial.slice(-12), contexto })
+      : await apiEnVivo("/api/tutor/", { mensaje: pregunta, adjuntos, historial: historial.slice(-12), contexto }, enVivo);
+    cancelAnimationFrame(pinta);
     globalThis.__ccIAOcupada = false;
     if (r.desafios_completados?.length) import("/js/cofres.js").then((m) => m.avisarPremios(r.desafios_completados)).catch(() => {});
     const { texto, cambios, resumen, error } = extraerCambios(r.respuesta);
@@ -1792,6 +2057,9 @@ const COMANDOS_PALETA = () => [
   { etiqueta: "Archivo: guardar", atajo: "Ctrl+S", accion: () => guardarAhora() },
   { etiqueta: "Archivo: cerrar el editor", accion: () => ui.activo && cerrarPestana(ui.activo) },
   { etiqueta: "Archivo: subir archivos…", accion: () => entradas.subirArchivos("") },
+  { etiqueta: "⚡ Cliente HTTP (tipo Postman): abrir", atajo: "Ctrl+Alt+H", accion: () => abrirClienteHttp() },
+  { etiqueta: "⚡ Cliente HTTP: importar el archivo .http abierto", accion: () => importarHttpDelProyecto() },
+  { etiqueta: "🗄️ Base de datos: nueva base SQLite (.db)", accion: () => crearYAbrir("base", "db", "") },
   { etiqueta: "Documentos: Word, Excel, PowerPoint y PDF…", accion: () => verDocumentos() },
   { etiqueta: "Archivo: importar .zip…", accion: () => entradas.importarZip() },
   { etiqueta: "Archivo: descargar el proyecto (.zip)", accion: () => entradas.descargarZip() },
@@ -1934,7 +2202,7 @@ async function abrirConector() {
       <p class="con-aviso">⚠️ Los comandos corren con <b>tus permisos</b> en ese equipo (empiezan en la carpeta elegida, pero pueden llegar a otras). Ciérralo con Ctrl+C cuando termines; si no lo usas por 30 minutos se cierra solo.</p>
       ${equipos.length ? `<div class="con-equipos">${equipos.map((e) => `<div class="con-eq ${e.en_linea ? "vivo" : ""}" data-id="${e.id}">
           <span class="con-punto" title="${e.en_linea ? "Conectado" : "Desconectado"}"></span>
-          <div class="con-info"><b>${escH(e.equipo)}</b><small>${escH(e.sistema)} · ${escH(e.carpeta || "")}</small>${e.en_linea && e.antivirus ? `<small class="con-av ${e.antivirus.activo === false ? "apagado" : ""}">🛡️ ${escH(e.antivirus.nombre || "Antivirus")}${e.antivirus.activo === false ? " — enciéndelo para estar protegido" : e.antivirus.revisa ? " · revisa los programas y archivos que entran y salen" : ""}</small>` : ""}</div>
+          <div class="con-info"><b>${escH(e.equipo)}</b><small>${escH(e.sistema)} · ${escH(e.carpeta || "")}</small>${e.en_linea && e.antivirus ? `<small class="con-av ${e.antivirus.activo === false ? "apagado" : ""}">🛡️ ${escH(e.antivirus.nombre || "Antivirus")}${e.antivirus.activo === false ? " — enciéndelo para estar protegido" : " · protege tu equipo en tiempo real"}</small>` : ""}</div>
           <div class="con-acc">${e.en_linea ? `<button type="button" class="ide-boton primario" data-a="carpeta" title="Elige una carpeta de ese equipo y trabaja en ella como en un editor de escritorio">📂 Abrir carpeta</button>
             <button type="button" class="ide-boton" data-a="terminal">Solo terminal</button>` : `<small class="con-off">Abre el Conector en ese equipo para usarlo</small>`}
             <button type="button" class="ide-boton peligro" data-a="olvidar" title="Desconectar y olvidar este equipo">✕</button></div></div>`).join("")}</div>` : ""}
@@ -1949,7 +2217,7 @@ async function abrirConector() {
             <small class="con-codigo">Código: <b id="conCodigo">…</b> <span id="conVence"></span></small></li>
           <li>Responde <b>s</b> y confirma con el <b>PIN, la huella o la contraseña</b> de tu equipo (Windows Hello, la contraseña de tu Mac o Linux, o la huella en Android con la app <b>Termux:API</b> y <code>pkg install termux-api</code>). ¡Listo! Aquí aparecerá tu equipo y eliges la carpeta de tu proyecto.</li>
         </ol>
-        <p class="con-nota">🛡️ CódigoCamp bloquea siempre los comandos peligrosos (borrar el disco o el sistema, apagar, desactivar el antivirus, robar contraseñas, control remoto, mineros) y los enlaces con virus o estafas. El antivirus de tu equipo revisa los programas y archivos que entran, salen o se ejecutan. Nunca se abren carpetas del sistema ni de contraseñas, el Conector no abre puertos y puedes desconectarlo aquí cuando quieras.</p>
+        <p class="con-nota">⚠️ En tu equipo los comandos corren tal cual, como en la terminal de VS Code: CódigoCamp no los bloquea ni te advierte, así que revisa lo que ejecutas. Tus archivos no se revisan ni se suben a CódigoCamp: trabajas directo en tu equipo, sin límites de la cuenta, y de los virus se encarga el antivirus de tu equipo. Nunca se abren carpetas del sistema ni de contraseñas, el Conector no abre puertos y puedes desconectarlo aquí cuando quieras.</p>
       </details>
       <div class="ide-dialogo-botones"><button class="ide-boton" value="cerrar">Cerrar</button></div></form>`;
     let soActual = so;
@@ -2086,6 +2354,7 @@ async function entrarAlEquipo({ equipo, silencioso = false }) {
   ui.activo = ui.abiertos[0] ?? null;
   urlServidor = null; paginaVista = null; urlVirtual = null; remotoVista = null;
   archivos.modoLocal(true);
+  FS.sinLimites(true);   // tu equipo: sin los límites de la cuenta (archivos, carpetas, texto)
   proyectoCambio({ origen: "remoto" });
   return true;
 }
@@ -2206,14 +2475,19 @@ async function irACarpetaEquipo(ruta) {
   } finally { cambiandoCarpeta = false; $("expRuta").classList.remove("cargando"); }
 }
 /** Elegir otra carpeta del equipo con el explorador de carpetas (empieza en la actual). */
-async function otraCarpetaEquipo() {
+async function otraCarpetaEquipo(tipo = "carpeta") {
   const eq = equipoAbierto;
   if (!eq) return;
   guardarArchivos();
-  await entradas.sincronizarAhora(false);
-  const carpeta = await elegirCarpetaEquipo(eq);
+  const guardado = entradas.sincronizarAhora(false).catch(() => {});   // se guarda mientras eliges: el explorador se abre al instante
+  const carpeta = await elegirCarpetaEquipo(eq, tipo);
+  await guardado;
   const seccion = $("ide").dataset.movil;
   if (carpeta && carpeta !== eq.carpeta && await carpetaManejable(eq, carpeta, eq.carpeta)) await entradas.vincularEquipo(eq, carpeta);
+  else if (carpeta && archivoPorAbrir?.carpeta === carpeta) {   // un archivo de la misma carpeta: solo se abre
+    const nombre = archivoPorAbrir.nombre; archivoPorAbrir = null;
+    if (FS.tieneArchivo(proyecto(), nombre)) abrir(nombre);
+  }
   if (MOVIL.matches && seccion && $("ide").dataset.movil !== seccion) seccionMovil(seccion);
 }
 function pintarRutaEquipo() {
@@ -2227,12 +2501,42 @@ function pintarRutaEquipo() {
   nav.innerHTML = `<button type="button" class="exp-ruta-subir" data-ir="${escH(padre?.ruta || "")}" ${padre ? "" : "disabled"} title="Subir a la carpeta de arriba${padre ? ` (${escH(padre.nombre)})` : ""}" aria-label="Subir a la carpeta de arriba">⬆</button>
     <div class="exp-ruta-migas">${migas.length > 3 ? '<button type="button" data-a="mas" title="Ver más carpetas">…</button><span>›</span>' : ""}${visibles.map((m, i) => i === visibles.length - 1
       ? `<button type="button" class="actual" data-a="elegir" title="Elegir otra carpeta de ${escH(equipoAbierto.equipo)}">${escH(m.nombre)} ▾</button>`
-      : `<button type="button" data-ir="${escH(m.ruta)}" title="Ir a ${escH(m.ruta)}">${escH(m.nombre)}</button><span>›</span>`).join("")}</div>`;
+      : `<button type="button" data-ir="${escH(m.ruta)}" title="Ir a ${escH(m.ruta)}">${escH(m.nombre)}</button><span>›</span>`).join("")}</div>
+    ${/android/i.test(equipoAbierto.sistema || "") ? "" : `<button type="button" class="exp-ruta-files" data-a="files" title="Files: abrir carpetas o archivos con el explorador de archivos de ${escH(equipoAbierto.equipo)}" aria-label="Files: explorador de archivos">🗂️ Files</button>`}`;
   nav.querySelector(".exp-ruta-migas").scrollLeft = 1e6;
+}
+/** Carpetas de tu equipo (para la ruta de arriba del explorador): se recorren y se abre la que quieras. */
+async function contenidoEquipo(ruta) {
+  const eq = equipoAbierto;
+  const d = await Conector.fsEquipo(eq, "explorar", { ruta });
+  const sep = d.separador || "/";
+  const unir = (a, b) => (a.endsWith(sep) ? a + b : a + sep + b);
+  const actual = (eq.carpeta || "").replace(/[\\/]+$/, "");
+  return {
+    titulo: d.ruta.split(/[\\/]/).filter(Boolean).pop() || d.ruta, ruta: d.ruta, arriba: d.padre ?? null,
+    abrirAqui: d.ruta.replace(/[\\/]+$/, "") !== actual && d.elegible !== false,
+    items: d.carpetas.map((n) => ({ nombre: n, ruta: unir(d.ruta, n), carpeta: true })),
+  };
 }
 $("expRuta").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b || b.disabled) return;
+  // Las carpetas de la ruta (root › proyectos › …) abren un menú para recorrer tu equipo, como en VS Code
+  if (b.dataset.ir && b.closest(".exp-ruta-migas")) {
+    if (menuMigasAbierto) { cerrarMenuMigas(); return; }
+    void menuMigas(b, b.dataset.ir, { marca: equipoAbierto?.carpeta, cargar: contenidoEquipo, elegir: (it) => void irACarpetaEquipo(it.ruta) });
+    return;
+  }
+  if (b.dataset.a === "files") {   // Files: el explorador de archivos real del equipo (como «Abrir carpeta» de VS Code)
+    const eq = equipoAbierto, r = b.getBoundingClientRect();
+    menuContextual(r.left, r.bottom + 4, [
+      { texto: "📂 Abrir carpeta…", fn: () => otraCarpetaEquipo("carpeta") },
+      { texto: "📄 Abrir archivo…", fn: () => otraCarpetaEquipo("archivo") },
+      "-",
+      { texto: `🗂️ Mostrar esta carpeta en el explorador de ${eq.equipo}`, fn: () => Conector.fsEquipo(eq, "mostrar", { ruta: "" }).catch((x) => aviso(x.message, { tipo: "error" })) },
+    ]);
+    return;
+  }
   if (b.dataset.ir) void irACarpetaEquipo(b.dataset.ir);
   else if (b.dataset.a === "elegir" || b.dataset.a === "mas") void otraCarpetaEquipo();
 });
@@ -2246,7 +2550,9 @@ function itemsCarpetaEquipo() {
   const corto = (c) => c.split(/[\\/]/).filter(Boolean).slice(-2).join("/");
   return [
     ...(padre ? [{ texto: `⬆ Subir a «${padre.nombre}»`, fn: () => irACarpetaEquipo(padre.ruta) }] : []),
-    { texto: `📂 Abrir otra carpeta de ${eq.equipo}…`, fn: () => otraCarpetaEquipo() },
+    { texto: `📂 Abrir carpeta de ${eq.equipo}…`, fn: () => otraCarpetaEquipo("carpeta") },
+    ...(/android/i.test(eq.sistema || "") ? [] : [{ texto: `📄 Abrir archivo de ${eq.equipo}…`, fn: () => otraCarpetaEquipo("archivo") }]),
+    ...(/android/i.test(eq.sistema || "") ? [] : [{ texto: `🗂️ Mostrar en el Explorador de archivos de ${eq.equipo}`, fn: () => Conector.fsEquipo(eq, "mostrar", { ruta: "" }).catch((e) => aviso(e.message, { tipo: "error" })) }]),
     ...(recientes.length ? [{ texto: "Carpetas recientes:", deshabilitado: true, fn: () => {} }, ...recientes.map((r) => ({ texto: `\u2003🕘 ${corto(r.carpeta)}`, fn: () => irACarpetaEquipo(r.carpeta) }))] : []),
     "-",
   ];
@@ -2254,6 +2560,17 @@ function itemsCarpetaEquipo() {
 
 function nombreProyectoVisible() {
   return equipoAbierto ? (equipoAbierto.carpeta.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "Mi proyecto") : "Mi proyecto";
+}
+
+/** Reabre las pestañas que tenías en esta carpeta del equipo (al recargar la página o volver a Trabajo). */
+function reabrirPestanasEquipo(eq) {
+  let g = null;
+  try { g = JSON.parse(localStorage.getItem(TABS_EQUIPO) || "null"); } catch { /* nada */ }
+  if (!g || g.id !== eq.id || g.carpeta !== eq.carpeta || !Array.isArray(g.abiertos)) return;
+  const py = proyecto();
+  const existen = g.abiertos.filter((r) => typeof r === "string" && FS.tieneArchivo(py, r));
+  for (const r of existen) abrir(r, { enfocar: false });
+  if (existen.includes(g.activo)) activar(g.activo, { enfocar: false });
 }
 
 /** La carpeta abierta pasó a ser (o dejó de ser) la de un equipo: terminal, Git y ▶ Ejecutar usan ese equipo.
@@ -2271,6 +2588,7 @@ function alCambiarEquipo(eq, motivo, nombreEquipo = "") {
     urlServidor = null; paginaVista = null; urlVirtual = null; remotoVista = null;
     almacen.salirModoEquipo();
     archivos.modoLocal(false);
+    FS.sinLimites(false);
     proyectoCambio({ origen: "remoto" });
     activar(ui.activo, { enfocar: false });
     aviso(motivo === "desconectado"
@@ -2305,7 +2623,13 @@ function alCambiarEquipo(eq, motivo, nombreEquipo = "") {
     if (!MOVIL.matches) { panel.abrir({ enfocar: false }); panel.activar(t); }
     terminalEnSilencio = false;
     const nombre = eq.carpeta.replace(/\\/g, "/").split("/").filter(Boolean).pop() || eq.carpeta;
-    if (!antes || antes.id !== eq.id) aviso(`🖥 Estás trabajando en «${nombre}» de ${eq.equipo}: lo que guardas se guarda allá (no en la nube). La terminal, Git y ▶ Ejecutar son los de tu equipo.`, { tipo: "info", ms: 9000 });
+    reabrirPestanasEquipo(eq);
+    if (archivoPorAbrir && archivoPorAbrir.id === eq.id && archivoPorAbrir.carpeta === eq.carpeta) {
+      const nombre = archivoPorAbrir.nombre; archivoPorAbrir = null;
+      if (FS.tieneArchivo(proyecto(), nombre)) abrir(nombre);
+    }
+    if (motivo === "retomar") aviso(`🖥 Seguimos en «${nombre}» de ${eq.equipo}.`, { tipo: "info", ms: 3000 });
+    else if (!antes || antes.id !== eq.id) aviso(`🖥 Estás trabajando en «${nombre}» de ${eq.equipo}: lo que guardas se guarda allá (no en la nube). La terminal, Git y ▶ Ejecutar son los de tu equipo.`, { tipo: "info", ms: 9000 });
   }
   mostrarPanelesGit();
   if (vistaGit) renderGit();
@@ -2351,56 +2675,114 @@ async function elegirOrigenCarpeta() {
 }
 
 /** Explorador de carpetas del equipo (como «Abrir carpeta» de un editor). Devuelve la carpeta elegida, ya abierta en el Conector. */
-async function elegirCarpetaEquipo(eq) {
+/** Archivo elegido en el explorador del equipo: se abre en cuanto su carpeta quede abierta. */
+let archivoPorAbrir = null;
+
+/** Explorador de tu equipo (como «Abrir» de VS Code): recorre carpetas y archivos y elige una carpeta o un archivo.
+ *  Devuelve la carpeta a abrir (si elegiste un archivo, la suya; el archivo se abre después en el editor). */
+/** Explorador de archivos DE VERDAD del equipo (Windows, macOS o Linux): se abre directo, sin ventanas intermedias.
+ *  Devuelve la carpeta elegida ya abierta en el Conector, null si se canceló o "sin_nativo" si el equipo no lo tiene. */
+async function exploradorReal(eq, tipo = "carpeta") {
+  const quitar = aviso(`🗂️ Se abrió el explorador de archivos en ${eq.equipo}: elige ${tipo === "archivo" ? "el archivo" : "la carpeta"} ahí.`, { ms: 15 * 60 * 1000 });
+  try {
+    const r = await Conector.fsEquipo(eq, "elegir_nativo", { tipo });
+    if (r.cancelado) return null;
+    const raiz = await Conector.fsEquipo(eq, "raiz", { ruta: r.carpeta });
+    archivoPorAbrir = r.archivo ? { id: eq.id, carpeta: raiz.carpeta, nombre: r.archivo } : null;
+    return raiz.carpeta;
+  } catch (x) {
+    if (x.sin_nativo || /sin pantalla|zenity|no tiene pantalla|no se encontró el explorador/i.test(x.message)) return "sin_nativo";
+    aviso(x.message, { tipo: "error" });
+    return null;
+  } finally { quitar(); }
+}
+
+async function elegirCarpetaEquipo(eq, tipo = "carpeta") {
+  // En computadores: el explorador real del sistema, directo. El explorador dentro de la página queda solo para
+  // celulares (Android) o equipos sin pantalla.
+  if (!/android/i.test(eq.sistema || "") && Number(eq.version || 0) >= 7) {
+    const r = await exploradorReal(eq, tipo);
+    if (r !== "sin_nativo") return r;
+  }
   const d = document.createElement("dialog");
   d.className = "ide-dialogo ancho dialogo-carpetas";
   document.body.appendChild(d);
-  let actual = null, cargando = false;
+  let actual = null, cargando = false, filtro = "", archivoSel = null;
+  const tam = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+  const unir = (x, n) => x.ruta.replace(/[\\/]$/, "") + (x.separador || "/") + n;
+  const lista = () => {
+    const x = actual, f = filtro.toLowerCase();
+    const cs = x.carpetas.filter((c) => c.toLowerCase().includes(f));
+    const as = (x.archivos || []).filter((a) => a.n.toLowerCase().includes(f));
+    if (!cs.length && !as.length) return `<p class="cf-vacia">${f ? "Nada coincide con la búsqueda." : "Esta carpeta está vacía."}</p>`;
+    return cs.map((c) => `<button type="button" role="option" class="cf-item" data-ir="${escH(unir(x, c))}"><span class="fi fi-carpeta" aria-hidden="true">📁</span><span class="cf-n">${escH(c)}</span><i>›</i></button>`).join("") +
+      as.map((a) => `<button type="button" role="option" class="cf-item cf-archivo ${archivoSel === a.n ? "sel" : ""}" data-archivo="${escH(a.n)}">${iconoArchivo(a.n)}<span class="cf-n">${escH(a.n)}</span><small>${tam(a.t)}</small></button>`).join("");
+  };
+  const botonAbrir = () => {
+    const nombre = actual.ruta.split(/[\\/]/).filter(Boolean).pop() || actual.ruta;
+    return archivoSel
+      ? `<button type="button" class="ide-boton primario" data-a="abrir" ${actual.elegible ? "" : "disabled"}>Abrir «${escH(archivoSel)}»</button>`
+      : `<button type="button" class="ide-boton primario" data-a="abrir" ${actual.elegible ? "" : "disabled"}>Abrir carpeta «${escH(nombre)}»</button>`;
+  };
   const pintar = (x, error = "") => {
-    actual = x;
+    actual = x; archivoSel = null;
     const partes = x.ruta.split(/[\\/]/).filter(Boolean);
     const sep = x.separador || "/";
     const inicio = x.ruta.startsWith("/") ? "/" : "";
     const migas = partes.map((p, i) => `<button type="button" data-ir="${escH(inicio + partes.slice(0, i + 1).join(sep) + (i === 0 && /:$/.test(p) ? sep : ""))}">${escH(p)}</button>`).join("<span>›</span>");
-    const nombre = partes[partes.length - 1] || x.ruta;
-    d.innerHTML = `<form method="dialog"><h3>${/android/i.test(eq.sistema) ? "📱" : "🖥"} Carpetas de ${escH(eq.equipo)}</h3>
+    d.innerHTML = `<form method="dialog"><h3>${/android/i.test(eq.sistema) ? "📱" : "🖥"} Abrir en ${escH(eq.equipo)}</h3>
       <div class="cf-raices">${(x.raices || []).map((r) => `<button type="button" data-ir="${escH(r.ruta)}" class="${r.ruta === x.ruta ? "on" : ""}">${escH(r.nombre)}</button>`).join("")}</div>
       <div class="cf-migas">${x.padre ? `<button type="button" class="cf-subir" data-ir="${escH(x.padre)}" title="Subir un nivel" aria-label="Subir un nivel">⬆</button>` : ""}<div>${migas}</div></div>
-      <div class="cf-lista" role="listbox" aria-label="Carpetas">${x.carpetas.length ? x.carpetas.map((c) => `<button type="button" role="option" data-ir="${escH(x.ruta.replace(/[\\/]$/, "") + sep + c)}"><span>📁</span>${escH(c)}</button>`).join("") : '<p class="cf-vacia">No hay carpetas aquí.</p>'}</div>
+      <input type="search" class="cf-buscar" placeholder="Buscar en esta carpeta…" aria-label="Buscar en esta carpeta" value="${escH(filtro)}">
+      <div class="cf-lista" role="listbox" aria-label="Carpetas y archivos">${lista()}</div>
       ${error ? `<p class="cf-error">${escH(error)}</p>` : ""}
-      ${x.elegible ? "" : '<p class="cf-nota">Entra a la carpeta de tu proyecto (o créala). Por seguridad no se abre todo el disco, tu carpeta personal completa ni carpetas del sistema.</p>'}
-      <div class="ide-dialogo-botones"><button type="button" class="ide-boton" data-a="nueva">＋ Nueva carpeta</button><button class="ide-boton" value="">Cancelar</button><button type="button" class="ide-boton primario" data-a="abrir" ${x.elegible ? "" : "disabled"}>Abrir «${escH(nombre)}»</button></div></form>`;
+      ${x.elegible ? '<p class="cf-nota">Toca una carpeta para entrar · elige un archivo para abrirlo con su carpeta.</p>' : '<p class="cf-nota">Entra a la carpeta de tu proyecto (o créala). Por seguridad no se abre todo el disco, tu carpeta personal completa ni carpetas del sistema.</p>'}
+      <div class="ide-dialogo-botones"><button type="button" class="ide-boton" data-a="nueva">＋ Nueva carpeta</button><button class="ide-boton" value="">Cancelar</button><span class="cf-abrir">${botonAbrir()}</span></div></form>`;
+    d.querySelector(".cf-buscar").addEventListener("input", (e) => { filtro = e.target.value; d.querySelector(".cf-lista").innerHTML = lista(); });
   };
   const ir = async (ruta) => {
     if (cargando) return;
-    cargando = true;
+    cargando = true; filtro = "";
     d.classList.add("cargando");
-    try { pintar(await Conector.fsEquipo(eq, "explorar", { ruta })); }
+    try { pintar(await Conector.fsEquipo(eq, "explorar", { ruta, archivos: true })); }
     catch (e) { if (actual) pintar(actual, e.message); else { aviso(e.message, { tipo: "error" }); d.close(); } }
     finally { cargando = false; d.classList.remove("cargando"); }
   };
-  d.innerHTML = '<form method="dialog"><h3>Leyendo las carpetas de tu equipo…</h3><p class="con-intro">Un momento.</p></form>';
+  d.innerHTML = '<form method="dialog"><h3>Leyendo tu equipo…</h3><p class="con-intro">Un momento.</p></form>';
   d.showModal();
   await ir(eq.carpeta || "");
   return new Promise((ok) => {
     let elegida = null;
+    const abrirSel = async (b) => {
+      cargando = true;
+      if (b) b.textContent = "Abriendo…";
+      try {
+        const r = await Conector.fsEquipo(eq, "raiz", { ruta: actual.ruta });
+        elegida = r.carpeta;
+        archivoPorAbrir = archivoSel ? { id: eq.id, carpeta: r.carpeta, nombre: archivoSel } : null;
+        d.close();
+      } catch (x) { cargando = false; pintar(actual, x.message); }
+    };
     d.addEventListener("click", async (e) => {
       const b = e.target.closest("button");
       if (!b || cargando) return;
       if (b.dataset.ir) return ir(b.dataset.ir);
+      if (b.dataset.archivo) {
+        if (archivoSel === b.dataset.archivo && actual.elegible) return abrirSel(null);   // segundo toque: abrir
+        archivoSel = b.dataset.archivo;
+        d.querySelectorAll(".cf-archivo").forEach((x) => x.classList.toggle("sel", x.dataset.archivo === archivoSel));
+        d.querySelector(".cf-abrir").innerHTML = botonAbrir();
+        return;
+      }
       if (b.dataset.a === "nueva") {
         const nombre = prompt("Nombre de la carpeta nueva", "mi-proyecto");
         if (!nombre?.trim()) return;
         try { const r = await Conector.fsEquipo(eq, "nueva", { ruta: actual.ruta, nombre: nombre.trim() }); await ir(r.ruta); }
         catch (x) { pintar(actual, x.message); }
       }
-      if (b.dataset.a === "abrir") {
-        cargando = true;
-        b.textContent = "Abriendo…";
-        try { const r = await Conector.fsEquipo(eq, "raiz", { ruta: actual.ruta }); elegida = r.carpeta; d.close(); }
-        catch (x) { cargando = false; pintar(actual, x.message); }
-      }
+      if (b.dataset.a === "abrir") return abrirSel(b);
     });
+    d.addEventListener("dblclick", (e) => { const b = e.target.closest("[data-archivo]"); if (b && actual.elegible && !cargando) { archivoSel = b.dataset.archivo; void abrirSel(null); } });
     d.addEventListener("close", () => { d.remove(); ok(elegida); });
   });
 }
@@ -2555,6 +2937,15 @@ $("verGit").onclick = () => alternarGit();
 $("verArchivos").onclick = () => vistaLateral("archivos");
 $("verExtensiones").onclick = () => alternarExt();
 $("buscarArchivos").onclick = () => manejarAtajo("buscar-archivos");
+$("abrirHttp").onclick = () => alternarClienteHttp();
+$("importarHttp").addEventListener("change", async (e) => {
+  const f = e.target.files?.[0];
+  e.target.value = "";
+  if (!f) return;
+  if (f.size > 2 * 1024 * 1024) { aviso("Ese archivo es demasiado grande para ser una colección .http.", { tipo: "error" }); return; }
+  mezclarHttp(await f.text(), f.name);
+});
+$("clienteHttp").addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.target.closest("input, textarea, select")) { e.stopPropagation(); cerrarClienteHttp(); } });
 $("abrirRapido").onclick = () => manejarAtajo("abrir-rapido");
 $("estProblemas").onclick = verProblemas;
 

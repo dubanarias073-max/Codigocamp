@@ -153,3 +153,40 @@
 .rc-badge{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--acc);color:#04130d;font-style:normal;font-size:12px;line-height:20px;text-align:center}
 .rc-panel[hidden]{display:none}
 @media (max-width:700px){.rc-resumen{grid-template-columns:repeat(2,1fr)}.rc-tabs{width:100%}.rc-tab{flex:1;justify-content:center;padding:9px 8px}}
+/* Medalla del mes y sus experiencias */
+.md-mes,.md-coleccion{margin-top:16px;padding:18px;border-radius:20px;background:var(--panel);border:1px solid var(--borde)}
+.md-cab{display:flex;gap:16px;align-items:center;margin-bottom:12px}
+.md-cab h2{margin:2px 0 4px;text-transform:none}
+.md-arte{flex:none}
+.md-sub{margin:0;color:var(--sub);font-size:14px}
+.md-exps{display:grid;gap:10px}
+.md-exp{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:14px;border:1px solid var(--borde);background:color-mix(in srgb,var(--acc) 5%,transparent)}
+.md-exp.hecha{border-color:color-mix(in srgb,#22c55e 55%,transparent);background:color-mix(in srgb,#22c55e 10%,transparent)}
+.md-exp h3{margin:0 0 6px;font-size:15px}
+.md-exp>div{flex:1;min-width:0}
+.md-exp small{color:var(--sub);font-weight:600}
+.md-ico{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;font-size:20px;background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.md-exp.hecha .md-ico{background:#22c55e;color:#fff;font-weight:900}
+.md-premio{margin:12px 0 0;font-weight:700}
+@media (max-width:600px){.md-cab{flex-direction:column;text-align:center}}
+.md-xp{margin-top:16px}
+.md-xp h3{margin:0 0 10px;font-size:15px}
+.md-xp h3 small{color:var(--sub);font-weight:600;margin-left:6px}
+.md-hitos{position:relative;height:118px;margin:0 34px 0 6px}
+.md-hitos-barra{position:absolute;left:0;right:0;top:22px;height:12px;border-radius:99px;background:color-mix(in srgb,var(--sub) 20%,transparent);overflow:hidden}
+.md-hitos-barra i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#facc15,#f97316)}
+.md-hito{position:absolute;top:0;transform:translateX(-50%);display:grid;justify-items:center;width:84px;text-align:center}
+.md-hito .cofre-mini{width:46px;height:46px;display:grid;place-items:center}
+.md-hito .cofre-mini svg{width:46px;height:46px}
+.md-hito b{font-size:12px}
+.md-hito small{font-size:10.5px;color:var(--sub);line-height:1.2}
+.md-hito.hecho b{color:#16a34a}
+.medalla-por-ganar{position:relative}
+.medalla-por-ganar .cc-ins{filter:saturate(.85)}
+.medalla-por-ganar::after{content:"Por ganar";position:absolute;left:50%;top:-6px;transform:translateX(-50%);padding:2px 8px;border-radius:99px;background:var(--acc);color:#fff;font:800 10px system-ui,sans-serif;white-space:nowrap}
+@media (max-width:700px){
+  .md-hitos{height:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 0}
+  .md-hitos-barra{position:relative;top:0;grid-column:1/-1;margin-bottom:6px}
+  .md-hito{position:static;transform:none;width:auto;left:auto!important}
+}
+@media (max-width:520px){ .md-hitos{grid-template-columns:repeat(2,1fr)} }
